@@ -2,6 +2,9 @@
 
 Control Core is the centralized authorization and compliance platform built for the AI-driven enterprise. It helps organizations take control of their new and legacy technology including AI initiatives by helping them enforce real-time decisions and context based on business, security or compliance policies. It helps the organizations enforce their rules, automate security with dynamic real-time context, audit for compliance and reduce resource drain to save costs.
 
+**Current Policy Engine**: Open Policy Agent (OPA) with Rego policies  
+**Future Enhancement**: AWS Cedar Policy Store support via [permitio/cedar-agent](https://github.com/permitio/cedar-agent)
+
 The goal is to provide a simplified, unified authorization and compliance management platform primarily for AI initiatives in an organization. The application must provide a ultra low effort deployment model, no-code and full-code options, AI assisted policy developed, an extensive library of policy templates for various scenarios including compliance frameworks in Canada and USA regions.
 
 ## 🏗️ Architecture Overview
