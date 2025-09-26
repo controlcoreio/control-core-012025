@@ -140,8 +140,6 @@ git push origin rakesh
 - `scripts/stop-dev.sh` - Stop development services
 - `scripts/test-all.sh` - Run all tests
 - `scripts/lint-all.sh` - Lint all code
-- `cc-infra/scripts/start-demo-app.sh` - Start demo app
-- `cc-infra/scripts/stop-demo-app.sh` - Stop demo app
 
 ### **Code Quality**
 
