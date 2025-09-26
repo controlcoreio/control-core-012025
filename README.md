@@ -234,9 +234,9 @@ Customer Environment:
 └── Dedicated resources and support
 ```
 
-### 4. **SaaS Solution (Future)**
+### 4. **Demo SaaS Instance (Made Available from Customer Onboarding Form on CC Business Admin Console)**
 
-Fully hosted solution for customer self-driven demo instances
+Fully hosted solution for customer self-driven demo. Cannot be promoted to production or Kickstart tier instance BUT same account information can be used to pass on to client upon deployment.
 
 ```text
 Control Core Cloud:
