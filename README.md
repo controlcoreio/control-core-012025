@@ -10,7 +10,7 @@ Control Core delivers three main service containers that can be deployed in diff
 
 ### Service Architecture
 
-#### 1. **Control Plane Service** 
+#### 1. **Control Plane Service**
 
 The centralized management and policy administration service that provides:
 
@@ -140,7 +140,7 @@ A professional business intelligence platform for demonstrations:
 
 - **Technology**: FastAPI, Python, Stripe integration, Auth0
 - **Purpose**: Fully hosted customer onboarding service
-- **Features**: 
+- **Features**:
   - Customer registration and onboarding
   - Subscription management
   - Package generation
@@ -196,7 +196,8 @@ Customer Environment:
 ```
 
 ### 2. **Pro Plan (Hybrid)**
-**Control Plane hosted by Control Core, Bouncer self-hosted by customer**
+
+Control Plane hosted by Control Core, Bouncer self-hosted by customer
 
 ```text
 AWS (Control Core Hosted):
