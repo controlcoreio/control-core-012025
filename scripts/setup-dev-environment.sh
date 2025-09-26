@@ -314,7 +314,7 @@ cat > scripts/start-dev.sh << 'EOF'
 echo "🚀 Starting Control Core Development Environment"
 
 # Start services with Docker Compose
-docker-compose up -d
+cd cc-infra/docker-compose && docker-compose -f docker-compose.yml up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
@@ -344,7 +344,7 @@ cat > scripts/stop-dev.sh << 'EOF'
 echo "🛑 Stopping Control Core Development Environment"
 
 # Stop services
-docker-compose down
+cd cc-infra/docker-compose && docker-compose -f docker-compose.yml down
 
 echo "✅ Development environment stopped!"
 EOF

@@ -5,7 +5,8 @@
 ### ✅ **What's Been Set Up**
 
 #### **1. Branch Structure**
-```
+
+```text
 main (production baseline)
 ├── rakesh (your development branch) ✅
 ├── developer-name (other developers)
@@ -13,12 +14,14 @@ main (production baseline)
 ```
 
 #### **2. Your Development Environment**
+
 - **Current Branch**: `rakesh` ✅
 - **Remote Tracking**: `origin/rakesh` ✅
 - **Isolation**: Complete development isolation ✅
 - **CI/CD**: Automated testing and deployment ✅
 
 #### **3. Automated Workflows**
+
 - **Linting & Formatting**: Code quality checks ✅
 - **Unit Testing**: Comprehensive test suite ✅
 - **Security Scanning**: Vulnerability detection ✅
@@ -26,6 +29,7 @@ main (production baseline)
 - **Integration Testing**: End-to-end testing ✅
 
 #### **4. Development Tools**
+
 - **Pre-commit Hooks**: Automatic code formatting ✅
 - **Commit Message Validation**: Conventional commits ✅
 - **VS Code Configuration**: Team consistency ✅
@@ -34,7 +38,9 @@ main (production baseline)
 ## 🚀 **Ready to Start Development**
 
 ### **Your Development Branch: `rakesh`**
+
 You're now working on the `rakesh` branch, which provides:
+
 - **Isolated Development**: No conflicts with other developers
 - **Direct Push Access**: You can push directly to your branch
 - **CI/CD Integration**: Automatic testing on every push
@@ -43,6 +49,7 @@ You're now working on the `rakesh` branch, which provides:
 ### **Daily Workflow**
 
 #### **Start of Day**
+
 ```bash
 # You're already on rakesh branch
 git pull origin main  # Get latest changes
@@ -124,6 +131,8 @@ git push origin rakesh
 - `scripts/stop-dev.sh` - Stop development services
 - `scripts/test-all.sh` - Run all tests
 - `scripts/lint-all.sh` - Lint all code
+- `cc-infra/scripts/start-demo-app.sh` - Start demo app
+- `cc-infra/scripts/stop-demo-app.sh` - Stop demo app
 
 ### **Code Quality**
 - `commitlint.config.js` - Commit message validation

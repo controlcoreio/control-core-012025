@@ -406,8 +406,15 @@ Signup Service:
 git clone https://github.com/controlcore/control-core.git
 cd control-core
 
+# Setup development environment
+./scripts/setup-dev-environment.sh
+
 # Start the development environment
-docker-compose up -d
+./scripts/start-dev.sh
+
+# Demo App Management (optional)
+./cc-infra/scripts/start-demo-app.sh
+./cc-infra/scripts/stop-demo-app.sh
 
 # Access the services
 # - Control Core Admin: http://localhost:3000
@@ -437,6 +444,8 @@ helm install controlcore ./controlcore
 - **Deployment Guides**: [cc-infra/deployment-guides/](cc-infra/deployment-guides/)
 - **Context Deployment**: [cc-infra/docs/context-deployment-guide.md](cc-infra/docs/context-deployment-guide.md)
 - **API Documentation**: [cc-pap-api/docs/](cc-pap-api/docs/)
+- **Development Setup**: [.github/DEVELOPMENT_SETUP.md](.github/DEVELOPMENT_SETUP.md)
+- **Git Workflow**: [.github/workflows/development-workflow.md](.github/workflows/development-workflow.md)
 
 ## 🔧 Development
 
