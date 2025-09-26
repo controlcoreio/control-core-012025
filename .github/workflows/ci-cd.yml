@@ -1,0 +1,273 @@
+name: Control Core CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, rakesh, develop ]
+  pull_request:
+    branches: [ main, rakesh ]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+  GO_VERSION: '1.21'
+
+jobs:
+  # Lint and Format Check
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          # Frontend dependencies
+          if [ -f "cc-pap/package.json" ]; then
+            cd cc-pap && npm ci
+            cd ..
+          fi
+          if [ -f "cc-demoapp/package.json" ]; then
+            cd cc-demoapp && npm ci
+            cd ..
+          fi
+          if [ -f "cc-docs/package.json" ]; then
+            cd cc-docs && npm ci
+            cd ..
+          fi
+          
+          # Backend dependencies
+          if [ -f "cc-pap-api/requirements.txt" ]; then
+            pip install -r cc-pap-api/requirements.txt
+          fi
+          if [ -f "cc-pap-pro-tenant/requirements.txt" ]; then
+            pip install -r cc-pap-pro-tenant/requirements.txt
+          fi
+          if [ -f "cc-signup-service/requirements.txt" ]; then
+            pip install -r cc-signup-service/requirements.txt
+          fi
+
+      - name: Lint frontend code
+        run: |
+          if [ -f "cc-pap/package.json" ]; then
+            cd cc-pap && npm run lint
+            cd ..
+          fi
+          if [ -f "cc-demoapp/package.json" ]; then
+            cd cc-demoapp && npm run lint
+            cd ..
+          fi
+
+      - name: Lint backend code
+        run: |
+          if [ -f "cc-pap-api/requirements.txt" ]; then
+            cd cc-pap-api && flake8 . --max-line-length=100
+            cd ..
+          fi
+
+      - name: Lint Go code
+        run: |
+          if [ -f "cc-bouncer/go.mod" ]; then
+            cd cc-bouncer && go vet ./...
+            cd ..
+          fi
+
+  # Unit Tests
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      matrix:
+        service: [cc-pap, cc-demoapp, cc-pap-api, cc-bouncer]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ matrix.service }}" = "cc-pap" ] && [ -f "cc-pap/package.json" ]; then
+            cd cc-pap && npm ci
+          elif [ "${{ matrix.service }}" = "cc-demoapp" ] && [ -f "cc-demoapp/package.json" ]; then
+            cd cc-demoapp && npm ci
+          elif [ "${{ matrix.service }}" = "cc-pap-api" ] && [ -f "cc-pap-api/requirements.txt" ]; then
+            pip install -r cc-pap-api/requirements.txt
+          elif [ "${{ matrix.service }}" = "cc-bouncer" ] && [ -f "cc-bouncer/go.mod" ]; then
+            cd cc-bouncer && go mod download
+          fi
+
+      - name: Run tests
+        run: |
+          if [ "${{ matrix.service }}" = "cc-pap" ] && [ -f "cc-pap/package.json" ]; then
+            cd cc-pap && npm test
+          elif [ "${{ matrix.service }}" = "cc-demoapp" ] && [ -f "cc-demoapp/package.json" ]; then
+            cd cc-demoapp && npm test
+          elif [ "${{ matrix.service }}" = "cc-pap-api" ] && [ -f "cc-pap-api/requirements.txt" ]; then
+            cd cc-pap-api && pytest
+          elif [ "${{ matrix.service }}" = "cc-bouncer" ] && [ -f "cc-bouncer/go.mod" ]; then
+            cd cc-bouncer && go test ./...
+          fi
+
+  # Security Scan
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Build and Test Docker Images
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    strategy:
+      matrix:
+        service: [cc-pap, cc-demoapp, cc-pap-api, cc-bouncer, cc-opal]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          if [ "${{ matrix.service }}" = "cc-pap" ] && [ -f "cc-pap/Dockerfile" ]; then
+            docker build -t cc-pap:latest cc-pap/
+          elif [ "${{ matrix.service }}" = "cc-demoapp" ] && [ -f "cc-demoapp/Dockerfile" ]; then
+            docker build -t cc-demoapp:latest cc-demoapp/
+          elif [ "${{ matrix.service }}" = "cc-pap-api" ] && [ -f "cc-pap-api/Dockerfile" ]; then
+            docker build -t cc-pap-api:latest cc-pap-api/
+          elif [ "${{ matrix.service }}" = "cc-bouncer" ] && [ -f "cc-bouncer/Dockerfile" ]; then
+            docker build -t cc-bouncer:latest cc-bouncer/
+          elif [ "${{ matrix.service }}" = "cc-opal" ] && [ -f "cc-opal/Dockerfile" ]; then
+            docker build -t cc-opal:latest cc-opal/
+          fi
+
+      - name: Test Docker image
+        run: |
+          if [ "${{ matrix.service }}" = "cc-pap" ]; then
+            docker run --rm cc-pap:latest npm test
+          elif [ "${{ matrix.service }}" = "cc-demoapp" ]; then
+            docker run --rm cc-demoapp:latest npm test
+          elif [ "${{ matrix.service }}" = "cc-pap-api" ]; then
+            docker run --rm cc-pap-api:latest pytest
+          elif [ "${{ matrix.service }}" = "cc-bouncer" ]; then
+            docker run --rm cc-bouncer:latest go test ./...
+          fi
+
+  # Integration Tests
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start services with Docker Compose
+        run: |
+          docker-compose up -d
+          sleep 30  # Wait for services to start
+
+      - name: Run integration tests
+        run: |
+          # Test API endpoints
+          curl -f http://localhost:8000/health || exit 1
+          curl -f http://localhost:3000 || exit 1
+          curl -f http://localhost:3001 || exit 1
+
+      - name: Stop services
+        run: docker-compose down
+
+  # Deploy to Staging (on merge to main)
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test, security, build, integration]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add your staging deployment commands here
+          # Example: kubectl apply -f k8s/staging/
+
+  # Deploy to Production (on release)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add your production deployment commands here
+          # Example: kubectl apply -f k8s/production/
+
+  # Notify on failure
+  notify:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [lint, test, security, build, integration]
+    if: failure()
+    steps:
+      - name: Notify team
+        run: |
+          echo "CI/CD pipeline failed. Please check the logs."
+          # Add notification logic here (Slack, email, etc.)
