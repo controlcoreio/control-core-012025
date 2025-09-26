@@ -1,0 +1,45 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the stack
+      run: docker-compose -f cc-infra/controlcore-compose.yml up --build -d
+    - name: Run tests
+      run: |
+        docker-compose -f cc-infra/controlcore-compose.yml exec -T cc-pap-api pytest
+        docker-compose -f cc-infra/controlcore-compose.yml exec -T cc-pap npm test
+
+  push_to_registry:
+    needs: build_and_test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        file: ./cc-infra/controlcore-compose.yml
+        push: true
+        tags: your-docker-hub-username/control-core-api:latest, your-docker-hub-username/control-core-pap:latest
+
+  deploy_to_staging:
+    needs: push_to_registry
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to staging
+      run: |
+        # This is a placeholder for deploying to a staging environment
+        # For example, you could use ssh to connect to a server and run docker-compose up
+        echo "Deploying to staging..."
