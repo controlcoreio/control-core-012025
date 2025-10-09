@@ -60,30 +60,35 @@ Control Core is built on a modern, cloud-native architecture with the following 
 ### Supporting Components
 
 #### 5. **cc-signup-service**
+
 - **Purpose**: Customer onboarding and signup service
 - **Technology**: FastAPI, Python
 - **Location**: `/cc-signup-service/`
 - **Features**: User registration, plan selection, billing integration
 
 #### 6. **cc-business-admin**
+
 - **Purpose**: Business administration and analytics
 - **Technology**: React, Python FastAPI
 - **Location**: `/cc-business-admin/`
 - **Features**: Business metrics, customer analytics, subscription management
 
 #### 7. **cc-language-server**
+
 - **Purpose**: Language server for policy development
 - **Technology**: TypeScript
 - **Location**: `/cc-language-server/`
 - **Features**: Policy syntax highlighting, autocomplete, validation
 
 #### 8. **cc-opal**
+
 - **Purpose**: OPAL (Open Policy Administration Layer) integration
 - **Technology**: Python
 - **Location**: `/cc-opal/`
 - **Features**: Policy synchronization, data source integration
 
 #### 9. **cc-infra**
+
 - **Purpose**: Infrastructure and deployment management
 - **Technology**: Docker, Kubernetes, Helm
 - **Location**: `/cc-infra/`
@@ -94,6 +99,7 @@ Control Core is built on a modern, cloud-native architecture with the following 
 Control Core supports multiple PAP deployment models:
 
 ### 1. **Self-Hosted PAP** (Kickstart Plan)
+
 - **Deployment**: Full self-hosted platform
 - **Components**: Control Plane + Bouncer + OPAL + Database
 - **Requirements**: Docker, Docker Compose, 4GB RAM, 2 CPU cores
@@ -101,6 +107,7 @@ Control Core supports multiple PAP deployment models:
 - **Use Case**: Small teams, testing, development
 
 ### 2. **Hosted PAP** (Pro Plan)
+
 - **Deployment**: Hybrid (hosted Control Plane + self-hosted Bouncer)
 - **Components**: Bouncer + OPAL Client
 - **Requirements**: Docker, Docker Compose, 2GB RAM, 1 CPU core
@@ -108,6 +115,7 @@ Control Core supports multiple PAP deployment models:
 - **Use Case**: Production environments with reduced infrastructure overhead
 
 ### 3. **Enterprise PAP** (Custom Plan)
+
 - **Deployment**: Self-hosted with enterprise features
 - **Components**: Control Plane + Bouncer + OPAL + Database + Monitoring + Backup
 - **Requirements**: Docker, Kubernetes, Helm, 8GB RAM, 4 CPU cores
@@ -119,6 +127,7 @@ Control Core supports multiple PAP deployment models:
 Control Core Bouncer (Policy Enforcement Point) supports multiple deployment patterns:
 
 ### 1. **API Gateway PEP**
+
 - **Type**: Proxy-based enforcement
 - **Use Case**: REST APIs and microservices
 - **Deployment**: Standalone service or sidecar container
@@ -126,18 +135,21 @@ Control Core Bouncer (Policy Enforcement Point) supports multiple deployment pat
 - **Features**: Request/response filtering, rate limiting, authentication
 
 ### 2. **Application PEP**
+
 - **Type**: Library/SDK integration
 - **Use Case**: Direct application integration
 - **Deployment**: Embedded in application code
 - **Features**: Fine-grained control, minimal latency
 
 ### 3. **Cloud Gateway PEP**
+
 - **Type**: Cloud provider integration
 - **Use Case**: AWS API Gateway, Google Cloud Endpoints, Azure API Management
 - **Deployment**: Cloud-native integration
 - **Features**: Serverless, auto-scaling, managed infrastructure
 
 ### 4. **Sidecar PEP**
+
 - **Type**: Container sidecar pattern
 - **Use Case**: Kubernetes deployments
 - **Deployment**: Sidecar container alongside application
@@ -146,6 +158,7 @@ Control Core Bouncer (Policy Enforcement Point) supports multiple deployment pat
 ## 🚀 Deployment Options
 
 ### Docker Compose
+
 ```bash
 # Quick start with Docker Compose
 cd cc-infra/docker-compose
@@ -153,12 +166,14 @@ docker-compose up -d
 ```
 
 ### Kubernetes (Helm)
+
 ```bash
 # Deploy with Helm charts
 helm install controlcore ./cc-infra/helm-chart/controlcore
 ```
 
 ### Cloud Providers
+
 - **AWS**: CloudFormation templates, Lambda authorizers
 - **Google Cloud**: Cloud Functions, Endpoints
 - **Azure**: API Management policies, Functions
@@ -168,12 +183,14 @@ helm install controlcore ./cc-infra/helm-chart/controlcore
 ## 📋 Demo Applications
 
 ### cc-demoapp
+
 - **Purpose**: Comprehensive demonstration application
 - **Technology**: Next.js, FastAPI, PostgreSQL
 - **Location**: `/cc-demoapp/`
 - **Features**: AI-powered business features, PBAC demonstrations, sample data
 
 ### cc-demoapp-api
+
 - **Purpose**: Demo application backend API
 - **Technology**: FastAPI, Python, SQLAlchemy
 - **Location**: `/cc-demoapp-api/`
@@ -182,12 +199,14 @@ helm install controlcore ./cc-infra/helm-chart/controlcore
 ## 🔧 Development Setup
 
 ### Prerequisites
+
 - Docker and Docker Compose
 - Node.js 18+ (for frontend development)
 - Python 3.9+ (for backend development)
 - Go 1.21+ (for Bouncer development)
 
 ### Quick Start
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -204,6 +223,7 @@ npm run dev
 ```
 
 ### Development Environment
+
 ```bash
 # Run setup script
 ./scripts/setup-dev-environment.sh
@@ -212,16 +232,19 @@ npm run dev
 ## 📚 Documentation
 
 ### Platform Documentation
+
 - **Architecture**: [cc-infra/docs/architecture-overview.md](cc-infra/docs/architecture-overview.md)
 - **Deployment Guides**: [cc-infra/deployment-guides/](cc-infra/deployment-guides/)
 - **API Documentation**: [cc-pap-api/docs/](cc-pap-api/docs/)
 
 ### Component Documentation
+
 - **Bouncer**: [cc-bouncer/README.md](cc-bouncer/README.md)
 - **PAP API**: [cc-pap-api/README.md](cc-pap-api/README.md)
 - **Demo App**: [cc-demoapp/README.md](cc-demoapp/README.md)
 
 ### Infrastructure Documentation
+
 - **Helm Charts**: [cc-infra/helm-chart/README.md](cc-infra/helm-chart/README.md)
 - **Docker Compose**: [cc-infra/docker-compose/README.md](cc-infra/docker-compose/README.md)
 - **Kubernetes**: [cc-infra/k8s/README.md](cc-infra/k8s/README.md)
@@ -229,18 +252,21 @@ npm run dev
 ## 🎯 Use Cases
 
 ### AI Security & Governance
+
 - **AI Prompt Filtering**: Control AI model inputs and outputs
 - **Content Injection**: Dynamic context management for AI agents
 - **Response Sanitization**: Remove sensitive data from AI responses
 - **Multi-Provider Policies**: Different rules for different AI providers
 
 ### Enterprise Authorization
+
 - **API Protection**: Secure REST APIs and microservices
 - **Data Access Control**: Row, column, and field-level security
 - **Compliance**: GDPR, HIPAA, SOX compliance enforcement
 - **Audit Logging**: Comprehensive activity tracking
 
 ### Business Intelligence
+
 - **Role-Based Analytics**: Secure data access for business intelligence
 - **Financial Data Protection**: Secure financial reporting and analytics
 - **Healthcare Compliance**: HIPAA-compliant patient data management
@@ -258,6 +284,7 @@ npm run dev
 ## 🌐 Integration Capabilities
 
 ### AI Providers
+
 - **OpenAI**: GPT models with policy enforcement
 - **Anthropic**: Claude models with safety controls
 - **Google**: Gemini models with enterprise policies
@@ -265,12 +292,14 @@ npm run dev
 - **Hugging Face**: Open-source models with governance
 
 ### Cloud Platforms
+
 - **AWS**: API Gateway, Lambda, EKS integration
 - **Google Cloud**: Cloud Functions, GKE, Endpoints
 - **Azure**: API Management, Functions, AKS
 - **Kubernetes**: Native K8s integration with sidecar pattern
 
 ### Enterprise Systems
+
 - **Identity Providers**: SAML, OAuth2, OIDC integration
 - **Databases**: PostgreSQL, MySQL, MongoDB support
 - **Message Queues**: Kafka, RabbitMQ, AWS SQS
@@ -279,11 +308,13 @@ npm run dev
 ## 📞 Support & Community
 
 ### Support Tiers
+
 - **Kickstart**: Community support via GitHub Issues
 - **Pro**: Priority support with SLA
 - **Custom**: Dedicated support with enterprise SLA
 
 ### Community Resources
+
 - **Documentation**: Comprehensive guides and API references
 - **Examples**: Sample policies and integration patterns
 - **Templates**: Pre-built policy templates for common use cases
@@ -294,3 +325,27 @@ npm run dev
 **Control Core** - Empowering organizations to innovate securely in the AI-driven enterprise. 🚀
 
 For detailed component documentation, see the individual README files in each directory.
+
+
+# Local Dev Server Containers
+
+## View all logs
+docker compose -f controlcore-local-dev.yml logs -f
+
+## View specific service logs
+docker compose -f controlcore-local-dev.yml logs -f cc-pap
+docker compose -f controlcore-local-dev.yml logs -f cc-pap-api
+docker compose -f controlcore-local-dev.yml logs -f cc-bouncer
+
+## Check status
+docker compose -f controlcore-local-dev.yml ps
+
+## Restart all services
+docker compose -f controlcore-local-dev.yml restart
+
+## Stop all services
+docker compose -f controlcore-local-dev.yml down
+
+## Rebuild and restart
+docker compose -f controlcore-local-dev.yml build
+docker compose -f controlcore-local-dev.yml up -d
