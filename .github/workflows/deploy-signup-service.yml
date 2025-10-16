@@ -1,0 +1,250 @@
+name: Deploy Control Core Signup Service
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'cc-signup-service/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'cc-signup-service/**'
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: controlcore/cc-signup-service
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: controlcore_signup_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('cc-signup-service/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        cd cc-signup-service
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+    
+    - name: Run tests
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/controlcore_signup_test
+        SECRET_KEY: test-secret-key
+        STRIPE_SECRET_KEY: sk_test_fake
+        STRIPE_PUBLISHABLE_KEY: pk_test_fake
+        STRIPE_WEBHOOK_SECRET: whsec_fake
+        SENDGRID_API_KEY: SG.fake
+        AUTH0_DOMAIN: test.auth0.com
+        AUTH0_CLIENT_ID: fake-client-id
+        AUTH0_CLIENT_SECRET: fake-client-secret
+        BAC_API_URL: http://localhost:8001
+        BAC_API_KEY: fake-bac-key
+      run: |
+        cd cc-signup-service
+        pytest tests/ -v --cov=app --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: cc-signup-service/coverage.xml
+        flags: signup-service
+        name: cc-signup-service
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: cc-signup-service
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: staging
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.12.0'
+    
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+    
+    - name: Deploy to staging
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Update image tag in deployment
+        kubectl set image deployment/cc-signup-service \
+          cc-signup-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n controlcore-staging
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/cc-signup-service -n controlcore-staging --timeout=300s
+    
+    - name: Run health check
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Wait for service to be ready
+        kubectl wait --for=condition=ready pod -l app=cc-signup-service -n controlcore-staging --timeout=300s
+        
+        # Get service URL
+        SERVICE_URL=$(kubectl get ingress cc-signup-service-ingress -n controlcore-staging -o jsonpath='{.spec.rules[0].host}')
+        
+        # Run health check
+        curl -f "https://$SERVICE_URL/health" || exit 1
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.12.0'
+    
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+    
+    - name: Deploy to production
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Update image tag in deployment
+        kubectl set image deployment/cc-signup-service \
+          cc-signup-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }} \
+          -n controlcore
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/cc-signup-service -n controlcore --timeout=300s
+    
+    - name: Run health check
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        # Wait for service to be ready
+        kubectl wait --for=condition=ready pod -l app=cc-signup-service -n controlcore --timeout=300s
+        
+        # Get service URL
+        SERVICE_URL=$(kubectl get ingress cc-signup-service-ingress -n controlcore -o jsonpath='{.spec.rules[0].host}')
+        
+        # Run health check
+        curl -f "https://$SERVICE_URL/health" || exit 1
+    
+    - name: Notify deployment
+      run: |
+        echo "🚀 Control Core Signup Service deployed to production!"
+        echo "Version: ${{ github.event.release.tag_name }}"
+        echo "URL: https://signup.controlcore.io"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'cc-signup-service'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
