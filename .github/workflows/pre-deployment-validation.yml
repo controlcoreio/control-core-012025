@@ -1,0 +1,120 @@
+name: Pre-Deployment Validation
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    name: Validate Database Schema
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: control_core_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd cc-pap-api
+          pip install -r requirements.txt
+
+      - name: Set environment variables
+        run: |
+          echo "DATABASE_URL=postgresql://postgres:password@localhost:5432/control_core_db" >> $GITHUB_ENV
+          echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+          echo "SECRET_KEY=test-secret-key" >> $GITHUB_ENV
+          echo "JWT_SECRET_KEY=test-jwt-secret" >> $GITHUB_ENV
+          echo "CC_BUILTIN_ADMIN_USER=ccadmin" >> $GITHUB_ENV
+          echo "CC_BUILTIN_ADMIN_PASS=SecurePass2025!" >> $GITHUB_ENV
+          echo "CC_DROP_TABLES=true" >> $GITHUB_ENV
+
+      - name: Initialize database
+        run: |
+          cd cc-pap-api
+          python init_db.py
+
+      - name: Validate Database Schema
+        run: |
+          cd cc-pap-api
+          python check_db_schema.py
+          if [ $? -ne 0 ]; then
+            echo "❌ Database schema validation FAILED!"
+            echo "Schema mismatch detected - this would break production!"
+            exit 1
+          fi
+
+      - name: Test Login Endpoint
+        run: |
+          cd cc-pap-api
+          # Start API in background
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          API_PID=$!
+          
+          # Wait for API to start
+          sleep 10
+          
+          # Test login
+          response=$(curl -X POST http://localhost:8000/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username": "ccadmin", "password": "SecurePass2025!"}' \
+            -w "\n%{http_code}")
+          
+          http_code=$(echo "$response" | tail -n1)
+          
+          if [ "$http_code" != "200" ]; then
+            echo "❌ Login test FAILED with status: $http_code"
+            echo "Response: $response"
+            kill $API_PID
+            exit 1
+          fi
+          
+          echo "✅ Login test passed"
+          kill $API_PID
+
+      - name: Deployment Safety Summary
+        if: success()
+        run: |
+          echo "✅ All pre-deployment validations passed"
+          echo "Safe to deploy to production"
+
+      - name: Block Deployment on Failure
+        if: failure()
+        run: |
+          echo "❌ Pre-deployment validation FAILED"
+          echo "DO NOT DEPLOY TO PRODUCTION"
+          exit 1
+
