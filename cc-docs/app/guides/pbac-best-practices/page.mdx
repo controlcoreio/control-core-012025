@@ -1,0 +1,1119 @@
+# Policy-Based Access Control (PBAC) Best Practices
+
+This guide provides comprehensive best practices for designing, implementing, and maintaining effective Policy-Based Access Control systems with Control Core, with emphasis on regulatory compliance for financial services and healthcare.
+
+## Understanding PBAC
+
+### PBAC vs RBAC vs ABAC
+
+**Role-Based Access Control (RBAC)**:
+```
+User → Has Role → Role Has Permissions → Access Granted
+Example: "Admin role can delete users"
+```
+
+**Limitations**:
+- Rigid role structures
+- Role explosion (too many specific roles)
+- Cannot handle contextual access
+- Difficult to express complex rules
+
+**Attribute-Based Access Control (ABAC)**:
+```
+User Attributes + Resource Attributes + Context → Access Decision
+Example: "Users in Engineering department can access development resources"
+```
+
+**Benefits**:
+- More flexible than RBAC
+- Uses attributes for decisions
+- Can handle some context
+
+**Limitations**:
+- Can become complex
+- Performance challenges with many attributes
+- Difficult to audit and debug
+
+**Policy-Based Access Control (PBAC)**:
+```
+Declarative Policies (Rego) + Dynamic Context → Access Decision
+Example: Complex rules including time, location, risk score, compliance requirements
+```
+
+**Benefits**:
+- Extremely flexible and expressive
+- Handles complex authorization logic
+- Supports dynamic context
+- Testable and auditable
+- Centrally managed
+- Version controlled
+- Can express RBAC and ABAC patterns
+
+### When to Use PBAC
+
+**Use PBAC when**:
+- Complex authorization requirements
+- Multiple factors in access decisions
+- Context-aware access control needed
+- Regulatory compliance requirements (FINTRAC, OSFI, HIPAA)
+- Fine-grained permissions required
+- Frequently changing access rules
+- Need for audit trail and compliance reporting
+
+**RBAC might be sufficient when**:
+- Simple, static role hierarchy
+- Few roles and permissions
+- No contextual requirements
+- Low compliance requirements
+
+## PBAC Design Principles
+
+### 1. Default Deny (Fail Secure)
+
+**Always start with default deny**:
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Good: Explicit default deny
+default allow := false
+
+allow if {
+    # Explicit conditions to allow
+    input.user.roles[_] == "admin"
+}
+
+# Bad: No default (undefined behavior)
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+### 2. Principle of Least Privilege
+
+**Grant minimum necessary permissions**:
+
+```rego
+# Good: Specific, minimal permissions
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name == "read"  # Only read
+    input.resource.environment == "development"  # Only dev environment
+}
+
+# Bad: Overly broad permissions
+allow if {
+    input.user.roles[_] == "developer"
+    # Allows all actions on all resources!
+}
+```
+
+### 3. Separation of Concerns
+
+**Modular policy design**:
+
+```rego
+# authentication.rego - Handle authentication
+package controlcore.auth
+
+import rego.v1
+
+user_authenticated if {
+    input.user.authenticated == true
+    token_valid(input.user.token)
+}
+
+# authorization.rego - Handle authorization
+package controlcore.authz
+
+import rego.v1
+import data.controlcore.auth
+
+default allow := false
+
+allow if {
+    data.controlcore.auth.user_authenticated  # Reuse auth check
+    user_has_permission
+}
+
+# compliance.rego - Handle compliance rules
+package controlcore.compliance
+
+import rego.v1
+
+fintrac_compliant if {
+    # FINTRAC-specific rules
+}
+```
+
+### 4. Explicit is Better Than Implicit
+
+```rego
+# Good: Explicit conditions
+allow if {
+    input.user.roles[_] == "manager"
+    input.resource.attributes.department == input.user.department
+    input.action.name in ["read", "update"]
+    not user_on_leave(input.user.id)
+}
+
+# Bad: Implicit assumptions
+allow if {
+    input.user.roles[_] == "manager"
+    # Assumes manager has all permissions
+}
+```
+
+### 5. Test Everything
+
+**Comprehensive testing**:
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+# Test cases
+test_admin_allowed if {
+    allow with input as {"user": {"roles": ["admin"]}}
+}
+
+test_developer_denied if {
+    not allow with input as {"user": {"roles": ["developer"]}}
+}
+
+test_no_role_denied if {
+    not allow with input as {"user": {"roles": []}}
+}
+
+test_empty_input_denied if {
+    not allow with input as {}
+}
+```
+
+## Access Control Patterns
+
+### Pattern 1: Role Hierarchy
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Define role levels
+role_levels := {
+    "superadmin": 5,
+    "admin": 4,
+    "manager": 3,
+    "developer": 2,
+    "viewer": 1
+}
+
+# Get user's highest role level
+user_level := max([level |
+    role := input.user.roles[_]
+    level := role_levels[role]
+])
+
+# Action requirements
+action_requirements := {
+    "delete": 4,
+    "write": 3,
+    "update": 2,
+    "read": 1
+}
+
+# Allow if user level meets requirement
+allow if {
+    required_level := action_requirements[input.action.name]
+    user_level >= required_level
+}
+```
+
+### Pattern 2: Department-Based Access
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Users can only access resources in their department
+allow if {
+    input.user.department == input.resource.attributes.department
+    input.action.name in ["read", "update"]
+}
+
+# Managers can access any department resource
+allow if {
+    input.user.roles[_] == "manager"
+    input.user.attributes.manages_departments[_] == input.resource.attributes.department
+}
+
+# Cross-department access requires approval
+allow if {
+    input.user.department != input.resource.attributes.department
+    approval := data.cross_dept_approvals[input.user.id][input.resource.id]
+    approval.status == "approved"
+    approval.expiry > time.now_ns()
+}
+```
+
+### Pattern 3: Time-Based Access
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Business hours access
+allow if {
+    input.user.roles[_] in ["employee", "contractor"]
+    is_business_hours
+    is_weekday
+}
+
+is_business_hours if {
+    [hour, _, _] := time.clock([time.now_ns()])
+    hour >= 9
+    hour < 17
+}
+
+is_weekday if {
+    weekday := time.weekday([time.now_ns()])
+    weekday >= 1  # Monday
+    weekday <= 5  # Friday
+}
+
+# After-hours access requires approval
+allow if {
+    not is_business_hours
+    input.user.attributes.after_hours_approved == true
+    input.action.name == "read"  # Read-only after hours
+}
+```
+
+### Pattern 4: Geo-Location Based Access
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Allowed countries for data access
+allowed_countries := ["US", "CA", "UK", "DE"]
+
+# Geo-restriction for sensitive data
+allow if {
+    input.resource.attributes.sensitivity == "restricted"
+    input.context.geo_location.country in allowed_countries
+    input.user.attributes.international_access_approved == true
+}
+
+# OSFI: Canadian data must be accessed from Canada
+allow if {
+    input.resource.attributes.data_residency == "Canada"
+    input.context.geo_location.country == "CA"
+}
+```
+
+### Pattern 5: Risk-Based Adaptive Access
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Calculate risk score
+risk_score := calculate_risk(input)
+
+calculate_risk(input) := score if {
+    factors := [
+        unusual_location_risk,
+        unusual_time_risk,
+        unusual_resource_risk,
+        user_risk_profile
+    ]
+    score := sum(factors) / count(factors)
+}
+
+unusual_location_risk := 0.5 if {
+    input.context.geo_location.country != input.user.attributes.usual_country
+} else := 0
+
+unusual_time_risk := 0.3 if {
+    not is_usual_hours
+} else := 0
+
+# Low risk: Normal access
+allow if {
+    risk_score < 0.3
+    input.user.authenticated == true
+}
+
+# Medium risk: Require MFA
+allow if {
+    risk_score >= 0.3
+    risk_score < 0.7
+    input.user.attributes.mfa_verified == true
+}
+
+# High risk: Deny and flag for review
+allow if {
+    risk_score >= 0.7
+    input.user.roles[_] == "admin"
+    input.context.security_review_completed == true
+}
+```
+
+## Financial Services Compliance Patterns
+
+### FINTRAC Transaction Monitoring
+
+```rego
+package fintrac.monitoring
+
+import rego.v1
+
+default allow := false
+default requires_reporting := false
+default requires_investigation := false
+
+# Large Cash Transaction Reporting (LCTR)
+requires_reporting if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    input.transaction.type == "cash"
+}
+
+# Suspicious Transaction Reporting (STR) indicators
+str_indicators[indicator] if {
+    # Structuring: Multiple transactions under threshold
+    recent := data.transactions_30days[input.transaction.customer_id]
+    near_threshold := [t | 
+        t := recent[_]
+        t.amount >= 9000
+        t.amount < 10000
+        t.type == "cash"
+    ]
+    count(near_threshold) >= 3
+    indicator := {
+        "type": "structuring",
+        "severity": "high",
+        "transactions": near_threshold
+    }
+}
+
+str_indicators[indicator] if {
+    # Unusual pattern
+    customer := data.customers[input.transaction.customer_id]
+    input.transaction.amount > (customer.avg_monthly_volume * 5)
+    indicator := {
+        "type": "unusual_amount",
+        "severity": "medium",
+        "deviation": input.transaction.amount / customer.avg_monthly_volume
+    }
+}
+
+# Allow with reporting/investigation
+allow if {
+    input.user.roles[_] in ["teller", "financial-advisor"]
+    input.user.attributes.fintrac_trained == true
+    
+    # If reporting required, ensure it's documented
+    not requires_reporting
+}
+
+allow if {
+    requires_reporting
+    input.transaction.lctr_number != null  # LCTR filed
+    input.user.roles[_] in ["teller", "compliance-officer"]
+}
+
+# Suspicious transactions need compliance review
+allow if {
+    count(str_indicators) > 0
+    input.user.roles[_] == "compliance-officer"
+    input.transaction.str_filed == true
+    input.transaction.senior_management_notified == true
+}
+```
+
+### OSFI Guideline B-10 Implementation
+
+```rego
+package osfi.segregation_duties
+
+import rego.v1
+
+default allow := false
+
+# Define conflicting duty pairs
+conflicting_duties := {
+    "payments": [
+        ["payment-initiator", "payment-approver"],
+        ["payment-creator", "payment-authorizer"]
+    ],
+    "accounts": [
+        ["account-opener", "account-approver"],
+        ["account-creator", "account-reviewer"]
+    ],
+    "limits": [
+        ["limit-requester", "limit-approver"],
+        ["limit-setter", "limit-authorizer"]
+    ]
+}
+
+# Check if user has conflicting roles
+has_conflicting_roles(user_roles, operation_type) if {
+    pairs := conflicting_duties[operation_type]
+    some pair in pairs
+    pair[0] in user_roles
+    pair[1] in user_roles
+}
+
+# Allow if no conflicts
+allow if {
+    operation_type := input.resource.attributes.operation_type
+    not has_conflicting_roles(input.user.roles, operation_type)
+    input.user.roles[_] in authorized_roles[operation_type][input.action.name]
+}
+
+authorized_roles := {
+    "payments": {
+        "initiate": ["payment-initiator", "payment-creator"],
+        "approve": ["payment-approver", "payment-authorizer"],
+        "review": ["compliance-officer", "auditor"]
+    },
+    "accounts": {
+        "create": ["account-opener", "account-creator"],
+        "approve": ["account-approver", "account-reviewer"],
+        "audit": ["compliance-officer"]
+    }
+}
+
+# Dual authorization for high-value transactions
+allow if {
+    input.transaction.amount >= 100000
+    input.transaction.currency == "CAD"
+    
+    # Requires two approvers
+    count(input.transaction.approvers) >= 2
+    
+    # Current user is one of the approvers
+    input.user.id in input.transaction.approvers
+    
+    # Approver has sufficient authority
+    input.user.roles[_] == "senior-manager"
+}
+```
+
+### AML/KYC Risk-Based Approach
+
+```rego
+package aml.risk_based
+
+import rego.v1
+
+default allow := false
+
+# Risk levels and requirements
+risk_requirements := {
+    "low": {
+        "kyc_required": true,
+        "enhanced_dd": false,
+        "ongoing_monitoring": "annual"
+    },
+    "medium": {
+        "kyc_required": true,
+        "enhanced_dd": false,
+        "source_of_funds": true,
+        "ongoing_monitoring": "quarterly"
+    },
+    "high": {
+        "kyc_required": true,
+        "enhanced_dd": true,
+        "source_of_funds": true,
+        "source_of_wealth": true,
+        "beneficial_owner": true,
+        "ongoing_monitoring": "monthly"
+    }
+}
+
+# Determine customer risk level
+customer_risk_level(customer) := "high" if {
+    # High-risk indicators
+    customer.pep_status == true
+} else := "high" if {
+    customer.high_risk_jurisdiction == true
+} else := "high" if {
+    customer.business_type in ["money_service", "casino", "virtual_currency"]
+} else := "medium" if {
+    customer.annual_revenue > 10000000
+} else := "medium" if {
+    customer.international_transactions_percentage > 50
+} else := "low"
+
+# Verify risk-appropriate controls
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    risk_level := customer_risk_level(customer)
+    requirements := risk_requirements[risk_level]
+    
+    # Verify KYC
+    customer.kyc_status == "verified"
+    kyc_current(customer.kyc_date)
+    
+    # Verify enhanced DD if required
+    enhanced_dd_satisfied(customer, requirements.enhanced_dd)
+    
+    # Verify monitoring is current
+    monitoring_current(customer, requirements.ongoing_monitoring)
+}
+
+kyc_current(kyc_date) if {
+    age_days := (time.now_ns() - time.parse_rfc3339_ns(kyc_date)) / (24 * 60 * 60 * 1000000000)
+    age_days < 365
+}
+
+enhanced_dd_satisfied(customer, required) if {
+    not required
+}
+
+enhanced_dd_satisfied(customer, required) if {
+    required == true
+    customer.enhanced_due_diligence == true
+    customer.beneficial_owner_identified == true
+    customer.source_of_wealth_verified == true
+}
+```
+
+## AI/LLM Authorization Patterns
+
+### Pattern 1: Prompt Filtering and Validation
+
+```rego
+package ai.prompt_filtering
+
+import rego.v1
+
+default allow := false
+
+# Allow AI access with comprehensive safety checks
+allow if {
+    user_authorized_for_ai
+    prompt_passes_safety_checks
+    usage_within_limits
+}
+
+user_authorized_for_ai if {
+    input.user.roles[_] in ["developer", "data-scientist", "ai-engineer"]
+    input.user.attributes.ai_safety_trained == true
+}
+
+prompt_passes_safety_checks if {
+    prompt := input.context.prompt
+    
+    # Length check
+    prompt_length := count(prompt)
+    prompt_length > 0
+    prompt_length < 8000
+    
+    # No PII patterns
+    not contains_pii_patterns(prompt)
+    
+    # No injection attempts
+    not contains_injection_patterns(prompt)
+    
+    # Safety score from ML model
+    input.context.safety_score > 0.85
+    
+    # Content policy compliance
+    complies_with_content_policy(prompt)
+}
+
+contains_pii_patterns(text) if {
+    # SSN pattern
+    regex.match(`\d{3}-\d{2}-\d{4}`, text)
+}
+
+contains_pii_patterns(text) if {
+    # Credit card pattern
+    regex.match(`\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}`, text)
+}
+
+contains_pii_patterns(text) if {
+    # SIN (Canadian) pattern
+    regex.match(`\d{3}[-\s]?\d{3}[-\s]?\d{3}`, text)
+}
+
+contains_injection_patterns(text) if {
+    injection_attempts := [
+        "ignore previous instructions",
+        "disregard safety",
+        "jailbreak",
+        "bypass filter"
+    ]
+    lower_text := lower(text)
+    some attempt in injection_attempts
+    contains(lower_text, attempt)
+}
+
+usage_within_limits if {
+    usage := data.usage_stats[input.user.id]
+    usage.requests_today < 1000
+    usage.tokens_today < 500000
+    usage.cost_today < 100.00  # USD
+}
+```
+
+### Pattern 2: Content Injection for Context
+
+```rego
+package ai.content_injection
+
+import rego.v1
+
+# Pre-prompt content injection
+pre_prompt_content := {
+    "user_context": user_context_block,
+    "compliance_guidelines": compliance_block,
+    "safety_instructions": safety_block
+} if {
+    input.context.injection_enabled == true
+}
+
+user_context_block := sprintf(`
+User Context:
+- Email: %s
+- Department: %s
+- Clearance Level: %d
+- Jurisdiction: %s
+`, [
+    input.user.email,
+    input.user.department,
+    input.user.attributes.clearance_level,
+    input.user.attributes.jurisdiction
+])
+
+compliance_block := sprintf(`
+Compliance Guidelines:
+- Do not discuss customer financial information
+- Follow FINTRAC reporting requirements
+- Maintain confidentiality per OSFI guidelines
+- Do not generate content that could violate AML regulations
+`) if {
+    input.resource.attributes.compliance_required == true
+}
+
+safety_block := sprintf(`
+Safety Instructions:
+- Do not generate harmful, illegal, or unethical content
+- Do not share personally identifiable information (PII)
+- Maintain professional and appropriate language
+- Flag suspicious queries for review
+`)
+
+# Post-response filtering
+filtered_response := masked if {
+    response := input.response.content
+    masked := mask_pii(response)
+}
+
+mask_pii(text) := result if {
+    # Mask SSN
+    step1 := regex.replace(text, `\d{3}-\d{2}-\d{4}`, "***-**-****")
+    
+    # Mask credit cards
+    step2 := regex.replace(step1, `\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}`, "****-****-****-****")
+    
+    # Mask email addresses (except domain)
+    result := regex.replace(step2, `([a-zA-Z0-9._%+-]+)@`, "***@")
+}
+```
+
+### Pattern 3: RAG System Authorization
+
+```rego
+package ai.rag_authorization
+
+import rego.v1
+
+default allow := false
+
+# Allow RAG query with source verification
+allow if {
+    user_authorized
+    query_safe
+    sources_accessible
+}
+
+user_authorized if {
+    input.user.roles[_] in ["researcher", "analyst", "developer"]
+    input.user.attributes.rag_access == true
+}
+
+query_safe if {
+    query := input.context.query
+    
+    # Not a SQL injection attempt
+    not contains(query, "'; DROP")
+    not contains(query, "OR 1=1")
+    
+    # Not a path traversal
+    not contains(query, "../")
+    not contains(query, "..\\")
+    
+    # Query scope appropriate
+    query_scope_valid
+}
+
+query_scope_valid if {
+    # Limit to user's department documents
+    scope := input.context.query_scope
+    scope.department == input.user.department
+}
+
+sources_accessible if {
+    # All retrieved sources must be accessible to user
+    sources := input.context.retrieved_sources
+    every source in sources {
+        user_can_access_source(source.id)
+    }
+}
+
+user_can_access_source(source_id) if {
+    source := data.documents[source_id]
+    source.owner == input.user.id
+}
+
+user_can_access_source(source_id) if {
+    source := data.documents[source_id]
+    source.department == input.user.department
+    source.classification in ["public", "internal"]
+}
+```
+
+## Multi-Tenancy Patterns
+
+### Tenant Isolation
+
+```rego
+package multitenancy.isolation
+
+import rego.v1
+
+default allow := false
+
+# Strict tenant isolation
+allow if {
+    # User belongs to tenant
+    input.user.tenant_id == input.resource.tenant_id
+    
+    # Action allowed for user role
+    input.user.roles[_] in authorized_roles[input.action.name]
+}
+
+# Cross-tenant access (explicitly approved only)
+allow if {
+    input.user.tenant_id != input.resource.tenant_id
+    
+    # Cross-tenant access must be approved
+    approval := data.cross_tenant_approvals[input.user.id][input.resource.tenant_id]
+    approval.status == "approved"
+    approval.expiry > time.now_ns()
+    
+    # Audit all cross-tenant access
+    input.context.audit_enabled == true
+}
+
+# Service accounts (tenant-agnostic)
+allow if {
+    input.user.type == "service_account"
+    input.user.attributes.multi_tenant_access == true
+    input.user.tenant_id in authorized_tenants[input.user.service_id]
+}
+```
+
+## Performance Optimization Patterns
+
+### Cache-Friendly Policies
+
+```rego
+# Good: Deterministic (cacheable)
+allow if {
+    input.user.roles[_] == "admin"
+    input.resource.type == "api"
+}
+
+# Bad: Time-dependent (not cacheable)
+allow if {
+    input.user.roles[_] == "admin"
+    time.now_ns() > 0  # Always true but changes every nanosecond
+}
+
+# Better: Use reasonable time granularity
+allow if {
+    input.user.roles[_] == "admin"
+    [hour, _, _] := time.clock([time.now_ns()])
+    hour >= 9  # Changes hourly, more cacheable
+}
+```
+
+### Early Returns
+
+```rego
+# Good: Check cheap conditions first
+allow if {
+    # Quick checks first
+    input.action.name == "read"
+    input.user.authenticated == true
+    
+    # Expensive checks last
+    user_has_department_access
+    user_passed_background_check
+}
+
+# Bad: Expensive check first
+allow if {
+    expensive_database_lookup  # Slow
+    input.action.name == "read"  # Fast but checked last
+}
+```
+
+## Migration Strategies
+
+### From RBAC to PBAC
+
+**Phase 1: Model existing RBAC in PBAC**
+
+```rego
+# Implement existing RBAC rules in Rego
+package migration.rbac_compat
+
+import rego.v1
+
+default allow := false
+
+# Map existing roles to permissions
+role_permissions := {
+    "admin": ["read", "write", "delete", "manage"],
+    "developer": ["read", "write"],
+    "viewer": ["read"]
+}
+
+allow if {
+    role := input.user.roles[_]
+    permissions := role_permissions[role]
+    input.action.name in permissions
+}
+```
+
+**Phase 2: Add context-aware rules**
+
+```rego
+# Enhance with context
+allow if {
+    role := input.user.roles[_]
+    permissions := role_permissions[role]
+    input.action.name in permissions
+    
+    # New: Add time-based access
+    is_business_hours
+    
+    # New: Add MFA for sensitive operations
+    mfa_satisfied_for_sensitivity
+}
+```
+
+**Phase 3: Fine-grained permissions**
+
+```rego
+# Replace broad roles with fine-grained policies
+allow if {
+    # Instead of "admin can do everything"
+    # Specific permissions based on context
+    input.user.permissions[_] == required_permission
+    resource_access_allowed
+    context_appropriate
+}
+```
+
+## Common Pitfalls
+
+### Pitfall 1: Role Explosion
+
+```rego
+# Bad: Creating too many specific roles
+allow if {
+    input.user.roles[_] in [
+        "api-reader",
+        "api-writer",
+        "api-deleter",
+        "database-reader",
+        "database-writer",
+        # 100+ more roles...
+    ]
+}
+
+# Good: Use attributes and context
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name in user_allowed_actions(input.user)
+    input.resource.type in user_allowed_resources(input.user)
+}
+```
+
+### Pitfall 2: Overly Complex Policies
+
+```rego
+# Bad: Too complex, hard to test and debug
+allow if {
+    count([r | r := input.user.roles[_]; r in allowed_roles]) > 0
+    count([a | a := input.resource.attributes[_]; a.type in ["public", "internal"]]) > 0
+    not count([x | x := input.user.restrictions[_]; x.type == "suspended"]) > 0
+}
+
+# Good: Break into helper functions
+allow if {
+    user_has_allowed_role
+    resource_is_accessible
+    user_not_suspended
+}
+
+user_has_allowed_role if {
+    input.user.roles[_] in allowed_roles
+}
+
+resource_is_accessible if {
+    input.resource.attributes.type in ["public", "internal"]
+}
+
+user_not_suspended if {
+    not input.user.restrictions[_].type == "suspended"
+}
+```
+
+### Pitfall 3: Insufficient Testing
+
+```rego
+# Always test edge cases
+test_empty_roles if {
+    not allow with input as {"user": {"roles": []}}
+}
+
+test_null_user if {
+    not allow with input as {"user": null}
+}
+
+test_missing_resource if {
+    not allow with input as {"user": {"roles": ["admin"]}}
+}
+
+test_invalid_action if {
+    not allow with input as {
+        "user": {"roles": ["admin"]},
+        "resource": {"type": "api"},
+        "action": {"name": "invalid-action"}
+    }
+}
+```
+
+## Organizational Best Practices
+
+### Policy Ownership Model
+
+**Recommended Structure**:
+
+```
+Policy Repository
+├── core/                    # Platform team owns
+│   ├── authentication.rego
+│   └── base_rbac.rego
+├── compliance/              # Compliance team owns
+│   ├── fintrac.rego
+│   ├── osfi.rego
+│   └── aml.rego
+├── applications/            # App teams own
+│   ├── api/
+│   │   └── access.rego
+│   ├── mobile/
+│   │   └── access.rego
+│   └── web/
+│       └── access.rego
+└── tests/                   # Everyone contributes
+    ├── core_tests.rego
+    ├── compliance_tests.rego
+    └── app_tests.rego
+```
+
+### Review and Approval Workflow
+
+```yaml
+# .github/workflows/policy-review.yml
+name: Policy Review Workflow
+
+on:
+  pull_request:
+    paths:
+      - 'policies/**/*.rego'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Validate Rego Syntax
+        run: opa check policies/
+      
+      - name: Run Tests
+        run: opa test policies/ -v
+      
+      - name: Security Scan
+        run: opa check --strict policies/
+  
+  review:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Review
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              reviewers: ['security-team', 'compliance-team']
+            })
+```
+
+## Support
+
+- **[Rego Guidelines](/guides/rego-guidelines)**: Learn the policy language
+- **[User Guide](/guides/user-guide)**: Create and manage policies
+- **[Policy Templates](/guides/policy-templates)**: Pre-built patterns
+- **[Security Best Practices](/guides/security)**: Secure your deployment
+
+---
+
+**Effective PBAC requires thoughtful design, comprehensive testing, and continuous refinement. Use these patterns as building blocks for your authorization system.**
+

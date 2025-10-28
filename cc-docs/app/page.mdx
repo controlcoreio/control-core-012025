@@ -1,0 +1,232 @@
+# Control Core Documentation
+
+Welcome to the comprehensive documentation for Control Core - the centralized authorization and compliance platform built for the AI-driven enterprise.
+
+## What is Control Core?
+
+Control Core solves the core problem of securing the dynamic, real-time interactions between new AI initiatives and legacy technology. By enforcing business, security, and compliance rules with dynamic context management, Control Core eliminates the need for brittle, custom-coded access logic, turning a major security liability into a strategic advantage.
+
+**Key Benefits:**
+- **Centralized Authorization**: Single source of truth for all access control policies
+- **Real-Time Enforcement**: Sub-100ms policy evaluation with intelligent caching
+- **Dynamic Context Management**: Context-aware policies with real-time data enrichment
+- **AI Security**: Advanced protection for AI agents, LLMs, and RAG systems
+- **Compliance**: Built-in support for GDPR, HIPAA, SOC2, and PCI-DSS
+- **Scalability**: Horizontally scalable architecture for enterprise workloads
+
+## 🚀 Quick Start
+
+**Get started with Control Core in minutes:**
+
+1. **[Getting Started Guide](/guides/getting-started)** - Complete introduction and quick start for all deployment models
+2. **Choose Your Deployment**:
+   - [Kickstart (Self-Hosted)](/guides/deployment/kickstart) - Full control, on your infrastructure
+   - [Pro (Hybrid)](/guides/deployment/pro) - Hosted Control Plane + self-hosted Bouncer
+   - [Enterprise](/guides/deployment/enterprise) - Large-scale with auto-scaling and HA
+
+## 📚 Core Documentation
+
+### Getting Started
+- **[Getting Started Guide](/guides/getting-started)** - Introduction to Control Core and first policy creation
+- **[Installation Guide](/guides/installation)** - Complete installation instructions
+- **[Architecture Overview](/architecture)** - System architecture and components
+
+### Deployment Guides
+- **[Kickstart Deployment](/guides/deployment/kickstart)** - Self-hosted deployment with Docker Compose
+- **[Pro Deployment](/guides/deployment/pro)** - Hybrid deployment with hosted Control Plane
+- **[Enterprise Deployment](/guides/deployment/enterprise)** - Enterprise-scale with auto-scaling, HA, and load balancing
+
+### Administration
+- **[Administrator Guide](/guides/admin)** - System administration, user management, and monitoring
+- **[DevOps Guide](/guides/devops)** - Infrastructure management and CI/CD integration
+- **[Security Best Practices](/guides/security)** - Securing your Control Core deployment
+
+### Policy Management
+- **[User Guide](/guides/user-guide)** - Policy creation, testing, and deployment
+- **[Rego Guidelines](/guides/rego-guidelines)** - Policy language guide with examples
+- **[Policy Templates](/guides/policy-templates)** - Pre-built templates and extension guide
+- **[PBAC Best Practices](/guides/pbac-best-practices)** - Policy design patterns and best practices
+
+### Policy Information Points (PIP)
+- **[PIP Getting Started](/guides/pip-getting-started)** - Connect your data sources for context-aware policies
+- **[PIP Admin Guide](/guides/pip-admin-guide)** - Configure and manage data source connections
+- **[PIP Developer Guide](/guides/pip-developer-guide)** - Technical guide for policy developers
+
+### Advanced Topics
+- **[API Reference](/guides/api-reference)** - Complete API documentation
+- **[Troubleshooting](/guides/troubleshooting)** - Common issues and solutions
+- **[Multi-Tenant API](/api/multi-tenant)** - Pro tier multi-tenant service APIs
+
+## 🏗️ Architecture Components
+
+### Policy Administration Console
+Web-based interface for managing policies, users, and resources with visual policy builder and Monaco code editor.
+
+### Policy Administration API
+Backend service handling policy CRUD, user authentication, resource management, and decision logging.
+
+### Policy Enforcement Point (Bouncer)
+Reverse proxy that enforces policies on incoming requests with sub-100ms evaluation and content injection for AI agents.
+
+### Policy Synchronization Server
+Based on OPAL, keeps policies and data synchronized across all components in real-time.
+
+### Policy Language Server
+Provides IDE support for Rego policy development with syntax highlighting, IntelliSense, and validation.
+
+
+## 🎯 Deployment Models
+
+### Kickstart (Self-Hosted)
+**Ideal for**: Small teams, development, testing, proof-of-concept
+
+- **Requirements**: 4GB RAM, 2 CPU cores, Docker
+- **Components**: Complete platform on your infrastructure
+- **Support**: Community support
+- **[Deployment Guide](/guides/deployment/kickstart)**
+
+### Pro (Hybrid)
+**Ideal for**: Production environments, reduced infrastructure overhead
+
+- **Requirements**: 2GB RAM, 1 CPU core, Docker
+- **Components**: Hosted Control Plane + self-hosted Bouncer
+- **Support**: Priority support with SLA
+- **[Deployment Guide](/guides/deployment/pro)**
+
+### Enterprise (Custom)
+**Ideal for**: Large organizations, high-traffic applications, compliance requirements
+
+- **Requirements**: Kubernetes cluster, 16GB+ RAM, 8+ CPU cores
+- **Architecture**: Multi-region, auto-scaling, high availability
+- **Support**: Dedicated support team with enterprise SLA
+- **[Deployment Guide](/guides/deployment/enterprise)**
+
+## 📖 Popular Guides
+
+### For Administrators
+1. [System Configuration and Management](/guides/admin)
+2. [User and Role Management](/guides/admin)
+3. [SAML/SSO Integration](/guides/admin)
+4. [Monitoring and Alerting](/guides/admin)
+5. [Backup and Recovery](/guides/deployment/kickstart)
+6. [Security Best Practices](/guides/security)
+
+### For Policy Developers
+1. [Creating Your First Policy](/guides/getting-started)
+2. [Rego Policy Language Guide](/guides/rego-guidelines)
+3. [Policy Testing Framework](/guides/user-guide)
+4. [Using Policy Templates](/guides/policy-templates)
+5. [Connecting Data Sources (PIP)](/integrations)
+6. [PBAC Best Practices](/guides/pbac-best-practices)
+
+### For DevOps Engineers
+1. [Kickstart Deployment with Docker](/guides/deployment/kickstart)
+2. [Pro Hybrid Deployment](/guides/deployment/pro)
+3. [Enterprise Kubernetes Deployment](/guides/deployment/enterprise)
+4. [Auto-Scaling Configuration](/guides/deployment/enterprise)
+5. [Load Balancing and HA](/guides/deployment/enterprise)
+6. [SSL/TLS Configuration](/guides/security)
+
+### For Compliance Officers
+1. [FINTRAC Compliance Policies](/guides/rego-guidelines)
+2. [OSFI Guidelines Implementation](/guides/rego-guidelines)
+3. [AML/KYC Requirements](/guides/policy-templates)
+4. [HIPAA Compliance Policies](/guides/policy-templates)
+5. [Audit Logging and Reporting](/guides/admin)
+6. [Regulatory Best Practices](/guides/pbac-best-practices)
+
+## 🔧 API Documentation
+
+### Core APIs
+- **[Policies as Code API](/api/policies-as-code)** - Develop, test, and deploy policies programmatically
+- **[IDE Integration API](/api/ide-integration)** - Integrate with VS Code, JetBrains, and other IDEs
+- **[Complete API Reference](/guides/api-reference)** - All endpoints, authentication, and examples
+
+### Features
+- **Policy Validation** - Real-time syntax and semantic validation
+- **Policy Testing** - Comprehensive test framework
+- **Policy Deployment** - Environment-specific deployment (sandbox/production)
+- **Policy Templates** - Pre-built templates for common scenarios
+- **Git Integration** - Import policies from repositories
+- **WebSocket Support** - Real-time communication for live updates
+
+## 💡 Use Cases
+
+### API Protection
+Secure your REST APIs with fine-grained access control, rate limiting, and authentication.
+
+### AI Agent Control
+Control AI agent access and behavior with prompt filtering, content injection, and response validation.
+
+### Data Access Control
+Implement row-level, column-level, and field-level security with dynamic data masking.
+
+### Compliance Enforcement
+Enforce GDPR, HIPAA, SOC2, and PCI-DSS compliance rules automatically.
+
+## 🛠️ IDE Integration
+
+Control Core provides comprehensive IDE integration for policy development:
+
+- **VS Code Extension** - Real-time validation, testing, and deployment
+- **JetBrains Plugin** - Code suggestions, inspections, and quick actions
+- **Monaco Editor** - Browser-based development with IntelliSense
+- **Git Integration** - Automatic policy synchronization from repositories
+- **Policy Language Server** - Advanced language features across all IDEs
+
+## 📞 Getting Help
+
+### Documentation
+- **[Getting Started](/guides/getting-started)** - Introduction and quick start
+- **[Troubleshooting Guide](/guides/troubleshooting)** - Common issues and solutions
+- **[API Reference](/guides/api-reference)** - Complete API documentation
+
+### Support Channels
+- **Documentation**: Browse our comprehensive guides
+- **Community**: [GitHub Discussions](https://github.com/controlcore/discussions)
+- **Support Email**: support@controlcore.io
+- **Sales Contact**: sales@controlcore.io
+
+### Support Tiers
+- **Kickstart**: Community support via GitHub
+- **Pro**: Priority support with SLA
+- **Enterprise**: Dedicated support team with enterprise SLA
+
+## 🔒 Security & Compliance
+
+Control Core is built with security and compliance at its core:
+
+- **Encryption**: AES-256 encryption at rest, TLS 1.3 in transit
+- **Authentication**: Support for Auth0, SAML, OAuth2, OIDC
+- **Audit Logging**: Comprehensive activity tracking
+- **Compliance**: GDPR, HIPAA, SOC2, PCI-DSS support
+- **Network Security**: VPC isolation, network policies, mTLS
+- **[Security Best Practices Guide](/guides/security)**
+
+## 🚀 What's New
+
+### Latest Features
+- **Comprehensive Documentation** - Complete guides for all aspects of deployment and management
+- **Enterprise Deployment Guide** - Detailed guide for large-scale deployments with auto-scaling
+- **Security Best Practices** - In-depth security configuration and hardening guide
+- **PBAC Patterns** - Policy design patterns and best practices
+- **Policy Templates** - Pre-built templates with extension guide
+- **PIP System** - Connect external data sources for context-aware policies
+
+### Recent Updates
+- **API Reference** - Complete API documentation with examples
+- **Rego Guidelines** - Comprehensive Rego policy language guide
+- **Troubleshooting Guide** - Enhanced with service-specific solutions
+- **Deployment Guides** - Detailed guides for all deployment models
+- **User Guide** - Complete policy manager guide
+
+## 📄 Version Information
+
+- **Current Version**: 012025.02
+- **Last Updated**: January 25, 2025
+- **API Version**: v1
+- **Documentation**: Comprehensive update with all guides
+
+---
+
+**Ready to get started?** Check out our [Getting Started Guide](/guides/getting-started) or choose your [Deployment Model](/guides/deployment/kickstart).

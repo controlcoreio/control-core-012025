@@ -1,0 +1,1508 @@
+# API Reference
+
+Complete API documentation for Control Core Policy Administration API. This guide covers all endpoints, authentication methods, request/response formats, and error handling.
+
+## Base URLs
+
+**90-day Pilot**:
+```
+https://your-tenant.controlcore.io/api/v1
+```
+
+**Pro (Hosted Control Plane)**:
+```
+https://your-tenant.controlplane.controlcore.io/api/v1
+```
+
+**Enterprise (Self-Hosted)**:
+```
+https://api.controlcore.yourcompany.com/api/v1
+```
+
+**Local Development**:
+```
+http://localhost:8082/api/v1
+```
+
+## Authentication
+
+### API Key Authentication
+
+Include your API key in the request header:
+
+```bash
+curl -H "X-API-Key: your-api-key-here" \
+  https://api.controlcore.yourcompany.com/api/v1/policies
+```
+
+**Get your API key**:
+1. Log in to Policy Administration Console
+2. Navigate to **Settings** → **API Keys**
+3. Click **Generate API Key**
+4. Copy and store securely
+
+### JWT Token Authentication
+
+For user-specific operations, use JWT tokens:
+
+```bash
+# 1. Login to get token
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin@company.com",
+    "password": "your-password"
+  }'
+
+# Response:
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 3600
+}
+
+# 2. Use token in subsequent requests
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  https://api.controlcore.yourcompany.com/api/v1/policies
+```
+
+### OAuth 2.0 (Auth0/SAML)
+
+For SSO-enabled organizations:
+
+```bash
+# Authorization URL
+https://your-tenant.auth0.com/authorize?
+  client_id=YOUR_CLIENT_ID&
+  response_type=code&
+  redirect_uri=https://console.controlcore.yourcompany.com/callback&
+  scope=openid%20profile%20email&
+  audience=https://api.controlcore.yourcompany.com
+
+# Exchange code for token
+curl -X POST https://your-tenant.auth0.com/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type": "authorization_code",
+    "client_id": "YOUR_CLIENT_ID",
+    "client_secret": "YOUR_CLIENT_SECRET",
+    "code": "AUTHORIZATION_CODE",
+    "redirect_uri": "https://console.controlcore.yourcompany.com/callback"
+  }'
+```
+
+## Rate Limiting
+
+All API endpoints are rate-limited:
+
+- **Standard**: 1000 requests per hour per API key
+- **Pro**: 5000 requests per hour per API key
+- **Enterprise**: 10,000 requests per hour per API key (configurable)
+
+**Rate Limit Headers**:
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 987
+X-RateLimit-Reset: 1643723400
+```
+
+**Rate Limit Exceeded Response**:
+```json
+{
+  "error": "rate_limit_exceeded",
+  "message": "API rate limit exceeded",
+  "retry_after": 3600
+}
+```
+
+## Policy Management APIs
+
+### List Policies
+
+**Endpoint**: `GET /policies`
+
+**Description**: Retrieve all policies with optional filtering
+
+**Query Parameters**:
+- `skip` (integer): Number of records to skip (default: 0)
+- `limit` (integer): Maximum records to return (default: 100, max: 1000)
+- `status` (string): Filter by status (`active`, `inactive`, `draft`)
+- `environment` (string): Filter by environment (`sandbox`, `production`)
+- `name` (string): Search by policy name (partial match)
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://api.controlcore.yourcompany.com/api/v1/policies?limit=50&environment=production"
+```
+
+**Example Response**:
+```json
+{
+  "policies": [
+    {
+      "id": 1,
+      "name": "api-authentication",
+      "description": "Basic API authentication policy",
+      "status": "active",
+      "environment": "production",
+      "rego_code": "package controlcore.policy\n\nimport rego.v1\n\ndefault allow := false\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+      "created_at": "2025-01-20T10:30:00Z",
+      "updated_at": "2025-01-25T14:20:00Z",
+      "created_by": "admin@company.com",
+      "version": 3,
+      "resource_id": 1,
+      "bouncer_id": 1
+    }
+  ],
+  "total": 45,
+  "page": 1,
+  "page_size": 50
+}
+```
+
+### Get Policy by ID
+
+**Endpoint**: `GET /policies/{policy_id}`
+
+**Description**: Retrieve a specific policy
+
+**Path Parameters**:
+- `policy_id` (integer): Policy ID
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/policies/1
+```
+
+**Example Response**:
+```json
+{
+  "id": 1,
+  "name": "api-authentication",
+  "description": "Basic API authentication policy",
+  "status": "active",
+  "environment": "production",
+  "rego_code": "package controlcore.policy...",
+  "test_cases": [
+    {
+      "name": "Admin can access",
+      "input": {"user": {"roles": ["admin"]}},
+      "expected": true
+    }
+  ],
+  "performance_metrics": {
+    "avg_evaluation_time_ms": 12,
+    "total_evaluations": 15000,
+    "cache_hit_rate": 0.87
+  }
+}
+```
+
+### Create Policy
+
+**Endpoint**: `POST /policies`
+
+**Description**: Create a new policy
+
+**Request Body**:
+```json
+{
+  "name": "api-read-access",
+  "description": "Allow developers to read API data",
+  "rego_code": "package controlcore.policy\n\nimport rego.v1\n\ndefault allow := false\n\nallow if {\n    input.user.roles[_] == \"developer\"\n    input.action.name == \"read\"\n}",
+  "environment": "sandbox",
+  "resource_id": 1,
+  "bouncer_id": 1,
+  "test_cases": [
+    {
+      "name": "Developer can read",
+      "input": {
+        "user": {"roles": ["developer"]},
+        "action": {"name": "read"}
+      },
+      "expected": true
+    }
+  ]
+}
+```
+
+**Example Request**:
+```bash
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/policies \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @policy.json
+```
+
+**Example Response**:
+```json
+{
+  "id": 25,
+  "name": "api-read-access",
+  "status": "active",
+  "environment": "sandbox",
+  "created_at": "2025-01-25T15:30:00Z",
+  "message": "Policy created successfully"
+}
+```
+
+### Update Policy
+
+**Endpoint**: `PUT /policies/{policy_id}`
+
+**Description**: Update an existing policy
+
+**Path Parameters**:
+- `policy_id` (integer): Policy ID to update
+
+**Request Body**: Same as Create Policy
+
+**Example Request**:
+```bash
+curl -X PUT https://api.controlcore.yourcompany.com/api/v1/policies/25 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "api-read-access-updated",
+    "description": "Updated policy description",
+    "rego_code": "..."
+  }'
+```
+
+### Delete Policy
+
+**Endpoint**: `DELETE /policies/{policy_id}`
+
+**Description**: Delete a policy (soft delete by default)
+
+**Path Parameters**:
+- `policy_id` (integer): Policy ID to delete
+
+**Query Parameters**:
+- `hard_delete` (boolean): Permanently delete (default: false)
+
+**Example Request**:
+```bash
+curl -X DELETE https://api.controlcore.yourcompany.com/api/v1/policies/25 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Example Response**:
+```json
+{
+  "message": "Policy deleted successfully",
+  "id": 25,
+  "deleted_at": "2025-01-25T16:00:00Z"
+}
+```
+
+### Validate Policy
+
+**Endpoint**: `POST /policies/validate`
+
+**Description**: Validate Rego policy syntax without saving
+
+**Request Body**:
+```json
+{
+  "rego_code": "package controlcore.policy\n\nimport rego.v1\n\ndefault allow := false\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}"
+}
+```
+
+**Example Response (Valid)**:
+```json
+{
+  "valid": true,
+  "message": "Policy syntax is valid",
+  "warnings": []
+}
+```
+
+**Example Response (Invalid)**:
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "line": 8,
+      "column": 5,
+      "message": "rego_parse_error: unexpected eof token",
+      "severity": "error"
+    }
+  ]
+}
+```
+
+### Test Policy
+
+**Endpoint**: `POST /policies/{policy_id}/test`
+
+**Description**: Run test cases against a policy
+
+**Request Body**:
+```json
+{
+  "test_cases": [
+    {
+      "name": "Admin access allowed",
+      "input": {
+        "user": {"id": "user-1", "roles": ["admin"]},
+        "resource": {"type": "api"},
+        "action": {"name": "write"}
+      },
+      "expected": true
+    },
+    {
+      "name": "Developer access denied",
+      "input": {
+        "user": {"id": "user-2", "roles": ["developer"]},
+        "resource": {"type": "api"},
+        "action": {"name": "write"}
+      },
+      "expected": false
+    }
+  ]
+}
+```
+
+**Example Response**:
+```json
+{
+  "results": [
+    {
+      "name": "Admin access allowed",
+      "passed": true,
+      "expected": true,
+      "actual": true,
+      "evaluation_time_ms": 15
+    },
+    {
+      "name": "Developer access denied",
+      "passed": true,
+      "expected": false,
+      "actual": false,
+      "evaluation_time_ms": 12
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "pass_rate": 1.0
+  }
+}
+```
+
+### Promote Policy to Production
+
+**Endpoint**: `POST /policies/{policy_id}/promote`
+
+**Description**: Promote a policy from sandbox to production
+
+**Example Request**:
+```bash
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/policies/25/promote \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deployment_notes": "Tested in sandbox for 48 hours, no issues",
+    "approver": "manager@company.com"
+  }'
+```
+
+**Example Response**:
+```json
+{
+  "message": "Policy promoted to production",
+  "policy_id": 25,
+  "environment": "production",
+  "promoted_at": "2025-01-25T16:30:00Z"
+}
+```
+
+## Resource Management APIs
+
+### List Protected Resources
+
+**Endpoint**: `GET /resources`
+
+**Description**: Get all protected resources
+
+**Query Parameters**:
+- `skip` (integer): Pagination offset
+- `limit` (integer): Results per page
+- `type` (string): Filter by resource type
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://api.controlcore.yourcompany.com/api/v1/resources?type=api"
+```
+
+**Example Response**:
+```json
+{
+  "resources": [
+    {
+      "id": 1,
+      "name": "User Management API",
+      "type": "api",
+      "path": "/api/v1/users/*",
+      "methods": ["GET", "POST", "PUT", "DELETE"],
+      "attributes": {
+        "sensitivity": "confidential",
+        "owner": "engineering-team",
+        "environment": "production"
+      },
+      "policies": [1, 5, 8],
+      "created_at": "2025-01-15T10:00:00Z"
+    }
+  ],
+  "total": 15
+}
+```
+
+### Create Resource
+
+**Endpoint**: `POST /resources`
+
+**Request Body**:
+```json
+{
+  "name": "Payment Processing API",
+  "type": "api",
+  "path": "/api/v1/payments/*",
+  "methods": ["POST", "GET"],
+  "attributes": {
+    "sensitivity": "restricted",
+    "compliance": ["PCI-DSS", "SOC2"],
+    "owner": "finance-team",
+    "environment": "production",
+    "data_classification": "financial"
+  },
+  "description": "Handles payment processing"
+}
+```
+
+**Example Response**:
+```json
+{
+  "id": 16,
+  "name": "Payment Processing API",
+  "created_at": "2025-01-25T17:00:00Z",
+  "message": "Resource created successfully"
+}
+```
+
+## Decision APIs
+
+### Evaluate Authorization Decision
+
+**Endpoint**: `POST /decisions/evaluate`
+
+**Description**: Evaluate an authorization decision based on policies
+
+**Request Body**:
+```json
+{
+  "user": {
+    "id": "user-123",
+    "email": "john@company.com",
+    "roles": ["developer", "team-lead"],
+    "department": "Engineering",
+    "attributes": {
+      "clearance_level": 3,
+      "mfa_enabled": true
+    }
+  },
+  "resource": {
+    "id": "api-users",
+    "type": "api",
+    "path": "/api/v1/users",
+    "attributes": {
+      "owner": "engineering",
+      "sensitivity": "internal"
+    }
+  },
+  "action": {
+    "name": "read",
+    "method": "GET"
+  },
+  "context": {
+    "ip_address": "192.168.1.100",
+    "timestamp": "2025-01-25T10:30:00Z",
+    "request_id": "req-123-456"
+  }
+}
+```
+
+**Example Response (Allowed)**:
+```json
+{
+  "decision": "PERMIT",
+  "reason": "User has developer role and read action is allowed",
+  "policy_name": "api-read-access",
+  "evaluation_time_ms": 15,
+  "cache_hit": false,
+  "decision_id": "dec-789-012",
+  "timestamp": "2025-01-25T10:30:00.234Z"
+}
+```
+
+**Example Response (Denied)**:
+```json
+{
+  "decision": "DENY",
+  "reason": "User lacks required role for write action",
+  "policy_name": "api-read-access",
+  "evaluation_time_ms": 12,
+  "cache_hit": true,
+  "decision_id": "dec-789-013",
+  "timestamp": "2025-01-25T10:30:05.456Z"
+}
+```
+
+### Bulk Decision Evaluation
+
+**Endpoint**: `POST /decisions/evaluate/bulk`
+
+**Description**: Evaluate multiple authorization decisions in one request
+
+**Request Body**:
+```json
+{
+  "decisions": [
+    {
+      "decision_id": "dec-1",
+      "user": {"id": "user-123", "roles": ["developer"]},
+      "resource": {"type": "api", "path": "/api/users"},
+      "action": {"name": "read"}
+    },
+    {
+      "decision_id": "dec-2",
+      "user": {"id": "user-123", "roles": ["developer"]},
+      "resource": {"type": "api", "path": "/api/users"},
+      "action": {"name": "write"}
+    }
+  ]
+}
+```
+
+**Example Response**:
+```json
+{
+  "results": [
+    {
+      "decision_id": "dec-1",
+      "decision": "PERMIT",
+      "reason": "Developer can read",
+      "evaluation_time_ms": 10
+    },
+    {
+      "decision_id": "dec-2",
+      "decision": "DENY",
+      "reason": "Developer cannot write",
+      "evaluation_time_ms": 8
+    }
+  ],
+  "total_evaluation_time_ms": 18
+}
+```
+
+### Get Decision Audit Logs
+
+**Endpoint**: `GET /decisions/audit`
+
+**Description**: Retrieve decision audit logs
+
+**Query Parameters**:
+- `start_date` (string): Start date (ISO 8601)
+- `end_date` (string): End date (ISO 8601)
+- `user_id` (string): Filter by user
+- `resource_id` (string): Filter by resource
+- `decision` (string): Filter by decision (`PERMIT`, `DENY`)
+- `policy_id` (integer): Filter by policy
+- `limit` (integer): Results per page
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://api.controlcore.yourcompany.com/api/v1/decisions/audit?start_date=2025-01-25T00:00:00Z&decision=DENY&limit=100"
+```
+
+**Example Response**:
+```json
+{
+  "logs": [
+    {
+      "decision_id": "dec-123-456",
+      "timestamp": "2025-01-25T10:30:00Z",
+      "user": {
+        "id": "user-123",
+        "email": "john@company.com"
+      },
+      "resource": {
+        "type": "api",
+        "path": "/api/v1/payments"
+      },
+      "action": "write",
+      "decision": "DENY",
+      "policy_name": "api-read-access",
+      "reason": "User lacks write permission",
+      "evaluation_time_ms": 12,
+      "ip_address": "192.168.1.100"
+    }
+  ],
+  "total": 1250,
+  "filtered": 45
+}
+```
+
+## User Management APIs
+
+### Create User
+
+**Endpoint**: `POST /users`
+
+**Request Body**:
+```json
+{
+  "email": "newuser@company.com",
+  "username": "newuser",
+  "password": "SecurePassword123!",
+  "roles": ["developer"],
+  "department": "Engineering",
+  "attributes": {
+    "clearance_level": 2,
+    "manager": "user-456"
+  }
+}
+```
+
+**Example Response**:
+```json
+{
+  "id": "user-789",
+  "email": "newuser@company.com",
+  "username": "newuser",
+  "roles": ["developer"],
+  "created_at": "2025-01-25T17:00:00Z",
+  "message": "User created successfully"
+}
+```
+
+### Update User Roles
+
+**Endpoint**: `PUT /users/{user_id}/roles`
+
+**Request Body**:
+```json
+{
+  "roles": ["developer", "team-lead"],
+  "reason": "Promoted to team lead"
+}
+```
+
+### Get Current User
+
+**Endpoint**: `GET /auth/me`
+
+**Description**: Get currently authenticated user information
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/auth/me
+```
+
+**Example Response**:
+```json
+{
+  "id": "user-123",
+  "email": "john@company.com",
+  "username": "john.doe",
+  "roles": ["developer", "team-lead"],
+  "department": "Engineering",
+  "attributes": {
+    "clearance_level": 3,
+    "mfa_enabled": true
+  },
+  "permissions": ["policies:read", "policies:create", "policies:test"]
+}
+```
+
+## AI Agent Management APIs
+
+### List AI Agents
+
+**Endpoint**: `GET /ai-agents`
+
+**Query Parameters**:
+- `agent_type` (string): Filter by type (`llm`, `rag`, `chatbot`)
+- `provider` (string): Filter by provider (`openai`, `anthropic`, `google`)
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://api.controlcore.yourcompany.com/api/v1/ai-agents?agent_type=llm"
+```
+
+**Example Response**:
+```json
+{
+  "agents": [
+    {
+      "id": 1,
+      "name": "Customer Support Bot",
+      "type": "llm",
+      "provider": "openai",
+      "model": "gpt-4",
+      "status": "active",
+      "configuration": {
+        "max_tokens": 4096,
+        "temperature": 0.7
+      },
+      "policies": [15, 16],
+      "created_at": "2025-01-20T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Register AI Agent
+
+**Endpoint**: `POST /ai-agents`
+
+**Request Body**:
+```json
+{
+  "name": "Financial Advisor AI",
+  "type": "llm",
+  "provider": "openai",
+  "model": "gpt-4",
+  "configuration": {
+    "max_tokens": 2000,
+    "temperature": 0.3,
+    "safety_settings": {
+      "content_filter": "strict",
+      "prompt_validation": true
+    }
+  },
+  "policies": [20, 21],
+  "attributes": {
+    "compliance": ["FINTRAC", "OSFI"],
+    "data_classification": "financial"
+  }
+}
+```
+
+## Policy Information Point (PIP) APIs
+
+### List Data Source Connections
+
+**Endpoint**: `GET /pip/connections`
+
+**Example Request**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/pip/connections
+```
+
+**Example Response**:
+```json
+{
+  "connections": [
+    {
+      "id": 1,
+      "name": "Production Okta",
+      "provider": "okta",
+      "connection_type": "identity",
+      "status": "active",
+      "last_sync": "2025-01-25T17:00:00Z",
+      "sync_frequency": "hourly",
+      "health_status": "healthy",
+      "records_synced": 1250
+    }
+  ]
+}
+```
+
+### Create Data Source Connection
+
+**Endpoint**: `POST /pip/connections`
+
+**Request Body**:
+```json
+{
+  "name": "Production Okta",
+  "provider": "okta",
+  "connection_type": "identity",
+  "configuration": {
+    "domain": "company.okta.com",
+    "api_version": "v1"
+  },
+  "credentials": {
+    "oauth_token": {
+      "client_id": "your-client-id",
+      "client_secret": "your-client-secret"
+    }
+  },
+  "sync_enabled": true,
+  "sync_frequency": "hourly"
+}
+```
+
+### Test Connection
+
+**Endpoint**: `POST /pip/connections/test`
+
+**Request Body**: Same as Create Connection
+
+**Example Response**:
+```json
+{
+  "success": true,
+  "status": "connected",
+  "response_time": 0.234,
+  "fields": [
+    {"name": "id", "type": "string"},
+    {"name": "email", "type": "string"},
+    {"name": "profile.department", "type": "string"}
+  ],
+  "sample_data": {
+    "user_count": 1250,
+    "group_count": 45
+  }
+}
+```
+
+### Trigger Manual Sync
+
+**Endpoint**: `POST /pip/connections/{connection_id}/trigger-sync`
+
+**Example Request**:
+```bash
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/pip/connections/1/trigger-sync \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Example Response**:
+```json
+{
+  "message": "Sync triggered successfully",
+  "connection_id": 1,
+  "sync_job_id": "sync-job-789",
+  "status": "in_progress"
+}
+```
+
+## Monitoring APIs
+
+### Get System Health
+
+**Endpoint**: `GET /health`
+
+**Description**: Get overall system health status
+
+**Example Request**:
+```bash
+curl https://api.controlcore.yourcompany.com/api/v1/health
+```
+
+**Example Response**:
+```json
+{
+  "status": "healthy",
+  "version": "2.0.0",
+  "uptime_seconds": 864000,
+  "components": {
+    "database": {
+      "status": "connected",
+      "latency_ms": 5,
+      "connections": 45
+    },
+    "redis": {
+      "status": "connected",
+      "latency_ms": 2,
+      "memory_usage_mb": 250
+    },
+    "opal": {
+      "status": "connected",
+      "last_sync": "2025-01-25T17:00:00Z",
+      "connected_clients": 10
+    }
+  },
+  "timestamp": "2025-01-25T17:05:00Z"
+}
+```
+
+### Get Metrics
+
+**Endpoint**: `GET /metrics`
+
+**Description**: Get system metrics (Prometheus format)
+
+**Example Response**:
+```
+# HELP http_requests_total Total HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/policies",status="200"} 15000
+http_requests_total{method="POST",endpoint="/decisions/evaluate",status="200"} 50000
+
+# HELP http_request_duration_seconds HTTP request latency
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{le="0.01"} 40000
+http_request_duration_seconds_bucket{le="0.05"} 48000
+http_request_duration_seconds_bucket{le="0.1"} 49500
+
+# HELP policy_evaluations_total Total policy evaluations
+# TYPE policy_evaluations_total counter
+policy_evaluations_total{policy="api-auth",decision="allow"} 35000
+policy_evaluations_total{policy="api-auth",decision="deny"} 5000
+```
+
+### Get Dashboard Statistics
+
+**Endpoint**: `GET /dashboard/stats`
+
+**Example Response**:
+```json
+{
+  "overview": {
+    "total_policies": 45,
+    "active_policies": 38,
+    "total_resources": 150,
+    "total_users": 1250,
+    "total_decisions_today": 450000
+  },
+  "performance": {
+    "avg_policy_evaluation_ms": 12,
+    "cache_hit_rate": 0.87,
+    "requests_per_second": 450
+  },
+  "security": {
+    "denied_requests_today": 2500,
+    "failed_auth_attempts_today": 15,
+    "suspicious_activities": 3
+  }
+}
+```
+
+## Bouncer/PEP Management APIs
+
+### List Bouncers
+
+**Endpoint**: `GET /bouncers`
+
+**Example Response**:
+```json
+{
+  "bouncers": [
+    {
+      "id": 1,
+      "name": "Production Bouncer 1",
+      "hostname": "bouncer-1.company.com",
+      "status": "connected",
+      "last_heartbeat": "2025-01-25T17:05:00Z",
+      "version": "2.0.0",
+      "environment": "production",
+      "policies_synced": 38,
+      "requests_per_second": 450,
+      "cache_hit_rate": 0.87
+    }
+  ]
+}
+```
+
+### Register Bouncer
+
+**Endpoint**: `POST /bouncers`
+
+**Request Body**:
+```json
+{
+  "name": "Production Bouncer 3",
+  "hostname": "bouncer-3.company.com",
+  "port": 8080,
+  "environment": "production",
+  "target_app": "api.company.com:8000",
+  "configuration": {
+    "cache_enabled": true,
+    "cache_ttl": "5m"
+  }
+}
+```
+
+### Get Bouncer Health
+
+**Endpoint**: `GET /bouncers/{bouncer_id}/health`
+
+**Example Response**:
+```json
+{
+  "bouncer_id": 1,
+  "status": "healthy",
+  "last_heartbeat": "2025-01-25T17:05:00Z",
+  "opal_connected": true,
+  "target_app_reachable": true,
+  "policies_loaded": 38,
+  "cache_status": {
+    "policy_cache_size": 38,
+    "decision_cache_size": 5430,
+    "hit_rate": 0.87
+  }
+}
+```
+
+## Webhook APIs
+
+### Configure Webhook
+
+**Endpoint**: `POST /webhooks`
+
+**Request Body**:
+```json
+{
+  "name": "Policy Update Notification",
+  "url": "https://your-app.com/webhooks/policy-update",
+  "events": ["policy.created", "policy.updated", "policy.deployed"],
+  "secret": "your-webhook-secret",
+  "enabled": true
+}
+```
+
+### Webhook Event Types
+
+```
+# Policy Events
+policy.created
+policy.updated
+policy.deleted
+policy.deployed
+policy.promoted
+
+# Resource Events
+resource.created
+resource.updated
+resource.deleted
+
+# User Events
+user.created
+user.updated
+user.deleted
+user.role_changed
+
+# Decision Events
+decision.high_deny_rate
+decision.suspicious_pattern
+
+# System Events
+bouncer.connected
+bouncer.disconnected
+opal.sync_completed
+opal.sync_failed
+```
+
+### Webhook Payload Format
+
+```json
+{
+  "event_id": "evt-123-456",
+  "event_type": "policy.deployed",
+  "timestamp": "2025-01-25T17:10:00Z",
+  "data": {
+    "policy_id": 25,
+    "policy_name": "api-authentication",
+    "environment": "production",
+    "deployed_by": "admin@company.com"
+  },
+  "signature": "sha256=..."
+}
+```
+
+**Verify Webhook Signature**:
+```python
+import hmac
+import hashlib
+
+def verify_webhook(payload, signature, secret):
+    expected = hmac.new(
+        secret.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(f"sha256={expected}", signature)
+```
+
+## Error Handling
+
+### HTTP Status Codes
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| 200 | OK | Request succeeded |
+| 201 | Created | Resource created successfully |
+| 400 | Bad Request | Invalid request parameters |
+| 401 | Unauthorized | Authentication required or failed |
+| 403 | Forbidden | Authenticated but not authorized |
+| 404 | Not Found | Resource not found |
+| 409 | Conflict | Resource already exists or conflict |
+| 422 | Unprocessable Entity | Validation error |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Server error |
+| 503 | Service Unavailable | Service temporarily unavailable |
+
+### Error Response Format
+
+```json
+{
+  "error": "validation_error",
+  "message": "Policy validation failed",
+  "details": [
+    {
+      "field": "rego_code",
+      "error": "Syntax error on line 10",
+      "line": 10,
+      "column": 5
+    }
+  ],
+  "request_id": "req-123-456",
+  "timestamp": "2025-01-25T17:15:00Z"
+}
+```
+
+### Common Error Codes
+
+**Authentication Errors**:
+```json
+{
+  "error": "invalid_token",
+  "message": "JWT token is invalid or expired",
+  "code": "AUTH_001"
+}
+```
+
+**Validation Errors**:
+```json
+{
+  "error": "validation_error",
+  "message": "Request validation failed",
+  "code": "VAL_001",
+  "details": {
+    "field": "email",
+    "constraint": "format",
+    "message": "Must be a valid email address"
+  }
+}
+```
+
+**Resource Errors**:
+```json
+{
+  "error": "resource_not_found",
+  "message": "Policy with ID 999 not found",
+  "code": "RES_001"
+}
+```
+
+## Code Examples
+
+### Python SDK Example
+
+```python
+import requests
+
+class ControlCoreClient:
+    def __init__(self, base_url, api_key):
+        self.base_url = base_url
+        self.headers = {
+            "X-API-Key": api_key,
+            "Content-Type": "application/json"
+        }
+    
+    def create_policy(self, policy_data):
+        """Create a new policy"""
+        response = requests.post(
+            f"{self.base_url}/policies",
+            headers=self.headers,
+            json=policy_data
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def evaluate_decision(self, user, resource, action, context=None):
+        """Evaluate an authorization decision"""
+        payload = {
+            "user": user,
+            "resource": resource,
+            "action": action,
+            "context": context or {}
+        }
+        response = requests.post(
+            f"{self.base_url}/decisions/evaluate",
+            headers=self.headers,
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
+# Usage
+client = ControlCoreClient(
+    "https://api.controlcore.yourcompany.com/api/v1",
+    "your-api-key"
+)
+
+# Create policy
+policy = client.create_policy({
+    "name": "api-access",
+    "rego_code": "package controlcore.policy...",
+    "environment": "sandbox"
+})
+
+# Evaluate decision
+decision = client.evaluate_decision(
+    user={"id": "user-123", "roles": ["developer"]},
+    resource={"type": "api", "path": "/api/users"},
+    action={"name": "read"}
+)
+
+print(f"Decision: {decision['decision']}")
+```
+
+### JavaScript/TypeScript SDK Example
+
+```typescript
+class ControlCoreClient {
+  private baseUrl: string;
+  private apiKey: string;
+
+  constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+  }
+
+  async createPolicy(policyData: any): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/policies`, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': this.apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(policyData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+
+  async evaluateDecision(
+    user: any,
+    resource: any,
+    action: any,
+    context?: any
+  ): Promise<any> {
+    const payload = { user, resource, action, context: context || {} };
+    
+    const response = await fetch(`${this.baseUrl}/decisions/evaluate`, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': this.apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+}
+
+// Usage
+const client = new ControlCoreClient(
+  'https://api.controlcore.yourcompany.com/api/v1',
+  'your-api-key'
+);
+
+// Evaluate decision
+const decision = await client.evaluateDecision(
+  { id: 'user-123', roles: ['developer'] },
+  { type: 'api', path: '/api/users' },
+  { name: 'read' }
+);
+
+console.log(`Decision: ${decision.decision}`);
+```
+
+### cURL Examples
+
+**Create and Deploy Policy**:
+```bash
+#!/bin/bash
+
+API_URL="https://api.controlcore.yourcompany.com/api/v1"
+API_KEY="your-api-key"
+
+# 1. Create policy
+POLICY_ID=$(curl -X POST "$API_URL/policies" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "api-access",
+    "description": "API access control",
+    "rego_code": "package controlcore.policy\n\nimport rego.v1\n\ndefault allow := false\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+    "environment": "sandbox"
+  }' | jq -r '.id')
+
+echo "Created policy ID: $POLICY_ID"
+
+# 2. Test policy
+curl -X POST "$API_URL/policies/$POLICY_ID/test" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "test_cases": [
+      {
+        "name": "Admin allowed",
+        "input": {"user": {"roles": ["admin"]}},
+        "expected": true
+      }
+    ]
+  }' | jq .
+
+# 3. Promote to production
+curl -X POST "$API_URL/policies/$POLICY_ID/promote" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"deployment_notes": "Tested successfully"}' | jq .
+```
+
+## Pagination
+
+All list endpoints support pagination:
+
+**Query Parameters**:
+- `skip`: Number of records to skip (default: 0)
+- `limit`: Maximum records to return (default: 100, max: 1000)
+
+**Response includes pagination metadata**:
+```json
+{
+  "data": [...],
+  "pagination": {
+    "total": 450,
+    "page": 1,
+    "page_size": 100,
+    "total_pages": 5
+  }
+}
+```
+
+## Filtering and Sorting
+
+**Filtering**:
+```bash
+# Filter by status
+GET /policies?status=active
+
+# Filter by environment
+GET /policies?environment=production
+
+# Filter by date range
+GET /decisions/audit?start_date=2025-01-20&end_date=2025-01-25
+
+# Multiple filters
+GET /policies?status=active&environment=production&name=api
+```
+
+**Sorting**:
+```bash
+# Sort by created date (descending)
+GET /policies?sort=-created_at
+
+# Sort by name (ascending)
+GET /policies?sort=name
+
+# Multiple sort fields
+GET /policies?sort=environment,-created_at
+```
+
+## Versioning
+
+The API uses URL versioning:
+
+- **Current**: `/api/v1`
+- **Legacy**: `/api/v0` (deprecated)
+
+**Version Header** (alternative):
+```bash
+curl -H "Accept-Version: v1" \
+  https://api.controlcore.yourcompany.com/api/policies
+```
+
+## Best Practices
+
+### 1. Use Idempotency Keys
+
+For non-idempotent operations (POST, PUT, DELETE):
+
+```bash
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/policies \
+  -H "Idempotency-Key: unique-key-123" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d @policy.json
+```
+
+### 2. Handle Rate Limits
+
+```python
+import time
+
+def make_request_with_retry(url, max_retries=3):
+    for attempt in range(max_retries):
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 429:
+            # Rate limited
+            retry_after = int(response.headers.get('Retry-After', 60))
+            time.sleep(retry_after)
+            continue
+        
+        return response
+    
+    raise Exception("Max retries exceeded")
+```
+
+### 3. Use Bulk Operations
+
+Instead of individual requests:
+```python
+# Good: Bulk evaluation
+decisions = client.evaluate_bulk([
+    {"user": user1, "resource": resource1, "action": action1},
+    {"user": user2, "resource": resource2, "action": action2}
+])
+
+# Bad: Individual requests (slower, more rate limit usage)
+decision1 = client.evaluate(user1, resource1, action1)
+decision2 = client.evaluate(user2, resource2, action2)
+```
+
+## Support
+
+- **[User Guide](/guides/user-guide)**: Learn to use the API through the UI
+- **[Troubleshooting](/guides/troubleshooting)**: Common API issues
+- **Interactive API Docs**: `https://api.controlcore.yourcompany.com/docs`
+- **Support**: support@controlcore.io
+
+---
+
+**Complete API documentation with interactive testing available at your API endpoint `/docs` (Swagger UI)**
+

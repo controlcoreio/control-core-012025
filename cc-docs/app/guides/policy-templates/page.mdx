@@ -1,0 +1,1211 @@
+# Policy Templates Guide
+
+Control Core provides a comprehensive library of pre-built policy templates for common authorization scenarios, regulatory compliance, and industry-specific use cases. This guide will help you use and extend these templates effectively.
+
+## Template Overview
+
+Policy templates provide starting points for common authorization scenarios, allowing you to deploy secure policies quickly without writing Rego code from scratch.
+
+### Benefits of Using Templates
+
+- **Faster Deployment**: Start with proven patterns
+- **Best Practices**: Templates follow security and compliance best practices
+- **Tested**: All templates include comprehensive test cases
+- **Customizable**: Easy to modify for your specific needs
+- **Compliant**: Compliance templates follow regulatory requirements
+
+### Template Categories
+
+1. **API Protection** - Secure REST APIs and microservices
+2. **Financial Compliance** - FINTRAC, OSFI, AML, FinCEN regulations
+3. **Healthcare Compliance** - HIPAA, PHIPA requirements
+4. **Data Protection** - GDPR, PCI-DSS, SOC 2
+5. **AI/LLM Control** - AI agent, LLM, and RAG system policies
+6. **Access Control** - RBAC, ABAC, time-based, geo-location
+7. **Enterprise Patterns** - Resource ownership, organizational access
+
+## Using Templates
+
+### Browsing Templates
+
+**In Policy Administration Console**:
+1. Navigate to **Policies** → **Templates**
+2. Browse by category or search
+3. Click template to preview
+
+**Via API**:
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/templates
+```
+
+### Applying a Template
+
+**Method 1: Through Console**
+
+1. Click **Policies** → **Create from Template**
+2. Select template (e.g., "FINTRAC Large Cash Transaction")
+3. Click **Use This Template**
+4. Customize variables and parameters
+5. Save and deploy
+
+**Method 2: Via API**
+
+```bash
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/policies/from-template \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": "fintrac-lctr",
+    "name": "Production FINTRAC LCTR Policy",
+    "parameters": {
+      "threshold_amount": 10000,
+      "threshold_currency": "CAD"
+    },
+    "environment": "sandbox"
+  }'
+```
+
+## Template Catalog
+
+### Financial Compliance Templates
+
+#### FINTRAC Large Cash Transaction Report (LCTR)
+
+**Template ID**: `fintrac-lctr`
+
+**Description**: Implements FINTRAC requirements for reporting cash transactions over CAD $10,000
+
+**Parameters**:
+- `threshold_amount` (number): Reporting threshold (default: 10000)
+- `threshold_currency` (string): Currency code (default: "CAD")
+- `allowed_roles` (array): Roles that can process transactions
+
+**Template Code**:
+```rego
+package fintrac.lctr
+
+import rego.v1
+
+default allow := false
+default requires_lctr := false
+
+# Configuration
+threshold_amount := {{threshold_amount}}
+threshold_currency := "{{threshold_currency}}"
+allowed_roles := {{allowed_roles}}
+
+# FINTRAC: Large Cash Transaction Reporting
+requires_lctr if {
+    input.transaction.amount >= threshold_amount
+    input.transaction.currency == threshold_currency
+    input.transaction.type in ["cash", "cash_equivalent"]
+}
+
+allow if {
+    # User must be authorized and trained
+    input.user.roles[_] in allowed_roles
+    input.user.attributes.fintrac_certified == true
+    
+    # Required transaction details present
+    input.transaction.customer_id != null
+    input.transaction.conductor_id != null
+    input.transaction.purpose != null
+    input.transaction.source_of_funds != null
+    
+    # Create LCTR if required
+    log_lctr_requirement if requires_lctr
+}
+
+log_lctr_requirement if {
+    # Creates audit log entry for LCTR filing
+    true
+}
+```
+
+**Use Case**: Banks, credit unions, money service businesses in Canada
+
+#### FINTRAC Suspicious Transaction Report (STR)
+
+**Template ID**: `fintrac-str`
+
+**Description**: Detects and handles suspicious transaction patterns
+
+**Template Code**:
+```rego
+package fintrac.str
+
+import rego.v1
+
+default allow := false
+
+# STR Detection Indicators
+str_indicators[indicator] if {
+    # Structuring: Multiple transactions under threshold
+    recent := data.transactions_30days[input.transaction.customer_id]
+    near_threshold := [t | 
+        t := recent[_]
+        t.amount >= 9000
+        t.amount < 10000
+    ]
+    count(near_threshold) >= 3
+    indicator := {
+        "type": "structuring",
+        "severity": "high",
+        "description": "Multiple transactions just under reporting threshold",
+        "transactions": near_threshold
+    }
+}
+
+str_indicators[indicator] if {
+    # Rapid funds movement
+    input.transaction.type == "wire_transfer"
+    input.transaction.time_since_receipt_hours < 24
+    input.transaction.immediate_withdrawal == true
+    indicator := {
+        "type": "rapid_funds_movement",
+        "severity": "high",
+        "description": "Funds received and immediately withdrawn"
+    }
+}
+
+str_indicators[indicator] if {
+    # Unusual transaction pattern
+    customer := data.customers[input.transaction.customer_id]
+    input.transaction.amount > (customer.average_transaction * 10)
+    indicator := {
+        "type": "unusual_amount",
+        "severity": "medium",
+        "description": "Transaction amount significantly higher than normal"
+    }
+}
+
+# Block suspicious transactions for compliance review
+allow if {
+    count(str_indicators) == 0
+}
+
+allow if {
+    count(str_indicators) > 0
+    input.user.roles[_] == "compliance-officer"
+    input.transaction.str_review_completed == true
+    input.transaction.str_filed == true
+}
+```
+
+#### OSFI Segregation of Duties
+
+**Template ID**: `osfi-segregation-duties`
+
+**Description**: Implements OSFI Guideline B-10 segregation of duties requirements
+
+**Parameters**:
+- `conflicting_pairs` (array): Pairs of conflicting roles
+
+**Template Code**:
+```rego
+package osfi.segregation
+
+import rego.v1
+
+default allow := false
+
+# Conflicting duty pairs (customizable)
+conflicting_duty_pairs := {{conflicting_pairs}}
+
+has_conflicting_duties if {
+    some pair in conflicting_duty_pairs
+    pair[0] in input.user.roles
+    pair[1] in input.user.roles
+}
+
+# Deny if user has conflicting duties
+allow if {
+    not has_conflicting_duties
+    input.user.roles[_] in authorized_roles[input.action.name]
+}
+
+# Dual authorization for high-value transactions
+allow if {
+    input.transaction.amount >= 100000
+    count(input.transaction.approvers) >= 2
+    input.user.id in input.transaction.approvers
+    input.user.roles[_] in ["senior-manager", "vp", "c-level"]
+}
+```
+
+**Default Parameters**:
+```json
+{
+  "conflicting_pairs": [
+    ["transaction-initiator", "transaction-approver"],
+    ["payment-creator", "payment-approver"],
+    ["account-opener", "account-approver"],
+    ["maker", "checker"]
+  ]
+}
+```
+
+#### AML Know Your Customer (KYC)
+
+**Template ID**: `aml-kyc`
+
+**Description**: Implements AML KYC verification requirements for US and Canada
+
+**Template Code**:
+```rego
+package aml.kyc
+
+import rego.v1
+
+default allow := false
+
+# AML: Customer Due Diligence
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    
+    # Basic KYC complete
+    customer.kyc_status == "verified"
+    customer.identity_verified == true
+    
+    # Four key elements present
+    customer.name != null
+    customer.date_of_birth != null
+    customer.address != null
+    customer.identification_number != null
+    
+    # KYC is current (less than 12 months old)
+    kyc_age_days := (time.now_ns() - time.parse_rfc3339_ns(customer.kyc_date)) / (24 * 60 * 60 * 1000000000)
+    kyc_age_days < 365
+    
+    # Risk-based requirements satisfied
+    risk_requirements_met(customer)
+}
+
+risk_requirements_met(customer) if {
+    customer.risk_level == "low"
+}
+
+risk_requirements_met(customer) if {
+    customer.risk_level == "medium"
+    customer.source_of_funds_verified == true
+}
+
+risk_requirements_met(customer) if {
+    customer.risk_level == "high"
+    customer.enhanced_due_diligence == true
+    customer.beneficial_owner_identified == true
+    customer.source_of_wealth_verified == true
+}
+
+# PEP (Politically Exposed Person) handling
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    customer.pep_status == true
+    customer.enhanced_due_diligence == true
+    customer.senior_management_approval == true
+    input.user.roles[_] == "compliance-officer"
+}
+
+# Sanctions screening
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    not customer.id in data.sanctions_lists.ofac
+    not customer.id in data.sanctions_lists.un
+    screening_current(customer.last_screening_date)
+}
+
+screening_current(date) if {
+    age_days := (time.now_ns() - time.parse_rfc3339_ns(date)) / (24 * 60 * 60 * 1000000000)
+    age_days < 30  # Re-screen monthly
+}
+```
+
+#### FinCEN Currency Transaction Report (CTR)
+
+**Template ID**: `fincen-ctr`
+
+**Description**: Implements FinCEN CTR requirements for USD $10,000+ transactions
+
+**Template Code**:
+```rego
+package fincen.ctr
+
+import rego.v1
+
+default allow := false
+default requires_ctr := false
+
+# FinCEN: CTR required for $10,000+ cash transactions
+requires_ctr if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "USD"
+    input.transaction.type in ["cash", "deposit", "withdrawal", "exchange"]
+}
+
+allow if {
+    input.user.roles[_] in ["teller", "financial-officer", "compliance-officer"]
+    
+    # CTR requirements
+    input.transaction.customer_identified == true
+    input.transaction.conductor_identified == true
+    
+    # Multiple person rule (>$10,000)
+    multiple_persons_handled if requires_ctr
+}
+
+multiple_persons_handled if {
+    # If multiple persons conducting, document all
+    count(input.transaction.conductors) > 1
+    every conductor in input.transaction.conductors {
+        conductor.identified == true
+        conductor.id_verified == true
+    }
+}
+
+# File CTR if required
+allow if {
+    requires_ctr
+    input.transaction.ctr_filed == true
+    input.transaction.ctr_number != null
+}
+```
+
+### Healthcare Compliance Templates
+
+#### HIPAA Minimum Necessary Rule
+
+**Template ID**: `hipaa-minimum-necessary`
+
+**Description**: Implements HIPAA minimum necessary principle for PHI access
+
+**Parameters**:
+- `care_roles` (array): Roles authorized for patient care
+- `necessary_fields` (object): Fields necessary by purpose
+
+**Template Code**:
+```rego
+package hipaa.minimum_necessary
+
+import rego.v1
+
+default allow := false
+
+# Care team roles
+care_roles := {{care_roles}}
+
+# Fields necessary for each purpose
+necessary_fields := {{necessary_fields}}
+
+# HIPAA: Access only minimum necessary PHI
+allow if {
+    input.user.roles[_] in care_roles
+    
+    # User is treating this patient
+    patient_id := input.resource.attributes.patient_id
+    care_team := data.patient_care_teams[patient_id]
+    input.user.id in care_team.members
+    
+    # Purpose is documented and valid
+    input.context.purpose_of_use in ["treatment", "payment", "healthcare-operations"]
+    
+    # Fields requested are necessary for purpose
+    requested := input.query.fields
+    necessary := necessary_fields[input.context.purpose_of_use]
+    every field in requested {
+        field in necessary
+    }
+}
+```
+
+**Default Parameters**:
+```json
+{
+  "care_roles": ["physician", "nurse", "medical-assistant", "pharmacist"],
+  "necessary_fields": {
+    "treatment": ["patient_id", "name", "dob", "diagnosis", "medications", "allergies", "vital_signs", "lab_results"],
+    "payment": ["patient_id", "name", "dob", "insurance_info", "billing_codes", "charges", "payment_history"],
+    "healthcare-operations": ["patient_id", "encounter_date", "provider_id", "facility", "department"]
+  }
+}
+```
+
+### API Protection Templates
+
+#### API Key Authentication
+
+**Template ID**: `api-key-auth`
+
+**Description**: Basic API key authentication
+
+**Template Code**:
+```rego
+package api.key_auth
+
+import rego.v1
+
+default allow := false
+
+# API key authentication
+allow if {
+    api_key := input.request.headers["X-API-Key"]
+    api_key != null
+    
+    # Verify API key
+    key_info := data.api_keys[api_key]
+    key_info != null
+    key_info.active == true
+    key_info.expiry > time.now_ns()
+    
+    # Check rate limiting
+    rate_limit_ok(key_info.key_id)
+}
+
+rate_limit_ok(key_id) if {
+    usage := data.api_key_usage[key_id]
+    usage.requests_last_hour < 1000
+}
+```
+
+#### OAuth 2.0 Token Validation
+
+**Template ID**: `oauth-token-validation`
+
+**Description**: Validate OAuth 2.0 Bearer tokens
+
+**Template Code**:
+```rego
+package api.oauth
+
+import rego.v1
+
+default allow := false
+
+# OAuth token validation
+allow if {
+    auth_header := input.request.headers["Authorization"]
+    startswith(auth_header, "Bearer ")
+    
+    token := trim_prefix(auth_header, "Bearer ")
+    token_valid(token)
+}
+
+token_valid(token) if {
+    # Decode and verify JWT
+    payload := io.jwt.decode(token)[1]
+    
+    # Check expiration
+    payload.exp > time.now_ns() / 1000000000
+    
+    # Check issuer
+    payload.iss == "https://auth.yourcompany.com"
+    
+    # Check audience
+    payload.aud == "https://api.yourcompany.com"
+    
+    # Check scopes
+    required_scope := input.resource.required_scope
+    required_scope in payload.scopes
+}
+```
+
+### Data Protection Templates
+
+#### GDPR Right to Access
+
+**Template ID**: `gdpr-right-to-access`
+
+**Description**: Implements GDPR Article 15 (Right to Access)
+
+**Template Code**:
+```rego
+package gdpr.access
+
+import rego.v1
+
+default allow := false
+
+# Data subject can access their own data
+allow if {
+    input.action.name == "read"
+    input.resource.type == "personal_data"
+    input.resource.attributes.data_subject_id == input.user.id
+}
+
+# Data Protection Officer can access for compliance
+allow if {
+    input.user.roles[_] == "data-protection-officer"
+    input.context.purpose == "compliance_review"
+    input.context.request_id != null
+    input.context.audit_enabled == true
+}
+
+# Support staff can access with customer consent
+allow if {
+    input.user.roles[_] == "customer-support"
+    consent := data.customer_consents[input.resource.attributes.data_subject_id]
+    consent.support_access == true
+    consent.expiry > time.now_ns()
+}
+```
+
+#### GDPR Right to Erasure
+
+**Template ID**: `gdpr-right-to-erasure`
+
+**Description**: Implements GDPR Article 17 (Right to be Forgotten)
+
+**Template Code**:
+```rego
+package gdpr.erasure
+
+import rego.v1
+
+default allow := false
+
+# Right to be forgotten
+allow if {
+    input.action.name == "delete"
+    input.resource.type == "personal_data"
+    
+    # Verify erasure request exists and is approved
+    erasure_request := data.erasure_requests[input.resource.attributes.data_subject_id]
+    erasure_request.status == "approved"
+    erasure_request.legal_grounds_verified == true
+    erasure_request.approved_by != null
+    
+    # Only DPO can execute
+    input.user.roles[_] == "data-protection-officer"
+    
+    # Check for legal obligations to retain
+    not legal_retention_required(input.resource)
+}
+
+legal_retention_required(resource) if {
+    # Tax records: 7 years
+    resource.attributes.category == "tax_record"
+    age_days := (time.now_ns() - time.parse_rfc3339_ns(resource.attributes.created_at)) / (24 * 60 * 60 * 1000000000)
+    age_days < 2555
+}
+
+legal_retention_required(resource) if {
+    # Employment records: 7 years after termination
+    resource.attributes.category == "employment_record"
+    employment_end := time.parse_rfc3339_ns(resource.attributes.employment_end_date)
+    age_since_end := (time.now_ns() - employment_end) / (24 * 60 * 60 * 1000000000)
+    age_since_end < 2555
+}
+```
+
+#### PCI-DSS Cardholder Data Access
+
+**Template ID**: `pci-cardholder-data`
+
+**Description**: Restricts access to cardholder data per PCI-DSS requirements
+
+**Template Code**:
+```rego
+package pci.cardholder_data
+
+import rego.v1
+
+default allow := false
+
+# PCI-DSS Requirement 7: Restrict access based on need to know
+allow if {
+    input.resource.attributes.contains_cardholder_data == true
+    
+    # User must have documented business need
+    input.user.attributes.pci_access_justification != null
+    input.user.roles[_] in data.pci_authorized_roles
+    
+    # Access from CDE (Cardholder Data Environment) only
+    input.context.network_segment == "cde"
+    
+    # Strong authentication
+    input.user.attributes.mfa_verified == true
+    
+    # Session timeout (15 minutes for PCI)
+    session_age := (time.now_ns() - time.parse_rfc3339_ns(input.context.session_start)) / 1000000000
+    session_age < 900
+}
+
+# PCI-DSS Requirement 8: No shared accounts
+allow if {
+    input.user.id != null
+    not is_shared_account(input.user.id)
+}
+
+is_shared_account(user_id) if {
+    user_id in ["admin", "root", "service", "shared", "default"]
+}
+```
+
+### AI/LLM Templates
+
+#### AI Agent Basic Access Control
+
+**Template ID**: `ai-agent-access`
+
+**Description**: Basic access control for AI agents with safety checks
+
+**Parameters**:
+- `allowed_roles` (array): Roles authorized to use AI
+- `max_tokens` (number): Maximum tokens per request
+- `safety_threshold` (number): Minimum safety score (0-1)
+
+**Template Code**:
+```rego
+package ai.agent
+
+import rego.v1
+
+default allow := false
+
+# Configuration
+allowed_roles := {{allowed_roles}}
+max_tokens := {{max_tokens}}
+safety_threshold := {{safety_threshold}}
+
+# AI agent access with safety checks
+allow if {
+    # User authorization
+    input.user.roles[_] in allowed_roles
+    input.user.attributes.ai_safety_trained == true
+    
+    # Prompt safety
+    prompt_safe(input.context.prompt)
+    
+    # Usage limits
+    within_limits(input.user.id)
+    
+    # Token limit
+    input.request.max_tokens <= max_tokens
+}
+
+prompt_safe(prompt) if {
+    # Length check
+    count(prompt) > 0
+    count(prompt) < 8000
+    
+    # No PII
+    not contains_pii(prompt)
+    
+    # Safety score
+    input.context.safety_score > safety_threshold
+    
+    # No injection attempts
+    not contains_injection(prompt)
+}
+
+contains_pii(text) if {
+    regex.match(`\d{3}-\d{2}-\d{4}`, text)  # SSN
+}
+
+contains_pii(text) if {
+    regex.match(`\d{16}`, text)  # Credit card
+}
+
+contains_injection(text) if {
+    lower_text := lower(text)
+    injection_keywords := ["ignore previous", "disregard", "jailbreak", "bypass"]
+    some keyword in injection_keywords
+    contains(lower_text, keyword)
+}
+
+within_limits(user_id) if {
+    usage := data.usage_stats[user_id]
+    usage.requests_today < 1000
+    usage.tokens_today < 500000
+}
+```
+
+**Default Parameters**:
+```json
+{
+  "allowed_roles": ["developer", "data-scientist", "ai-engineer"],
+  "max_tokens": 4096,
+  "safety_threshold": 0.85
+}
+```
+
+#### LLM Content Filtering
+
+**Template ID**: `llm-content-filter`
+
+**Description**: Filter LLM responses for sensitive content
+
+**Template Code**:
+```rego
+package ai.content_filter
+
+import rego.v1
+
+# Filter response content
+filtered_response := masked if {
+    response := input.response.content
+    masked := apply_filters(response)
+}
+
+apply_filters(text) := result if {
+    # Step 1: Mask PII
+    step1 := mask_pii(text)
+    
+    # Step 2: Remove sensitive keywords
+    step2 := remove_sensitive_keywords(step1)
+    
+    # Step 3: Check compliance
+    result := ensure_compliant(step2)
+}
+
+mask_pii(text) := result if {
+    # Mask SSN
+    step1 := regex.replace(text, `\d{3}-\d{2}-\d{4}`, "***-**-****")
+    
+    # Mask credit cards
+    step2 := regex.replace(step1, `\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}`, "****-****-****-****")
+    
+    # Mask email addresses
+    step3 := regex.replace(step2, `([a-zA-Z0-9._%+-]+)@`, "***@")
+    
+    # Mask phone numbers
+    result := regex.replace(step3, `\d{3}[-.]?\d{3}[-.]?\d{4}`, "***-***-****")
+}
+
+remove_sensitive_keywords(text) := result if {
+    sensitive := ["password", "api-key", "secret", "private-key", "token"]
+    result := replace_sensitive(text, sensitive)
+}
+
+ensure_compliant(text) := text if {
+    # Verify no regulatory violations
+    not contains(lower(text), "money laundering")
+    not contains(lower(text), "tax evasion")
+}
+```
+
+### Access Control Templates
+
+#### Time-Based Access
+
+**Template ID**: `time-based-access`
+
+**Description**: Restrict access to business hours
+
+**Parameters**:
+- `business_hours_start` (number): Start hour (0-23)
+- `business_hours_end` (number): End hour (0-23)
+- `allowed_days` (array): Allowed days (0-6, 0=Sunday)
+
+**Template Code**:
+```rego
+package access.time_based
+
+import rego.v1
+
+default allow := false
+
+# Configuration
+business_hours_start := {{business_hours_start}}
+business_hours_end := {{business_hours_end}}
+allowed_days := {{allowed_days}}
+
+# Business hours access
+allow if {
+    input.user.roles[_] in ["employee", "contractor"]
+    is_business_hours
+    is_allowed_day
+}
+
+is_business_hours if {
+    [hour, _, _] := time.clock([time.now_ns()])
+    hour >= business_hours_start
+    hour < business_hours_end
+}
+
+is_allowed_day if {
+    weekday := time.weekday([time.now_ns()])
+    weekday in allowed_days
+}
+
+# After-hours access requires approval
+allow if {
+    not is_business_hours
+    input.user.attributes.after_hours_approved == true
+    input.user.roles[_] in ["on-call", "manager", "admin"]
+    input.context.justification != null
+}
+```
+
+**Default Parameters**:
+```json
+{
+  "business_hours_start": 9,
+  "business_hours_end": 17,
+  "allowed_days": [1, 2, 3, 4, 5]
+}
+```
+
+#### Resource Ownership
+
+**Template ID**: `resource-ownership`
+
+**Description**: Users can access only resources they own
+
+**Template Code**:
+```rego
+package access.ownership
+
+import rego.v1
+
+default allow := false
+
+# Users can access their own resources
+allow if {
+    input.resource.attributes.owner_id == input.user.id
+}
+
+# Users can access resources in their team
+allow if {
+    input.resource.attributes.team_id == input.user.attributes.team_id
+    input.action.name in ["read", "list"]
+}
+
+# Managers can access team members' resources
+allow if {
+    input.user.roles[_] == "manager"
+    
+    # Check if user manages resource owner
+    resource_owner := data.users[input.resource.attributes.owner_id]
+    resource_owner.manager_id == input.user.id
+}
+
+# Admin override
+allow if {
+    input.user.roles[_] == "admin"
+    input.context.admin_justification != null
+}
+```
+
+#### Row-Level Security
+
+**Template ID**: `row-level-security`
+
+**Description**: Filter database query results based on user permissions
+
+**Template Code**:
+```rego
+package data.row_level_security
+
+import rego.v1
+
+# Filter visible rows
+visible_rows[row] if {
+    some row in input.query.result
+    
+    # User can see their own rows
+    row.owner_id == input.user.id
+}
+
+visible_rows[row] if {
+    some row in input.query.result
+    
+    # User can see department rows
+    input.user.roles[_] in ["manager", "team-lead"]
+    row.department == input.user.department
+}
+
+visible_rows[row] if {
+    some row in input.query.result
+    
+    # Admin can see all
+    input.user.roles[_] == "admin"
+}
+
+# Mask sensitive columns
+masked_columns[column] := "***REDACTED***" if {
+    some column in sensitive_columns
+    not user_has_clearance_for_column(column)
+}
+
+sensitive_columns := ["ssn", "salary", "bank_account", "credit_card"]
+
+user_has_clearance_for_column(column) if {
+    input.user.attributes.clearance_level >= 3
+}
+```
+
+## Extending Templates
+
+### Customizing Templates
+
+**Step 1: Select and Copy Template**
+```bash
+# Get template
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/templates/fintrac-lctr > template.json
+
+# Extract Rego code
+cat template.json | jq -r '.rego_code' > policy.rego
+```
+
+**Step 2: Modify for Your Needs**
+
+```rego
+# Original template
+allow if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+}
+
+# Customized
+allow if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    
+    # Add: Branch-specific rules
+    input.transaction.branch_id in authorized_branches
+    
+    # Add: Additional validation
+    input.transaction.verified_by_manager == true
+}
+
+authorized_branches := ["branch-001", "branch-002", "branch-005"]
+```
+
+**Step 3: Test Your Customization**
+
+```rego
+# Add tests for custom rules
+test_branch_restriction if {
+    not allow with input as {
+        "transaction": {
+            "amount": 15000,
+            "currency": "CAD",
+            "branch_id": "branch-999"  # Unauthorized branch
+        }
+    }
+}
+```
+
+### Creating Custom Templates
+
+**Template Structure**:
+
+```json
+{
+  "id": "custom-compliance-template",
+  "name": "Custom Compliance Policy",
+  "description": "Organization-specific compliance requirements",
+  "category": "compliance",
+  "subcategory": "custom",
+  "parameters": [
+    {
+      "name": "threshold_amount",
+      "type": "number",
+      "required": true,
+      "default": 10000,
+      "description": "Transaction threshold for additional checks"
+    },
+    {
+      "name": "required_approvers",
+      "type": "number",
+      "required": true,
+      "default": 2,
+      "description": "Number of required approvers"
+    }
+  ],
+  "rego_code": "...",
+  "test_cases": [...],
+  "documentation": "..."
+}
+```
+
+**Share Templates with Team**:
+
+1. Create template in your policy repository
+2. Test thoroughly
+3. Document parameters and use cases
+4. Submit to template library
+5. Share with organization
+
+## Template Best Practices
+
+### 1. Parameterize Configurable Values
+
+```rego
+# Good: Parameterized
+threshold := {{threshold_amount}}  # Configurable
+allowed_roles := {{allowed_roles}}  # Configurable
+
+allow if {
+    input.transaction.amount >= threshold
+    input.user.roles[_] in allowed_roles
+}
+
+# Bad: Hard-coded values
+allow if {
+    input.transaction.amount >= 10000  # Hard to change
+    input.user.roles[_] == "admin"  # Hard to customize
+}
+```
+
+### 2. Include Comprehensive Tests
+
+```rego
+# Include tests for all scenarios
+test_below_threshold_allowed if {
+    allow with input as {
+        "transaction": {"amount": 5000},
+        "user": {"roles": ["teller"]}
+    }
+}
+
+test_above_threshold_requires_approval if {
+    not allow with input as {
+        "transaction": {"amount": 15000},
+        "user": {"roles": ["teller"]}
+    }
+}
+
+test_approved_transaction_allowed if {
+    allow with input as {
+        "transaction": {"amount": 15000, "approved": true},
+        "user": {"roles": ["manager"]}
+    }
+}
+```
+
+### 3. Document Purpose and Usage
+
+```rego
+package custom.template
+
+import rego.v1
+
+# Template: Custom Compliance Policy
+# Purpose: Enforce organization-specific compliance requirements
+# Owner: Compliance Team
+# Last Updated: 2025-01-25
+#
+# Parameters:
+#   - threshold_amount: Transaction amount requiring additional review
+#   - required_approvers: Number of approvers for high-value transactions
+#
+# Compliance:
+#   - FINTRAC: Large transaction reporting
+#   - OSFI: Segregation of duties
+#   - Internal: Dual authorization policy
+#
+# Usage:
+#   1. Set threshold_amount to your organization's limit
+#   2. Configure required_approvers (typically 2 for high-value)
+#   3. Deploy to sandbox for testing
+#   4. Promote to production after validation
+```
+
+## Template Catalog Reference
+
+### Complete Template List
+
+**Financial Compliance**:
+- `fintrac-lctr` - Large Cash Transaction Reporting
+- `fintrac-str` - Suspicious Transaction Reporting
+- `fintrac-third-party` - Third Party Determination
+- `osfi-segregation-duties` - Segregation of Duties (B-10)
+- `osfi-outsourcing` - Third-Party Access Control (B-10)
+- `aml-kyc` - Know Your Customer Verification
+- `aml-cdd` - Customer Due Diligence
+- `aml-edd` - Enhanced Due Diligence
+- `fincen-ctr` - Currency Transaction Report
+- `fincen-sar` - Suspicious Activity Report
+- `fincen-cip` - Customer Identification Program
+- `ofac-screening` - OFAC Sanctions Screening
+
+**Healthcare Compliance**:
+- `hipaa-minimum-necessary` - Minimum Necessary Rule
+- `hipaa-break-glass` - Emergency Access
+- `hipaa-audit-log` - Audit Logging Requirements
+- `phipa-consent` - Patient Consent Verification
+
+**Data Protection**:
+- `gdpr-right-to-access` - Right to Access (Article 15)
+- `gdpr-right-to-erasure` - Right to be Forgotten (Article 17)
+- `gdpr-purpose-limitation` - Purpose Limitation (Article 5)
+- `gdpr-data-portability` - Data Portability (Article 20)
+- `pci-cardholder-data` - Cardholder Data Access
+- `pci-encryption` - Encryption Requirements
+- `soc2-access-control` - Access Control (CC6.1, CC6.2)
+
+**API Protection**:
+- `api-key-auth` - API Key Authentication
+- `api-oauth` - OAuth 2.0 Token Validation
+- `api-jwt` - JWT Token Validation
+- `api-rate-limiting` - Rate Limiting
+- `api-ip-whitelist` - IP Whitelisting
+
+**AI/LLM**:
+- `ai-agent-access` - AI Agent Access Control
+- `ai-prompt-filter` - Prompt Filtering
+- `ai-content-filter` - Response Content Filtering
+- `llm-context-aware` - LLM Context-Aware Policy
+- `rag-authorization` - RAG System Authorization
+- `ai-usage-limits` - AI Usage Quotas
+
+**Access Control**:
+- `rbac-basic` - Basic Role-Based Access
+- `rbac-hierarchy` - Role Hierarchy
+- `abac-attributes` - Attribute-Based Access
+- `time-based-access` - Time-Restricted Access
+- `geo-location` - Geographic Restrictions
+- `resource-ownership` - Resource Ownership
+- `row-level-security` - Database Row Filtering
+- `column-masking` - Sensitive Column Masking
+
+## Quick Start with Templates
+
+### Example: Deploy FINTRAC Template
+
+```bash
+# 1. List available templates
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/templates?category=financial
+
+# 2. Get FINTRAC LCTR template
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.controlcore.yourcompany.com/api/v1/templates/fintrac-lctr
+
+# 3. Create policy from template
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/policies/from-template \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": "fintrac-lctr",
+    "name": "Production FINTRAC LCTR",
+    "parameters": {
+      "threshold_amount": 10000,
+      "threshold_currency": "CAD",
+      "allowed_roles": ["teller", "financial-advisor", "branch-manager"]
+    },
+    "environment": "sandbox"
+  }'
+
+# 4. Test in sandbox
+# Use Console UI or API to test
+
+# 5. Promote to production
+curl -X POST https://api.controlcore.yourcompany.com/api/v1/policies/123/promote \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Support
+
+- **[User Guide](/guides/user-guide)**: Learn to create policies
+- **[Rego Guidelines](/guides/rego-guidelines)**: Master the policy language
+- **[PBAC Best Practices](/guides/pbac-best-practices)**: Advanced patterns
+- **Template Requests**: Request new templates at support@controlcore.io
+
+---
+
+**Start with templates, customize for your needs, and deploy secure policies faster!**
+

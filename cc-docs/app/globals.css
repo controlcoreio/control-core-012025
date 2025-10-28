@@ -1,0 +1,187 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 255, 255, 255;
+  --background-end-rgb: 255, 255, 255;
+  
+  /* Brand colors */
+  --brand-primary: #fad02c;
+  --brand-dark: #08070e;
+  
+  /* Semantic color variables for light mode */
+  --background: #ffffff;
+  --foreground: #000000;
+  --text-primary: #1f2937; /* Dark gray for main text */
+  --text-secondary: #6b7280; /* Medium gray for secondary text */
+  --text-muted: #9ca3af; /* Light gray for muted text */
+  --accent-color: #fad02c; /* Yellow for highlights only */
+  --muted-bg: #f8f9fa;
+  --border-color: #e5e7eb;
+}
+
+/* Dark mode color overrides */
+.dark {
+  --foreground-rgb: 250, 208, 44; /* Yellow for main text */
+  --background-start-rgb: 8, 7, 14;
+  --background-end-rgb: 8, 7, 14;
+  
+  --background: #08070e;
+  --foreground: #fad02c;
+  --text-primary: #e6c547; /* Yellow for main text */
+  --text-secondary: #ffffff; 
+  --text-muted: #ffffff; /* More dimmed yellow for muted text */
+  --accent-color: #fad02c; /* Same yellow for highlights */
+  --muted-bg: #1a1a1a;
+  --border-color: #333333;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-start-rgb));
+  line-height: 1.6;
+}
+
+/* Prose styling for MDX content */
+.prose {
+  @apply max-w-none;
+}
+
+.prose h1 {
+  @apply text-4xl font-bold mb-6 border-b pb-4;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.prose h2 {
+  @apply text-2xl font-semibold mb-4 mt-8 border-b pb-2;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.prose h3 {
+  @apply text-xl font-medium mb-3 mt-6;
+  color: var(--text-primary);
+}
+
+.prose h4 {
+  @apply text-lg font-medium mb-2 mt-4;
+  color: var(--text-primary);
+}
+
+.prose p {
+  @apply mb-4 leading-relaxed;
+  color: var(--text-secondary);
+}
+
+.prose ul {
+  @apply mb-4 pl-6 space-y-1;
+}
+
+.prose ol {
+  @apply mb-4 pl-6 space-y-1 list-decimal;
+}
+
+.prose li {
+  color: var(--text-secondary);
+}
+
+.prose li > ul,
+.prose li > ol {
+  @apply mt-2 mb-0;
+}
+
+/* Inline code */
+.prose code:not(pre code) {
+  @apply px-2 py-1 rounded text-sm font-mono;
+  background-color: var(--muted-bg);
+  color: var(--text-primary);
+}
+
+/* Code blocks */
+.prose pre {
+  @apply p-4 rounded-lg overflow-x-auto mb-6;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid var(--border-color);
+}
+
+.prose pre code {
+  @apply bg-transparent text-inherit p-0 rounded-none text-sm;
+}
+
+/* Blockquotes - using brand colors for highlighting */
+.prose blockquote {
+  @apply border-l-4 pl-4 py-2 mb-4 italic;
+  border-color: var(--accent-color);
+  background-color: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  color: var(--text-primary);
+}
+
+/* Tables */
+.prose table {
+  @apply w-full mb-6 border-collapse;
+}
+
+.prose th {
+  @apply px-4 py-3 text-left text-xs font-medium uppercase tracking-wider;
+  background-color: var(--muted-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.prose td {
+  @apply px-4 py-3 text-sm;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+/* Links - using accent color for highlighting */
+.prose a {
+  @apply underline transition-colors;
+  color: var(--accent-color);
+}
+
+.prose a:hover {
+  color: color-mix(in srgb, var(--accent-color) 80%, var(--text-primary));
+}
+
+/* Strong and emphasis */
+.prose strong {
+  @apply font-semibold;
+  color: var(--text-primary);
+}
+
+.prose em {
+  @apply italic;
+  color: var(--text-secondary);
+}
+
+/* Note/Warning boxes */
+.prose > blockquote {
+  @apply not-italic;
+}
+
+.prose blockquote p:first-child::before {
+  content: none;
+}
+
+.prose blockquote p:last-child::after {
+  content: none;
+}
+
+/* Custom components */
+.card {
+  @apply rounded-lg shadow-sm p-6 mb-6;
+  background-color: var(--background);
+  border: 1px solid var(--border-color);
+}
+
+/* Responsive sidebar */
+@media (max-width: 768px) {
+  .prose {
+    @apply px-4;
+  }
+} 

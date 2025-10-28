@@ -1,0 +1,1558 @@
+# Kickstart Deployment Guide
+
+The Kickstart deployment model provides a complete, self-hosted Control Core platform on your infrastructure. This guide will walk you through deploying Control Core using Docker Compose.
+
+## Overview
+
+**Kickstart** is ideal for:
+- Small to medium teams (5-50 users)
+- Development and testing environments
+- Proof-of-concept deployments
+- Organizations requiring complete control over infrastructure
+- Learning and evaluation purposes
+
+## Prerequisites
+
+### System Requirements
+
+**Operating System**:
+- Linux (Ubuntu 20.04+ or Debian 11+ recommended)
+- macOS 11.0+ (for development)
+- Windows 11 with WSL2 (for development)
+
+**Hardware**:
+- **Memory**: 4GB RAM minimum, 8GB RAM recommended
+- **CPU**: 2 cores minimum, 4 cores recommended
+- **Storage**: 20GB free space minimum, SSD recommended
+- **Network**: Stable internet connection for initial setup
+
+**Software**:
+- Docker Engine 20.10.0 or higher
+- Docker Compose 2.0.0 or higher
+- Git (optional, for policy management)
+
+### Port Requirements
+
+Ensure these ports are available:
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 3000 | Policy Administration Console | Web UI for policy management |
+| 8080 | Policy Enforcement Point | Bouncer/PEP for request protection |
+| 8082 | Policy Administration API | Backend API service |
+| 7000 | Policy Synchronization Server | OPAL server for policy sync |
+| 5432 | PostgreSQL | Database (internal only) |
+| 6379 | Redis | Cache (internal only) |
+
+### Network Requirements
+
+**Firewall Rules**:
+- Allow inbound on ports 3000, 8080, 8082 (as needed)
+- Allow outbound HTTPS (443) for external integrations
+- Allow internal communication between Docker containers
+
+## Installation
+
+### Step 1: Download Control Core Package
+
+Access your Control Core account and download your personalized Kickstart package:
+
+```bash
+# Download your package (replace with your actual user ID)
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+
+# Alternative: Use your provided download link
+curl -O <your-download-link>
+
+# Extract the package
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+```
+
+The package contains:
+- `docker-compose.yml` - Docker Compose configuration
+- `.env.example` - Environment variable template
+- `setup.sh` - Setup script
+- `start.sh` - Startup script
+- `stop.sh` - Shutdown script
+- `README.md` - Quick reference guide
+
+### Step 2: Install Docker and Docker Compose
+
+**Ubuntu/Debian**:
+
+```bash
+# Update package index
+sudo apt-get update
+
+# Install dependencies
+sudo apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Add Docker's official GPG key
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Set up the repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Add your user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Verify installation
+docker --version
+docker compose version
+```
+
+**macOS**:
+
+```bash
+# Install Docker Desktop for Mac
+# Download from: https://www.docker.com/products/docker-desktop/
+
+# Or use Homebrew
+brew install --cask docker
+
+# Start Docker Desktop and verify
+docker --version
+docker compose version
+```
+
+**CentOS/RHEL**:
+
+```bash
+# Install Docker
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Start Docker service
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+```
+
+### Step 3: Configure Environment
+
+Create your environment configuration file:
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit with your preferred editor
+nano .env
+```
+
+**Key Configuration Options**:
+
+```bash
+# ============================================
+# CORE CONFIGURATION
+# ============================================
+
+# Tenant Configuration
+TENANT_ID=your-organization-name
+ENVIRONMENT=production  # or development, staging
+
+# API Keys (generate secure random strings)
+API_KEY=your-secure-api-key-here
+SECRET_KEY=your-secure-secret-key-here
+
+# ============================================
+# POLICY ADMINISTRATION CONSOLE
+# ============================================
+
+CONSOLE_PORT=3000
+CONSOLE_HOST=0.0.0.0
+
+# ============================================
+# POLICY ADMINISTRATION API
+# ============================================
+
+API_PORT=8082
+API_HOST=0.0.0.0
+API_WORKERS=4
+
+# Admin Account (set strong credentials)
+CC_BUILTIN_ADMIN_USER=admin
+CC_BUILTIN_ADMIN_PASS=ChangeThisSecurePassword123!
+
+# ============================================
+# POLICY ENFORCEMENT POINT (BOUNCER)
+# ============================================
+
+BOUNCER_PORT=8080
+BOUNCER_HOST=0.0.0.0
+
+# Target application to protect
+TARGET_HOST=your-app.example.com:8000
+
+# Caching Configuration
+CACHE_ENABLED=true
+CACHE_TTL=5m
+CACHE_MAX_SIZE=1000
+
+# ============================================
+# DATABASE CONFIGURATION
+# ============================================
+
+DATABASE_HOST=control-core-db
+DATABASE_PORT=5432
+DATABASE_NAME=control_core_db
+DATABASE_USER=controlcore
+DATABASE_PASSWORD=ChangeThisDatabasePassword123!
+
+# Connection Pool
+DATABASE_POOL_SIZE=20
+DATABASE_MAX_OVERFLOW=10
+
+# Full connection string (auto-generated)
+DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}
+
+# ============================================
+# REDIS CONFIGURATION
+# ============================================
+
+REDIS_HOST=control-core-redis
+REDIS_PORT=6379
+REDIS_PASSWORD=ChangeThisRedisPassword123!
+REDIS_DB=0
+
+# Full connection string
+REDIS_URL=redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}
+
+# ============================================
+# POLICY SYNCHRONIZATION (OPAL)
+# ============================================
+
+OPAL_SERVER_URL=http://control-core-opal:7000
+OPAL_SERVER_PORT=7000
+
+# Policy Repository (if using Git integration)
+POLICY_REPO_URL=https://github.com/your-org/policies
+POLICY_REPO_BRANCH=main
+POLICY_REPO_TOKEN=your-github-personal-access-token
+POLICY_REPO_SSH_KEY=/path/to/ssh/key
+
+# Sync Configuration
+OPAL_SYNC_INTERVAL=60  # seconds
+
+# ============================================
+# LOGGING CONFIGURATION
+# ============================================
+
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FORMAT=json  # json or text
+LOG_OUTPUT=stdout  # stdout or file
+
+# File logging (if LOG_OUTPUT=file)
+LOG_FILE_PATH=/var/log/controlcore/app.log
+LOG_FILE_MAX_SIZE=100MB
+LOG_FILE_RETENTION=30  # days
+
+# ============================================
+# SECURITY CONFIGURATION
+# ============================================
+
+# CORS Settings
+CORS_ALLOWED_ORIGINS=http://localhost:3000,https://yourdomain.com
+CORS_ALLOW_CREDENTIALS=true
+
+# Session Configuration
+SESSION_TIMEOUT=28800  # 8 hours in seconds
+SESSION_COOKIE_SECURE=true  # Set to false for HTTP (dev only)
+SESSION_COOKIE_HTTPONLY=true
+
+# Rate Limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS=1000
+RATE_LIMIT_WINDOW=3600  # seconds
+
+# ============================================
+# AUTH0 INTEGRATION (Optional)
+# ============================================
+
+AUTH0_ENABLED=false
+AUTH0_DOMAIN=your-domain.auth0.com
+AUTH0_CLIENT_ID=your-client-id
+AUTH0_CLIENT_SECRET=your-client-secret
+AUTH0_AUDIENCE=https://api.controlcore.io
+
+# ============================================
+# MONITORING CONFIGURATION
+# ============================================
+
+METRICS_ENABLED=true
+METRICS_PORT=9090
+
+HEALTH_CHECK_ENABLED=true
+HEALTH_CHECK_INTERVAL=30  # seconds
+
+# ============================================
+# BACKUP CONFIGURATION
+# ============================================
+
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE="0 2 * * *"  # Daily at 2 AM (cron format)
+BACKUP_RETENTION_DAYS=30
+BACKUP_PATH=/var/backups/controlcore
+```
+
+**Security Best Practices**:
+
+1. **Generate Strong Passwords**:
+```bash
+# Generate secure random passwords
+openssl rand -base64 32
+```
+
+2. **Protect Sensitive Files**:
+```bash
+chmod 600 .env
+```
+
+3. **Never Commit `.env` to Version Control**:
+```bash
+echo ".env" >> .gitignore
+```
+
+### Step 4: Run Setup Script
+
+The setup script initializes the database and prepares the environment:
+
+```bash
+# Make scripts executable
+chmod +x setup.sh start.sh stop.sh
+
+# Run setup
+./setup.sh
+```
+
+The setup script will:
+1. Validate Docker installation
+2. Check port availability
+3. Pull required Docker images
+4. Initialize database schema
+5. Create admin user
+6. Set up initial configuration
+7. Validate the installation
+
+**Expected Output**:
+```
+[✓] Docker installation validated
+[✓] Docker Compose installation validated
+[✓] Port availability checked
+[✓] Pulling Docker images...
+[✓] Database initialized
+[✓] Admin user created
+[✓] Configuration validated
+[✓] Setup completed successfully!
+```
+
+### Step 5: Start Control Core
+
+Start all Control Core services:
+
+```bash
+# Start services
+./start.sh
+
+# Or manually with Docker Compose
+docker-compose up -d
+```
+
+**Verify Services are Running**:
+
+```bash
+# Check all services
+docker-compose ps
+
+# Expected output shows all services as "Up"
+NAME                          STATUS    PORTS
+control-core-console          Up        0.0.0.0:3000->3000/tcp
+control-core-api              Up        0.0.0.0:8082->8082/tcp
+control-core-bouncer          Up        0.0.0.0:8080->8080/tcp
+control-core-opal             Up        0.0.0.0:7000->7000/tcp
+control-core-db               Up        5432/tcp
+control-core-redis            Up        6379/tcp
+```
+
+### Step 6: Verify Installation
+
+**1. Health Check Endpoints**:
+
+```bash
+# Check Policy Administration Console
+curl http://localhost:3000/api/health
+# Expected: {"status": "healthy"}
+
+# Check Policy Administration API
+curl http://localhost:8082/api/v1/health
+# Expected: {"status": "healthy", "database": "connected", "redis": "connected"}
+
+# Check Policy Enforcement Point
+curl http://localhost:8080/health
+# Expected: {"status": "healthy", "opal": "connected"}
+
+# Check Policy Synchronization Server
+curl http://localhost:7000/health
+# Expected: {"status": "healthy"}
+```
+
+**2. Access Services**:
+
+- **Policy Administration Console**: http://localhost:3000
+  - Login with admin credentials from `.env` file
+  - You should see the dashboard
+
+- **API Documentation**: http://localhost:8082/docs
+  - Interactive Swagger UI documentation
+  - Test API endpoints
+
+**3. Check Logs**:
+
+```bash
+# View all logs
+docker-compose logs
+
+# Follow logs for specific service
+docker-compose logs -f control-core-api
+
+# Check for errors
+docker-compose logs | grep ERROR
+```
+
+## Cloud Deployment Options
+
+The Kickstart deployment can be hosted on any cloud provider or on-premises infrastructure. This section provides examples for popular cloud platforms.
+
+### AWS EC2 Deployment
+
+Deploy Control Core on Amazon EC2 instances:
+
+**1. Launch EC2 Instance**:
+
+```bash
+# Create instance (using AWS CLI)
+aws ec2 run-instances \
+  --image-id ami-0c55b159cbfafe1f0 \  # Ubuntu 22.04 LTS
+  --instance-type t3.medium \           # 4GB RAM, 2 vCPU
+  --key-name your-key-pair \
+  --security-group-ids sg-xxxxxxxxx \
+  --subnet-id subnet-xxxxxxxxx \
+  --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=control-core-kickstart}]'
+```
+
+**2. Configure Security Group**:
+
+| Type | Protocol | Port Range | Source |
+|------|----------|------------|--------|
+| SSH | TCP | 22 | Your IP/CIDR |
+| HTTP | TCP | 3000 | Your IP/CIDR |
+| HTTP | TCP | 8080 | Your IP/CIDR |
+| HTTP | TCP | 8082 | Your IP/CIDR |
+| HTTPS | TCP | 443 | 0.0.0.0/0 |
+
+**3. Connect and Install**:
+
+```bash
+# SSH into instance
+ssh -i your-key.pem ubuntu@<instance-public-ip>
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker ubuntu
+
+# Download and setup Control Core
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# Configure for cloud deployment
+cp .env.example .env
+# Edit .env to set PUBLIC_URL to your instance's public IP or domain
+
+# Start Control Core
+./start.sh
+```
+
+**4. Set up Elastic IP (Optional)**:
+
+```bash
+# Allocate Elastic IP
+aws ec2 allocate-address --domain vpc
+
+# Associate with instance
+aws ec2 associate-address \
+  --instance-id i-xxxxxxxxx \
+  --allocation-id eipalloc-xxxxxxxxx
+```
+
+**5. Configure Route 53 DNS (Optional)**:
+
+```bash
+# Create DNS record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "controlcore.yourdomain.com",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "your-elastic-ip"}]
+      }
+    }]
+  }'
+```
+
+### Google Cloud Platform (GCP) Deployment
+
+Deploy Control Core on Google Compute Engine:
+
+**1. Create Compute Instance**:
+
+```bash
+# Create instance (using gcloud CLI)
+gcloud compute instances create control-core-kickstart \
+  --zone=us-central1-a \
+  --machine-type=e2-medium \  # 4GB RAM, 2 vCPU
+  --image-family=ubuntu-2204-lts \
+  --image-project=ubuntu-os-cloud \
+  --boot-disk-size=30GB \
+  --boot-disk-type=pd-ssd \
+  --tags=controlcore \
+  --metadata=startup-script='#!/bin/bash
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh'
+```
+
+**2. Configure Firewall Rules**:
+
+```bash
+# Create firewall rule
+gcloud compute firewall-rules create allow-controlcore \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=default \
+  --action=ALLOW \
+  --rules=tcp:3000,tcp:8080,tcp:8082,tcp:443 \
+  --source-ranges=0.0.0.0/0 \
+  --target-tags=controlcore
+```
+
+**3. Connect and Install**:
+
+```bash
+# SSH into instance
+gcloud compute ssh control-core-kickstart --zone=us-central1-a
+
+# Download and setup Control Core
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# Configure
+cp .env.example .env
+# Edit .env with instance's external IP
+
+# Start
+./start.sh
+```
+
+**4. Reserve Static IP (Optional)**:
+
+```bash
+# Reserve static IP
+gcloud compute addresses create control-core-ip --region=us-central1
+
+# Assign to instance
+gcloud compute instances delete-access-config control-core-kickstart \
+  --zone=us-central1-a
+gcloud compute instances add-access-config control-core-kickstart \
+  --zone=us-central1-a \
+  --address=$(gcloud compute addresses describe control-core-ip --region=us-central1 --format='value(address)')
+```
+
+**5. Configure Cloud DNS (Optional)**:
+
+```bash
+# Create DNS record
+gcloud dns record-sets create controlcore.yourdomain.com. \
+  --zone=your-dns-zone \
+  --type=A \
+  --ttl=300 \
+  --rrdatas=your-static-ip
+```
+
+### Microsoft Azure Deployment
+
+Deploy Control Core on Azure Virtual Machines:
+
+**1. Create Resource Group and VM**:
+
+```bash
+# Create resource group
+az group create \
+  --name controlcore-rg \
+  --location eastus
+
+# Create VM
+az vm create \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --image Ubuntu2204 \
+  --size Standard_B2s \  # 4GB RAM, 2 vCPU
+  --admin-username azureuser \
+  --generate-ssh-keys \
+  --public-ip-sku Standard \
+  --os-disk-size-gb 30
+```
+
+**2. Open Network Ports**:
+
+```bash
+# Open ports
+az vm open-port \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --port 3000 --priority 1001
+
+az vm open-port \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --port 8080 --priority 1002
+
+az vm open-port \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --port 8082 --priority 1003
+
+az vm open-port \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --port 443 --priority 1004
+```
+
+**3. Connect and Install**:
+
+```bash
+# Get public IP
+PUBLIC_IP=$(az vm show \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --show-details \
+  --query publicIps \
+  --output tsv)
+
+# SSH into VM
+ssh azureuser@$PUBLIC_IP
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker azureuser
+
+# Download and setup Control Core
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# Configure
+cp .env.example .env
+# Edit .env with VM's public IP
+
+# Start
+./start.sh
+```
+
+**4. Create Static Public IP (Optional)**:
+
+```bash
+# Create static IP
+az network public-ip create \
+  --resource-group controlcore-rg \
+  --name control-core-ip \
+  --sku Standard \
+  --allocation-method Static
+
+# Associate with VM's NIC
+NIC_ID=$(az vm show \
+  --resource-group controlcore-rg \
+  --name control-core-kickstart \
+  --query 'networkProfile.networkInterfaces[0].id' \
+  --output tsv)
+
+az network nic ip-config update \
+  --resource-group controlcore-rg \
+  --nic-name $(basename $NIC_ID) \
+  --name ipconfig1 \
+  --public-ip-address control-core-ip
+```
+
+**5. Configure Azure DNS (Optional)**:
+
+```bash
+# Create DNS record
+az network dns record-set a add-record \
+  --resource-group your-dns-rg \
+  --zone-name yourdomain.com \
+  --record-set-name controlcore \
+  --ipv4-address your-static-ip
+```
+
+### DigitalOcean Deployment
+
+Deploy Control Core on a DigitalOcean Droplet:
+
+**1. Create Droplet**:
+
+```bash
+# Using doctl (DigitalOcean CLI)
+doctl compute droplet create control-core-kickstart \
+  --image ubuntu-22-04-x64 \
+  --size s-2vcpu-4gb \  # 4GB RAM, 2 vCPU
+  --region nyc1 \
+  --ssh-keys your-ssh-key-id \
+  --enable-monitoring \
+  --enable-ipv6
+```
+
+**2. Configure Firewall**:
+
+```bash
+# Create firewall
+doctl compute firewall create \
+  --name controlcore-fw \
+  --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0 protocol:tcp,ports:3000,sources:addresses:0.0.0.0/0 protocol:tcp,ports:8080,sources:addresses:0.0.0.0/0 protocol:tcp,ports:8082,sources:addresses:0.0.0.0/0 protocol:tcp,ports:443,sources:addresses:0.0.0.0/0" \
+  --outbound-rules "protocol:tcp,ports:all,destinations:addresses:0.0.0.0/0 protocol:udp,ports:all,destinations:addresses:0.0.0.0/0" \
+  --droplet-ids $(doctl compute droplet list --format ID --no-header)
+```
+
+**3. Connect and Install**:
+
+```bash
+# SSH into droplet
+ssh root@<droplet-ip>
+
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+
+# Download and setup Control Core
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# Configure
+cp .env.example .env
+# Edit .env with droplet's public IP
+
+# Start
+./start.sh
+```
+
+**4. Configure DNS (Optional)**:
+
+```bash
+# Create DNS record using DigitalOcean DNS
+doctl compute domain records create yourdomain.com \
+  --record-type A \
+  --record-name controlcore \
+  --record-data <droplet-ip> \
+  --record-ttl 3600
+```
+
+### Linode Deployment
+
+Deploy Control Core on a Linode instance:
+
+**1. Create Linode**:
+
+```bash
+# Using Linode CLI
+linode-cli linodes create \
+  --label control-core-kickstart \
+  --image linode/ubuntu22.04 \
+  --region us-east \
+  --type g6-standard-2 \  # 4GB RAM, 2 vCPU
+  --root_pass 'your-strong-password' \
+  --authorized_keys "$(cat ~/.ssh/id_rsa.pub)"
+```
+
+**2. Configure Firewall**:
+
+```bash
+# Create firewall
+linode-cli firewalls create \
+  --label controlcore-firewall \
+  --rules.inbound '[
+    {"protocol": "TCP", "ports": "22", "addresses": {"ipv4": ["0.0.0.0/0"]}},
+    {"protocol": "TCP", "ports": "3000", "addresses": {"ipv4": ["0.0.0.0/0"]}},
+    {"protocol": "TCP", "ports": "8080", "addresses": {"ipv4": ["0.0.0.0/0"]}},
+    {"protocol": "TCP", "ports": "8082", "addresses": {"ipv4": ["0.0.0.0/0"]}},
+    {"protocol": "TCP", "ports": "443", "addresses": {"ipv4": ["0.0.0.0/0"]}}
+  ]' \
+  --rules.outbound '[
+    {"protocol": "TCP", "ports": "1-65535", "addresses": {"ipv4": ["0.0.0.0/0"]}},
+    {"protocol": "UDP", "ports": "1-65535", "addresses": {"ipv4": ["0.0.0.0/0"]}}
+  ]'
+
+# Attach firewall to Linode
+linode-cli firewalls devices-create <firewall-id> --id <linode-id>
+```
+
+**3. Connect and Install**:
+
+```bash
+# SSH into Linode
+ssh root@<linode-ip>
+
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+
+# Download and setup Control Core
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# Configure
+cp .env.example .env
+# Edit .env with Linode's public IP
+
+# Start
+./start.sh
+```
+
+### On-Premises Deployment
+
+Deploy Control Core on your own hardware:
+
+**Requirements**:
+- Physical server or VM with Ubuntu 22.04 LTS
+- 4GB RAM minimum, 8GB recommended
+- 2 CPU cores minimum, 4 recommended
+- 30GB disk space minimum
+- Static IP address or internal DNS
+- Network access to required ports
+
+**Installation Steps**:
+
+1. **Prepare Server**:
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install required packages
+sudo apt install -y curl wget unzip
+
+# Install Docker
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+```
+
+2. **Configure Network**:
+- Ensure firewall allows ports 3000, 8080, 8082, 443
+- Configure static IP or DHCP reservation
+- Set up internal DNS if needed
+
+3. **Deploy Control Core**:
+```bash
+# Download package
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# Configure
+cp .env.example .env
+# Edit .env with your server's IP or domain
+
+# Start
+./start.sh
+```
+
+4. **Configure Reverse Proxy (Optional)**:
+
+If using NGINX as reverse proxy:
+
+```nginx
+server {
+    listen 80;
+    server_name controlcore.yourdomain.com;
+
+    # Redirect HTTP to HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name controlcore.yourdomain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    # Console
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API
+    location /api/ {
+        proxy_pass http://localhost:8082/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Bouncer (optional, if exposing directly)
+    location /bouncer/ {
+        proxy_pass http://localhost:8080/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### Cloud Deployment Best Practices
+
+**1. Use Managed Databases (Optional)**:
+- Replace PostgreSQL container with managed service
+- Replace Redis container with managed cache
+- Update connection strings in `.env`
+
+**2. Set Up Backups**:
+- Configure automated backups to cloud storage (S3, GCS, Azure Blob)
+- Test restoration procedures
+- Maintain off-site backups
+
+**3. Enable Monitoring**:
+- Use cloud provider monitoring (CloudWatch, Cloud Monitoring, Azure Monitor)
+- Set up alerts for resource utilization
+- Monitor application logs
+
+**4. Configure Auto-Start**:
+- Set up systemd service for automatic restart
+- Configure health checks
+- Enable auto-recovery
+
+**5. Security Hardening**:
+- Use security groups/firewall rules to restrict access
+- Enable SSL/TLS with valid certificates
+- Configure VPN or private networking
+- Regular security updates
+
+**6. Cost Optimization**:
+- Use reserved instances for long-term deployments
+- Enable auto-shutdown for non-production environments
+- Monitor and optimize resource usage
+- Use appropriate instance sizes
+
+## Initial Configuration
+
+### Create Your First Policy
+
+1. **Log in to Policy Administration Console**:
+   - Navigate to http://localhost:3000
+   - Enter admin credentials
+
+2. **Create a Policy**:
+   - Click **Policies** → **Create Policy**
+   - Enter policy details:
+     - **Name**: `api-basic-auth`
+     - **Description**: Basic API authentication
+     - **Environment**: Sandbox
+
+3. **Add Policy Code**:
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Allow requests with valid API key
+allow if {
+    input.request.headers["X-API-Key"]
+    input.request.headers["X-API-Key"] == data.api_keys[input.user.id]
+}
+
+# Allow admin users
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+4. **Test the Policy**:
+   - Click **Test** tab
+   - Add test cases
+   - Run tests to verify
+
+5. **Deploy**:
+   - Click **Deploy** → **Deploy to Sandbox**
+   - Test in sandbox environment
+   - Promote to production when ready
+
+### Configure Protected Resources
+
+1. **Add a Resource**:
+   - Click **Resources** → **Add Resource**
+   - Enter resource details:
+     - **Name**: Your API name
+     - **Type**: API
+     - **Path**: `/api/v1/*`
+     - **Methods**: GET, POST, PUT, DELETE
+
+2. **Configure Bouncer Target**:
+
+Edit `.env` file:
+```bash
+TARGET_HOST=your-api.example.com:8000
+```
+
+Restart Bouncer:
+```bash
+docker-compose restart control-core-bouncer
+```
+
+3. **Test Protected Endpoint**:
+
+```bash
+# Request through Bouncer (should be protected)
+curl -X GET http://localhost:8080/api/v1/data \
+  -H "X-API-Key: your-api-key"
+
+# Should receive policy decision
+```
+
+## Monitoring and Maintenance
+
+### Health Monitoring
+
+**Set Up Regular Health Checks**:
+
+```bash
+#!/bin/bash
+# health-check.sh
+
+SERVICES=("console:3000" "api:8082" "bouncer:8080" "opal:7000")
+
+for service in "${SERVICES[@]}"; do
+    name=$(echo $service | cut -d: -f1)
+    port=$(echo $service | cut -d: -f2)
+    
+    if curl -sf http://localhost:$port/health > /dev/null; then
+        echo "[✓] $name is healthy"
+    else
+        echo "[✗] $name is down"
+        # Send alert
+    fi
+done
+```
+
+**Add to Cron**:
+```bash
+# Run health check every 5 minutes
+*/5 * * * * /path/to/health-check.sh
+```
+
+### Log Management
+
+**View Logs**:
+
+```bash
+# All services
+docker-compose logs
+
+# Specific service with timestamps
+docker-compose logs -f --timestamps control-core-api
+
+# Last 100 lines
+docker-compose logs --tail=100 control-core-bouncer
+
+# Filter by log level
+docker-compose logs | grep ERROR
+docker-compose logs | grep WARNING
+```
+
+**Configure Log Rotation**:
+
+Create `/etc/logrotate.d/controlcore`:
+
+```
+/var/lib/docker/containers/*/*.log {
+    rotate 7
+    daily
+    compress
+    size=10M
+    missingok
+    delaycompress
+    copytruncate
+}
+```
+
+### Database Maintenance
+
+**Backup Database**:
+
+```bash
+# Manual backup
+docker-compose exec control-core-db pg_dump -U controlcore control_core_db > backup_$(date +%Y%m%d).sql
+
+# Compressed backup
+docker-compose exec control-core-db pg_dump -U controlcore control_core_db | gzip > backup_$(date +%Y%m%d).sql.gz
+
+# Backup script
+#!/bin/bash
+# backup-database.sh
+
+BACKUP_DIR="/var/backups/controlcore"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="$BACKUP_DIR/controlcore_$DATE.sql.gz"
+
+mkdir -p $BACKUP_DIR
+
+docker-compose exec -T control-core-db pg_dump -U controlcore control_core_db | \
+    gzip > $BACKUP_FILE
+
+# Keep only last 30 days
+find $BACKUP_DIR -name "controlcore_*.sql.gz" -mtime +30 -delete
+
+echo "Backup completed: $BACKUP_FILE"
+```
+
+**Automated Backups with Cron**:
+
+```bash
+# Add to crontab
+0 2 * * * /path/to/backup-database.sh
+```
+
+**Restore from Backup**:
+
+```bash
+# Decompress and restore
+gunzip < backup_20250122.sql.gz | \
+    docker-compose exec -T control-core-db psql -U controlcore control_core_db
+
+# Or from uncompressed backup
+docker-compose exec -T control-core-db psql -U controlcore control_core_db < backup_20250122.sql
+```
+
+**Database Performance Monitoring**:
+
+```bash
+# Connect to database
+docker-compose exec control-core-db psql -U controlcore control_core_db
+
+# Check database size
+SELECT pg_size_pretty(pg_database_size('control_core_db'));
+
+# Check table sizes
+SELECT 
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+# Check for slow queries
+SELECT 
+    query,
+    calls,
+    mean_exec_time,
+    max_exec_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 10;
+
+# Vacuum and analyze
+VACUUM ANALYZE;
+```
+
+### Redis Monitoring
+
+**Check Redis Status**:
+
+```bash
+# Connect to Redis
+docker-compose exec control-core-redis redis-cli -a $REDIS_PASSWORD
+
+# Get info
+INFO
+
+# Check memory usage
+INFO memory
+
+# Check connected clients
+CLIENT LIST
+
+# Monitor commands in real-time
+MONITOR
+
+# Check key statistics
+DBSIZE
+
+# Inspect specific keys
+KEYS policy:*
+GET policy:api-basic-auth
+```
+
+**Clear Cache**:
+
+```bash
+# Clear all cache
+docker-compose exec control-core-redis redis-cli -a $REDIS_PASSWORD FLUSHALL
+
+# Clear specific pattern
+docker-compose exec control-core-redis redis-cli -a $REDIS_PASSWORD \
+    --scan --pattern "policy:*" | \
+    xargs docker-compose exec control-core-redis redis-cli -a $REDIS_PASSWORD DEL
+```
+
+### Performance Monitoring
+
+**Resource Usage**:
+
+```bash
+# Monitor container resources
+docker stats
+
+# Continuous monitoring
+watch -n 2 docker stats --no-stream
+
+# Specific service
+docker stats control-core-api
+
+# System resource usage
+top
+htop
+```
+
+**Set Resource Limits** (edit `docker-compose.yml`):
+
+```yaml
+services:
+  control-core-api:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+```
+
+## Backup and Recovery
+
+### Full System Backup
+
+**Backup Script**:
+
+```bash
+#!/bin/bash
+# full-backup.sh
+
+BACKUP_DIR="/var/backups/controlcore"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_PATH="$BACKUP_DIR/$DATE"
+
+mkdir -p $BACKUP_PATH
+
+# Backup database
+docker-compose exec -T control-core-db pg_dump -U controlcore control_core_db | \
+    gzip > $BACKUP_PATH/database.sql.gz
+
+# Backup configuration
+cp .env $BACKUP_PATH/
+cp docker-compose.yml $BACKUP_PATH/
+
+# Backup volumes
+docker run --rm \
+    -v control-core-data:/data \
+    -v $BACKUP_PATH:/backup \
+    alpine tar czf /backup/volumes.tar.gz /data
+
+# Create manifest
+cat > $BACKUP_PATH/manifest.txt <<EOF
+Backup Date: $(date)
+Database: ✓
+Configuration: ✓
+Volumes: ✓
+EOF
+
+echo "Full backup completed: $BACKUP_PATH"
+```
+
+### Disaster Recovery
+
+**Recovery Procedure**:
+
+```bash
+#!/bin/bash
+# restore-backup.sh
+
+BACKUP_PATH="/var/backups/controlcore/20250122_020000"
+
+# Stop services
+./stop.sh
+
+# Restore configuration
+cp $BACKUP_PATH/.env .
+cp $BACKUP_PATH/docker-compose.yml .
+
+# Restore volumes
+docker run --rm \
+    -v control-core-data:/data \
+    -v $BACKUP_PATH:/backup \
+    alpine tar xzf /backup/volumes.tar.gz -C /
+
+# Start database only
+docker-compose up -d control-core-db control-core-redis
+
+# Wait for database
+sleep 10
+
+# Restore database
+gunzip < $BACKUP_PATH/database.sql.gz | \
+    docker-compose exec -T control-core-db psql -U controlcore control_core_db
+
+# Start all services
+./start.sh
+
+echo "Recovery completed"
+```
+
+## Updating Control Core
+
+### Update Procedure
+
+```bash
+# 1. Backup current installation
+./full-backup.sh
+
+# 2. Download new version
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}-v2.0.0.zip
+
+# 3. Stop services
+./stop.sh
+
+# 4. Extract update
+unzip kickstart-{your-user-id}-v2.0.0.zip -d update
+
+# 5. Review changes
+diff docker-compose.yml update/docker-compose.yml
+
+# 6. Backup current files
+cp docker-compose.yml docker-compose.yml.backup
+cp .env .env.backup
+
+# 7. Apply update
+cp update/docker-compose.yml .
+# Merge any new .env variables
+
+# 8. Pull new images
+docker-compose pull
+
+# 9. Run migrations (if needed)
+docker-compose run --rm control-core-api alembic upgrade head
+
+# 10. Start services
+./start.sh
+
+# 11. Verify update
+docker-compose ps
+curl http://localhost:8082/api/v1/version
+```
+
+## Troubleshooting
+
+### Services Won't Start
+
+**Check Port Conflicts**:
+```bash
+# Check if ports are in use
+netstat -tulpn | grep :3000
+netstat -tulpn | grep :8080
+netstat -tulpn | grep :8082
+
+# Find process using port
+lsof -i :3000
+
+# Kill process if needed
+kill -9 <PID>
+```
+
+**Check Docker Status**:
+```bash
+# Verify Docker is running
+systemctl status docker
+
+# Start Docker if needed
+sudo systemctl start docker
+
+# Check Docker resources
+docker system df
+docker system info
+```
+
+**Check Logs for Errors**:
+```bash
+docker-compose logs | grep -i error
+docker-compose logs control-core-api
+```
+
+### Database Connection Issues
+
+**Verify Database is Running**:
+```bash
+docker-compose ps control-core-db
+docker-compose logs control-core-db
+```
+
+**Test Database Connection**:
+```bash
+docker-compose exec control-core-db psql -U controlcore -d control_core_db -c "SELECT 1"
+```
+
+**Reset Database**:
+```bash
+# WARNING: This deletes all data
+docker-compose down -v
+docker-compose up -d control-core-db control-core-redis
+sleep 10
+./setup.sh
+```
+
+### Performance Issues
+
+**Check Resource Usage**:
+```bash
+docker stats
+free -h
+df -h
+```
+
+**Optimize Database**:
+```bash
+docker-compose exec control-core-db psql -U controlcore control_core_db -c "VACUUM ANALYZE"
+```
+
+**Clear Cache**:
+```bash
+docker-compose exec control-core-redis redis-cli -a $REDIS_PASSWORD FLUSHALL
+docker-compose restart control-core-bouncer
+```
+
+## Security Hardening
+
+### SSL/TLS Configuration
+
+**Using Let's Encrypt with Nginx**:
+
+1. Install Certbot:
+```bash
+sudo apt-get install certbot python3-certbot-nginx
+```
+
+2. Create Nginx configuration (`/etc/nginx/sites-available/controlcore`):
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Policy Administration Console
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Policy Administration API
+    location /api/ {
+        proxy_pass http://localhost:8082;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+3. Obtain certificate:
+```bash
+sudo certbot --nginx -d your-domain.com
+```
+
+### Firewall Configuration
+
+**Using UFW (Ubuntu)**:
+
+```bash
+# Enable firewall
+sudo ufw enable
+
+# Allow SSH
+sudo ufw allow ssh
+
+# Allow HTTP/HTTPS
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Allow Control Core services (if needed externally)
+sudo ufw allow 8080/tcp  # Bouncer
+sudo ufw allow 8082/tcp  # API
+
+# Check status
+sudo ufw status
+```
+
+## Next Steps
+
+- **[Administrator Guide](/guides/admin)**: Learn how to manage users and policies
+- **[User Guide](/guides/user-guide)**: Master policy creation
+- **[Pro Deployment](/guides/deployment/pro)**: Consider upgrading to Pro
+- **[Troubleshooting](/guides/troubleshooting)**: Common issues and solutions
+
+## Support
+
+- **Documentation**: https://docs.controlcore.io
+- **Community**: GitHub Discussions
+- **Email**: support@controlcore.io
+

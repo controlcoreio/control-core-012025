@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.policyAdminServer.name }}-config
+  labels:
+    app: {{ .Values.policyAdminServer.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+data:
+  {{- range .Values.policyAdminServer.env }}
+  {{ .name }}: {{ .value | quote }}
+  {{- end }}

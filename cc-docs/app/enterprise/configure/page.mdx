@@ -1,0 +1,1065 @@
+# Enterprise Configuration
+
+This guide covers post-deployment configuration for Control Core enterprise deployments, including performance tuning, security hardening, monitoring setup, and compliance requirements.
+
+## Initial Configuration
+
+After deploying Control Core to your enterprise environment, complete these essential configuration steps.
+
+### 1. System Health Check
+
+Verify all components are running:
+
+```bash
+# Check all pods
+kubectl get pods -n controlcore
+
+# Expected output:
+# NAME                          READY   STATUS    RESTARTS   AGE
+# pap-console-xxx               1/1     Running   0          5m
+# pap-api-xxx                   1/1     Running   0          5m
+# opal-server-xxx               1/1     Running   0          5m
+# bouncer-xxx                   1/1     Running   0          5m
+# postgresql-xxx                1/1     Running   0          5m
+# redis-xxx                     1/1     Running   0          5m
+
+# Check services
+kubectl get svc -n controlcore
+
+# Check ingress
+kubectl get ingress -n controlcore
+```
+
+### 2. Access the Administration Console
+
+Navigate to your Console URL (configured during deployment):
+
+```
+https://console.your-domain.com
+```
+
+**Default login** (change immediately):
+- Email: `admin@your-domain.com` (set during deployment)
+- Password: Check Kubernetes secret
+
+```bash
+# Retrieve initial admin password
+kubectl get secret controlcore-admin -n controlcore \
+  -o jsonpath='{.data.password}' | base64 -d
+```
+
+### 3. Change Default Credentials
+
+**Important**: Change the default admin password immediately after first login.
+
+1. Log in to the Console
+2. Navigate to **Settings** → **Profile**
+3. Click **Change Password**
+4. Use a strong password (min 12 chars, uppercase, lowercase, numbers, symbols)
+5. Enable MFA (strongly recommended)
+
+## Authentication Configuration
+
+### SAML/SSO Integration
+
+Configure enterprise SSO for centralized authentication.
+
+#### Okta Integration
+
+1. **In Okta Admin Console**:
+   - Create new SAML 2.0 application
+   - Single sign-on URL: `https://console.your-domain.com/auth/saml/callback`
+   - Audience URI: `https://console.your-domain.com`
+   - Attribute Statements:
+     - `email` → `user.email`
+     - `firstName` → `user.firstName`
+     - `lastName` → `user.lastName`
+     - `groups` → `user.groups`
+
+2. **In Control Core Console**:
+   - Navigate to **Settings** → **Authentication** → **SAML**
+   - Enable SAML
+   - Upload Okta metadata XML
+   - Configure attribute mapping
+   - Set default role for new users
+
+**Configuration via API**:
+
+```bash
+curl -X POST https://api.your-domain.com/v1/auth/saml/config \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": true,
+    "entityId": "https://console.your-domain.com",
+    "ssoUrl": "https://your-org.okta.com/app/xxx/sso/saml",
+    "certificate": "-----BEGIN CERTIFICATE-----\n...",
+    "attributeMapping": {
+      "email": "email",
+      "firstName": "firstName",
+      "lastName": "lastName",
+      "groups": "groups"
+    },
+    "defaultRole": "policy-viewer"
+  }'
+```
+
+#### Azure AD Integration
+
+```bash
+# Azure AD SAML configuration
+{
+  "enabled": true,
+  "entityId": "https://console.your-domain.com",
+  "ssoUrl": "https://login.microsoftonline.com/TENANT_ID/saml2",
+  "certificate": "-----BEGIN CERTIFICATE-----\n...",
+  "attributeMapping": {
+    "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+    "firstName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+    "lastName": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+    "groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+  },
+  "jitProvisioning": true
+}
+```
+
+#### Google Workspace Integration
+
+```bash
+# Google SAML configuration
+{
+  "enabled": true,
+  "entityId": "https://console.your-domain.com",
+  "ssoUrl": "https://accounts.google.com/o/saml2/idp?idpid=xxx",
+  "certificate": "-----BEGIN CERTIFICATE-----\n...",
+  "attributeMapping": {
+    "email": "email",
+    "firstName": "first_name",
+    "lastName": "last_name"
+  }
+}
+```
+
+### Multi-Factor Authentication (MFA)
+
+Enable MFA for all administrative users:
+
+```bash
+# Enable MFA organization-wide
+curl -X PATCH https://api.your-domain.com/v1/organization/settings \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "mfa": {
+      "enabled": true,
+      "enforced": true,
+      "methods": ["totp", "sms", "email"],
+      "gracePeriodDays": 7
+    }
+  }'
+```
+
+**Supported MFA Methods**:
+- **TOTP** (Google Authenticator, Authy) - Recommended
+- **SMS** (Twilio integration required)
+- **Email** (Backup only)
+- **WebAuthn/FIDO2** (Hardware keys)
+
+### API Keys and Service Accounts
+
+Create service accounts for automated integrations:
+
+```bash
+# Create service account
+curl -X POST https://api.your-domain.com/v1/service-accounts \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "name": "ci-cd-pipeline",
+    "description": "Service account for CI/CD policy deployment",
+    "roles": ["policy-admin"],
+    "expiresAt": "2026-12-31T23:59:59Z"
+  }'
+
+# Response includes API key
+{
+  "id": "sa_xxx",
+  "apiKey": "sk_live_xxx",  # Store securely!
+  "createdAt": "2025-01-15T10:00:00Z"
+}
+```
+
+## Database Configuration
+
+### Connection Pool Tuning
+
+Optimize PostgreSQL connection pooling for your workload:
+
+```yaml
+# values.yaml for Helm chart
+database:
+  # Primary connection pool (PAP API)
+  connectionPool:
+    size: 50              # Max connections per API pod
+    maxOverflow: 20       # Additional connections under load
+    timeout: 30           # Connection timeout (seconds)
+    recycleTime: 3600     # Recycle connections after 1 hour
+  
+  # Read replica configuration
+  readReplicas:
+    enabled: true
+    count: 2
+    loadBalancing: "round-robin"  # or "least-connections"
+```
+
+**Recommended Pool Sizes by Deployment**:
+
+| Deployment Size | API Pods | Pool Size | Max Overflow | Total Connections |
+|----------------|----------|-----------|--------------|-------------------|
+| **Small** | 2 | 20 | 10 | 60 |
+| **Medium** | 5 | 30 | 15 | 225 |
+| **Large** | 10 | 50 | 20 | 700 |
+| **Enterprise** | 20+ | 50 | 20 | 1400+ |
+
+### Database Performance Tuning
+
+**PostgreSQL Configuration** (`postgresql.conf`):
+
+```ini
+# Memory settings (for 16GB RAM server)
+shared_buffers = 4GB
+effective_cache_size = 12GB
+maintenance_work_mem = 1GB
+work_mem = 64MB
+
+# Connections
+max_connections = 500
+
+# Write-Ahead Logging
+wal_buffers = 16MB
+checkpoint_completion_target = 0.9
+checkpoint_timeout = 15min
+
+# Query planning
+random_page_cost = 1.1
+effective_io_concurrency = 200
+
+# Logging for auditing
+log_statement = 'mod'  # Log all data-modifying statements
+log_duration = on
+log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+```
+
+### Backup Configuration
+
+**Automated Backups**:
+
+```yaml
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention:
+    daily: 30
+    weekly: 12
+    monthly: 84  # 7 years for compliance
+  
+  destination:
+    # AWS S3
+    s3:
+      bucket: "controlcore-backups"
+      region: "us-east-1"
+      encryption: "AES256"
+    
+    # Google Cloud Storage
+    gcs:
+      bucket: "controlcore-backups"
+      location: "us-central1"
+    
+    # Azure Blob Storage
+    azure:
+      storageAccount: "controlcorebackups"
+      container: "backups"
+      redundancy: "GRS"
+```
+
+**Manual Backup**:
+
+```bash
+# Create immediate backup
+kubectl exec -n controlcore postgresql-0 -- \
+  pg_dump -U controlcore -Fc controlcore > backup-$(date +%Y%m%d-%H%M%S).dump
+
+# Upload to cloud storage
+aws s3 cp backup-*.dump s3://controlcore-backups/manual/
+```
+
+## Redis Cache Configuration
+
+### Cache Strategy
+
+Configure Redis for optimal performance:
+
+```yaml
+redis:
+  # Redis mode
+  mode: "cluster"  # or "sentinel" for HA
+  
+  # Cluster configuration
+  cluster:
+    nodes: 6
+    replicas: 1
+  
+  # Memory management
+  maxmemory: "2gb"
+  maxmemoryPolicy: "allkeys-lru"  # Evict least recently used
+  
+  # Persistence
+  persistence:
+    enabled: true
+    aof: true  # Append-only file
+    rdb: true  # Snapshots
+    aofSchedule: "everysec"
+    rdbSchedule: "0 */6 * * *"  # Every 6 hours
+  
+  # Performance
+  timeout: 300  # Connection timeout
+  tcpKeepalive: 60
+```
+
+### Cache TTL Configuration
+
+Set appropriate TTLs for different data types:
+
+```bash
+# Configure via API
+curl -X PATCH https://api.your-domain.com/v1/settings/cache \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "policies": {
+      "ttl": 900,          # 15 minutes
+      "enabled": true
+    },
+    "decisions": {
+      "ttl": 300,          # 5 minutes
+      "enabled": true,
+      "keyPattern": "user:{user_id}:resource:{resource_id}"
+    },
+    "pipData": {
+      "ttl": 3600,         # 1 hour
+      "enabled": true
+    },
+    "sessionData": {
+      "ttl": 86400,        # 24 hours
+      "enabled": true
+    }
+  }'
+```
+
+## OPAL Configuration
+
+### Policy Sync Settings
+
+Configure how policies are synchronized across Bouncers:
+
+```yaml
+opal:
+  # Git repository settings
+  policySource:
+    type: "git"
+    url: "https://github.com/your-org/policies.git"
+    branch: "main"
+    pollInterval: 30  # seconds
+    authentication:
+      method: "ssh"  # or "token"
+      sshKeySecret: "opal-git-ssh-key"
+  
+  # Broadcast configuration
+  broadcast:
+    type: "postgres"  # or "redis"
+    channel: "policy-updates"
+  
+  # Client management
+  clients:
+    maxConnections: 1000
+    heartbeatInterval: 30
+    reconnectBackoff:
+      initial: 1
+      max: 60
+      multiplier: 2
+  
+  # Data sources (PIP integrations)
+  dataSources:
+    - name: "user-directory"
+      url: "https://api.your-domain.com/v1/pip/users"
+      syncInterval: 300  # 5 minutes
+      authentication:
+        type: "bearer"
+        tokenSecret: "pip-auth-token"
+```
+
+### Webhook Configuration
+
+Configure webhooks for real-time policy updates:
+
+```bash
+# Register webhook for policy changes
+curl -X POST https://api.your-domain.com/v1/webhooks \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "name": "policy-update-notification",
+    "events": ["policy.created", "policy.updated", "policy.deleted"],
+    "url": "https://your-service.com/webhooks/policy-updates",
+    "secret": "webhook_secret_key",
+    "enabled": true
+  }'
+```
+
+## Bouncer Configuration
+
+### Performance Tuning
+
+Optimize Bouncer performance for your workload:
+
+```yaml
+bouncer:
+  # Replica configuration
+  replicas: 10
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 50
+    targetCPUUtilization: 70
+    targetMemoryUtilization: 80
+  
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  
+  # OPA configuration
+  opa:
+    decisionLogging: true
+    bundleMode: false  # Use OPAL streaming
+    caching:
+      enabled: true
+      maxSize: 1000
+      ttl: 300
+  
+  # Target application
+  target:
+    url: "http://your-app:8080"
+    timeout: 30
+    retries: 3
+    connectionPool:
+      size: 100
+      maxIdle: 50
+```
+
+### Load Balancing
+
+Configure load balancing across Bouncers:
+
+**NGINX Ingress Controller**:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bouncer-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$request_uri"
+    nginx.ingress.kubernetes.io/session-cookie-name: "bouncer-affinity"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: app.your-domain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: bouncer
+            port:
+              number: 8080
+```
+
+**AWS ALB**:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: bouncer
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+spec:
+  type: LoadBalancer
+  selector:
+    app: bouncer
+  ports:
+  - port: 80
+    targetPort: 8080
+```
+
+## Monitoring and Observability
+
+### Prometheus Integration
+
+Deploy Prometheus monitoring:
+
+```bash
+# Install Prometheus Operator
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace
+
+# Install Control Core ServiceMonitors
+kubectl apply -f - <<EOF
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controlcore-monitoring
+  namespace: controlcore
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: controlcore
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+EOF
+```
+
+### Grafana Dashboards
+
+Import pre-built Control Core dashboards:
+
+```bash
+# Access Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# Import dashboards (ID provided by Control Core)
+# - Control Core Overview: 12345
+# - Policy Performance: 12346
+# - Bouncer Metrics: 12347
+# - Database Performance: 12348
+```
+
+**Key Metrics to Monitor**:
+
+| Metric | Alert Threshold | Description |
+|--------|----------------|-------------|
+| `bouncer_request_duration_p95` | > 100ms | Policy evaluation latency |
+| `bouncer_error_rate` | > 1% | Authorization errors |
+| `opal_sync_failures` | > 0 | Policy sync issues |
+| `database_connection_pool_usage` | > 80% | Connection saturation |
+| `redis_memory_usage` | > 90% | Cache exhaustion |
+| `api_request_rate` | N/A | API throughput |
+
+### Centralized Logging
+
+**ELK Stack (Elasticsearch, Logstash, Kibana)**:
+
+```bash
+# Install ELK
+helm repo add elastic https://helm.elastic.co
+helm install elasticsearch elastic/elasticsearch -n logging --create-namespace
+helm install kibana elastic/kibana -n logging
+helm install filebeat elastic/filebeat -n logging
+
+# Configure log forwarding
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: logging
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: container
+      paths:
+        - /var/log/containers/*controlcore*.log
+      processors:
+      - add_kubernetes_metadata:
+          host: \${NODE_NAME}
+          matchers:
+          - logs_path:
+              logs_path: "/var/log/containers/"
+    
+    output.elasticsearch:
+      hosts: ['elasticsearch:9200']
+      index: "controlcore-%{+yyyy.MM.dd}"
+EOF
+```
+
+**Cloud-Native Options**:
+
+| Cloud | Service | Configuration |
+|-------|---------|---------------|
+| **AWS** | CloudWatch Logs | Fluent Bit daemonset with CloudWatch output |
+| **GCP** | Cloud Logging | GKE-native logging (automatic) |
+| **Azure** | Azure Monitor | Azure Monitor agent with Log Analytics |
+
+### Audit Logging
+
+Enable comprehensive audit logging for compliance:
+
+```yaml
+audit:
+  enabled: true
+  retention: 2555  # 7 years (days) for FINTRAC compliance
+  
+  # What to log
+  events:
+    - policy.created
+    - policy.updated
+    - policy.deleted
+    - policy.deployed
+    - authorization.decision
+    - user.login
+    - user.logout
+    - user.role_changed
+    - settings.modified
+    - integration.configured
+  
+  # Where to send logs
+  destinations:
+    # Local database (for Console access)
+    - type: database
+      table: audit_logs
+      retention: 2555
+    
+    # S3/GCS/Blob for long-term storage
+    - type: cloud_storage
+      provider: s3
+      bucket: controlcore-audit-logs
+      encryption: AES256
+      objectLock: true  # Immutable for compliance
+    
+    # SIEM integration
+    - type: syslog
+      host: siem.your-domain.com
+      port: 514
+      protocol: tcp
+      tls: true
+```
+
+## Security Hardening
+
+### Network Security
+
+**Network Policies**:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controlcore-network-policy
+  namespace: controlcore
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: controlcore
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - port: 8080
+      protocol: TCP
+  
+  # Allow internal communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: controlcore
+  
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+  
+  # Allow database
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - port: 5432
+  
+  # Allow Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - port: 6379
+  
+  # Allow external HTTPS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - port: 443
+```
+
+### TLS/SSL Configuration
+
+**Generate certificates with cert-manager**:
+
+```bash
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+
+# Create ClusterIssuer for Let's Encrypt
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@your-domain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+EOF
+
+# Create certificate
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: controlcore-tls
+  namespace: controlcore
+spec:
+  secretName: controlcore-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - console.your-domain.com
+  - api.your-domain.com
+  - opal.your-domain.com
+EOF
+```
+
+### Secrets Management
+
+**Use external secrets manager**:
+
+```bash
+# AWS Secrets Manager
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets \
+  -n external-secrets-system --create-namespace
+
+# Create SecretStore
+kubectl apply -f - <<EOF
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: aws-secrets-manager
+  namespace: controlcore
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: external-secrets-sa
+EOF
+
+# Create ExternalSecret
+kubectl apply -f - <<EOF
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: controlcore-secrets
+  namespace: controlcore
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: controlcore-secrets
+  data:
+  - secretKey: database-password
+    remoteRef:
+      key: controlcore/database-password
+  - secretKey: redis-password
+    remoteRef:
+      key: controlcore/redis-password
+  - secretKey: opal-client-token
+    remoteRef:
+      key: controlcore/opal-token
+EOF
+```
+
+## Compliance Configuration
+
+### FINTRAC Compliance (Canada)
+
+Configure for FINTRAC reporting requirements:
+
+```bash
+# Enable FINTRAC-specific audit logging
+curl -X PATCH https://api.your-domain.com/v1/compliance/fintrac \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "enabled": true,
+    "reportingThresholds": {
+      "largeCashTransaction": 10000,
+      "currency": "CAD",
+      "suspiciousTransaction": true
+    },
+    "dataRetention": {
+      "transactionRecords": 2555,  # 7 years
+      "clientIdentification": 2555,
+      "auditLogs": 2555
+    },
+    "dataResidency": {
+      "region": "ca-central-1",
+      "enforceGeofencing": true
+    }
+  }'
+```
+
+### OSFI Guidelines (Canada)
+
+Configure for OSFI compliance:
+
+```yaml
+compliance:
+  osfi:
+    enabled: true
+    guidelines:
+      # B-10: Outsourcing
+      - code: "B-10"
+        controls:
+          - vendor_approval_required: true
+          - due_diligence_tracking: true
+          - service_level_monitoring: true
+      
+      # E-21: Operational Risk
+      - code: "E-21"
+        controls:
+          - incident_tracking: true
+          - risk_assessment: true
+          - business_continuity: true
+    
+    reporting:
+      enabled: true
+      frequency: "quarterly"
+      destination: "s3://osfi-reports/"
+```
+
+### GDPR Compliance (EU)
+
+```yaml
+compliance:
+  gdpr:
+    enabled: true
+    dataResidency:
+      region: "eu-west-1"
+      enforceEUOnly: true
+    
+    userRights:
+      rightToAccess: true
+      rightToErasure: true
+      rightToPortability: true
+      rightToRectification: true
+    
+    dataProcessing:
+      consentRequired: true
+      purposeLimitation: true
+      dataMinimization: true
+      auditTrail: true
+```
+
+## Performance Optimization
+
+### Auto-Scaling Configuration
+
+**Horizontal Pod Autoscaler (HPA)**:
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bouncer-hpa
+  namespace: controlcore
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bouncer
+  minReplicas: 5
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "1000"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 120
+```
+
+**Cluster Autoscaler** (cloud-specific):
+
+```yaml
+# AWS
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler
+  namespace: kube-system
+data:
+  cluster-autoscaler-config: |
+    scale-down-enabled: true
+    scale-down-delay-after-add: 10m
+    scale-down-unneeded-time: 10m
+    min-nodes: 3
+    max-nodes: 20
+
+# GCP
+gcloud container clusters update CLUSTER_NAME \
+  --enable-autoscaling \
+  --min-nodes=3 \
+  --max-nodes=20 \
+  --zone=us-central1-a
+
+# Azure
+az aks update \
+  --resource-group RESOURCE_GROUP \
+  --name CLUSTER_NAME \
+  --enable-cluster-autoscaler \
+  --min-count 3 \
+  --max-count 20
+```
+
+### Resource Quotas
+
+Set resource quotas to prevent resource exhaustion:
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: controlcore-quota
+  namespace: controlcore
+spec:
+  hard:
+    requests.cpu: "100"
+    requests.memory: "200Gi"
+    limits.cpu: "200"
+    limits.memory: "400Gi"
+    pods: "100"
+    services: "20"
+    persistentvolumeclaims: "10"
+```
+
+## Troubleshooting
+
+### Common Configuration Issues
+
+**Issue 1: Database Connection Failures**
+
+```bash
+# Check database connectivity
+kubectl exec -n controlcore deployment/pap-api -- \
+  pg_isready -h postgresql -p 5432 -U controlcore
+
+# Check connection pool exhaustion
+kubectl logs -n controlcore deployment/pap-api | grep "connection pool"
+
+# Solution: Increase pool size or add read replicas
+```
+
+**Issue 2: Redis Cache Misses**
+
+```bash
+# Check cache hit rate
+kubectl exec -n controlcore redis-0 -- redis-cli INFO stats | grep hit_rate
+
+# Solution: Increase TTL or memory limit
+helm upgrade controlcore ./helm/controlcore \
+  --set redis.maxmemory=4gb \
+  --set cache.policies.ttl=1800
+```
+
+**Issue 3: OPAL Sync Delays**
+
+```bash
+# Check OPAL logs
+kubectl logs -n controlcore deployment/opal-server
+
+# Check connected clients
+kubectl exec -n controlcore opal-server-0 -- \
+  curl http://localhost:7000/statistics
+
+# Solution: Increase OPAL replicas or optimize Git polling
+```
+
+## Next Steps
+
+- **[Enterprise Policies](/enterprise/policies)**: Implement enterprise policy patterns
+- **[Security Best Practices](/guides/security)**: Additional security hardening
+- **[Monitoring](/troubleshooting)**: Advanced monitoring and alerting
+- **[User Guide](/guides/user-guide)**: Day-to-day operations
+
+---
+
+**Proper configuration is critical for enterprise deployments. Consider engaging Control Core professional services for configuration review and optimization.**

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Control Core Kickstart</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 10px 0;
+        }
+        .feature-list {
+            background-color: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🛡️ Control Core</div>
+        <h1>Welcome to Control Core Kickstart!</h1>
+    </div>
+
+    <div class="content">
+        <p>Hi {{ name }},</p>
+        
+        <p>Welcome to Control Core! Your 90-day free trial for the <strong>Kickstart Plan</strong> is now active. You're all set to start securing your APIs and AI systems with enterprise-grade authorization.</p>
+
+        <div class="feature-list">
+            <h3>🚀 What's Included in Your Kickstart Plan:</h3>
+            <ul>
+                <li><strong>90 days free</strong> - No charges during your trial</li>
+                <li><strong>Self-hosted Control Plane</strong> - Full control over your deployment</li>
+                <li><strong>Up to 100 policies</strong> - Perfect for getting started</li>
+                <li><strong>1M API calls/month</strong> - Generous usage allowance</li>
+                <li><strong>Email support</strong> - We're here to help</li>
+                <li><strong>Policy templates</strong> - Pre-built policies for common use cases</li>
+            </ul>
+        </div>
+
+        <h3>📥 Next Steps:</h3>
+        <ol>
+            <li><strong>Download your Control Plane</strong> - Get your deployment package</li>
+            <li><strong>Deploy in your infrastructure</strong> - Follow our simple deployment guide</li>
+            <li><strong>Complete the Getting Started Wizard</strong> - We'll guide you through setup</li>
+            <li><strong>Start protecting your APIs</strong> - Deploy your first policies</li>
+        </ol>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ download_url }}" class="button">Download Control Plane</a>
+        </div>
+
+        <h3>📚 Resources to Get You Started:</h3>
+        <ul>
+            <li><a href="{{ docs_url }}">📖 Getting Started Guide</a> - Step-by-step setup instructions</li>
+            <li><a href="https://docs.controlcore.io/deployment">🚀 Deployment Guide</a> - Detailed deployment options</li>
+            <li><a href="https://docs.controlcore.io/policies">📋 Policy Examples</a> - Sample policies for common scenarios</li>
+            <li><a href="https://community.controlcore.io">💬 Community Forum</a> - Connect with other users</li>
+        </ul>
+
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #92400e;">💡 Pro Tip</h4>
+            <p style="margin-bottom: 0; color: #92400e;">Start with our pre-built policy templates to quickly secure common API endpoints. You can customize them later as your needs grow.</p>
+        </div>
+
+        <p>If you have any questions or need help getting started, don't hesitate to reach out to our support team at <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+
+        <p>Welcome to the future of API security!</p>
+        
+        <p>Best regards,<br>
+        The Control Core Team</p>
+    </div>
+
+    <div class="footer">
+        <p>This email was sent to {{ email }} because you signed up for Control Core.</p>
+        <p>
+            <a href="https://controlcore.io/privacy-policy">Privacy Policy</a> | 
+            <a href="https://controlcore.io/terms-of-use">Terms of Service</a> | 
+            <a href="mailto:{{ support_email }}">Support</a>
+        </p>
+        <p>© 2024 Control Core. All rights reserved.</p>
+    </div>
+</body>
+</html>

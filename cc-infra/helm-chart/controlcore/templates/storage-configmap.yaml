@@ -1,0 +1,150 @@
+{{/*
+Storage Configuration ConfigMap
+This template creates a ConfigMap with storage configuration for all components
+*/}}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controlcore.fullname" . }}-storage-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: storage
+    config-type: storage-paths
+data:
+  # Global storage configuration
+  STORAGE_BASE_PATH: {{ .Values.global.storage.basePath | quote }}
+  STORAGE_ENABLED: {{ .Values.persistence.enabled | quote }}
+  
+  # Component storage paths
+  {{- range $name, $config := .Values.persistence.paths }}
+  {{- if $config.enabled }}
+  STORAGE_{{ $name | upper }}_PATH: {{ $config.path | quote }}
+  STORAGE_{{ $name | upper }}_SIZE: {{ $config.size | quote }}
+  {{- end }}
+  {{- end }}
+  
+  # Database storage configuration
+  {{- if .Values.components.database.persistence.enabled }}
+  DATABASE_STORAGE_ENABLED: "true"
+  DATABASE_STORAGE_PATH: {{ .Values.components.database.persistence.mountPath | quote }}
+  DATABASE_STORAGE_SIZE: {{ .Values.components.database.persistence.size | quote }}
+  {{- else }}
+  DATABASE_STORAGE_ENABLED: "false"
+  {{- end }}
+  
+  # Redis storage configuration
+  {{- if .Values.components.redis.persistence.enabled }}
+  REDIS_STORAGE_ENABLED: "true"
+  REDIS_STORAGE_PATH: {{ .Values.components.redis.persistence.mountPath | quote }}
+  REDIS_STORAGE_SIZE: {{ .Values.components.redis.persistence.size | quote }}
+  {{- else }}
+  REDIS_STORAGE_ENABLED: "false"
+  {{- end }}
+  
+  # OPAL storage configuration
+  {{- if .Values.components.opal.persistence.enabled }}
+  OPAL_STORAGE_ENABLED: "true"
+  OPAL_STORAGE_PATH: {{ .Values.components.opal.persistence.mountPath | quote }}
+  OPAL_STORAGE_SIZE: {{ .Values.components.opal.persistence.size | quote }}
+  {{- else }}
+  OPAL_STORAGE_ENABLED: "false"
+  {{- end }}
+  
+  # Logging configuration
+  LOG_RETENTION_DAYS: {{ .Values.logging.retention.days | quote }}
+  LOG_MAX_SIZE: {{ .Values.logging.retention.maxSize | quote }}
+  LOG_FRONTEND_LEVEL: {{ .Values.logging.levels.frontend | quote }}
+  LOG_PAP_API_LEVEL: {{ .Values.logging.levels.papApi | quote }}
+  LOG_BOUNCER_LEVEL: {{ .Values.logging.levels.bouncer | quote }}
+  LOG_PDP_LEVEL: {{ .Values.logging.levels.pdp | quote }}
+  LOG_OPAL_LEVEL: {{ .Values.logging.levels.opal | quote }}
+  LOG_DATABASE_LEVEL: {{ .Values.logging.levels.database | quote }}
+  
+  # Security configuration
+  STORAGE_OWNER: {{ .Values.security.permissions.owner | quote }}
+  STORAGE_MODE: {{ .Values.security.permissions.mode | quote }}
+  STORAGE_FILE_MODE: {{ .Values.security.permissions.fileMode | quote }}
+  
+  # Performance configuration
+  POSTGRES_SHARED_BUFFERS: {{ .Values.performance.memory.sharedBuffers | quote }}
+  POSTGRES_EFFECTIVE_CACHE_SIZE: {{ .Values.performance.memory.effectiveCacheSize | quote }}
+  POSTGRES_MAX_CONNECTIONS: {{ .Values.performance.memory.maxConnections | quote }}
+
+---
+# Storage paths documentation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "controlcore.fullname" . }}-storage-docs
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: storage
+    config-type: documentation
+data:
+  # Storage paths documentation
+  {{- range $name, $config := .Values.persistence.paths }}
+  {{- if $config.enabled }}
+  {{ $name | upper }}_DESCRIPTION: {{ $config.description | quote }}
+  {{- end }}
+  {{- end }}
+  
+  # README content
+  README.md: |
+    # Control Core Storage Configuration
+    
+    ## Storage Paths
+    
+    This deployment uses the following configurable storage paths:
+    
+    {{- range $name, $config := .Values.persistence.paths }}
+    {{- if $config.enabled }}
+    
+    ### {{ $name | title }}
+    - **Path**: {{ $config.path }}
+    - **Size**: {{ $config.size }}
+    - **Purpose**: {{ $config.description }}
+    {{- end }}
+    {{- end }}
+    
+    ## Configuration
+    
+    All storage paths can be configured in the Helm values:
+    
+    ```yaml
+    persistence:
+      paths:
+        opal:
+          enabled: true
+          path: "/opt/control-core/data/opal"
+          size: "5Gi"
+        postgresql:
+          enabled: true
+          path: "/opt/control-core/data/postgresql"
+          size: "50Gi"
+        # ... other paths
+    ```
+    
+    ## Storage Classes
+    
+    Customers can specify different storage classes based on their infrastructure:
+    
+    - **AWS EKS**: `gp2`, `gp3`, `io1`, `io2`
+    - **GCP GKE**: `standard`, `ssd`, `premium-rwo`
+    - **Azure AKS**: `default`, `managed-premium`
+    - **Local**: `local-path`, `hostpath`
+    
+    ## Security
+    
+    - All storage uses persistent volume claims for data persistence
+    - File permissions are configurable per customer requirements
+    - Encryption at rest can be enabled if supported by storage class
+    
+    ## Monitoring
+    
+    Storage usage and performance metrics are available through:
+    - Kubernetes metrics server
+    - Custom storage monitoring (if enabled)
+    - Application-level storage metrics

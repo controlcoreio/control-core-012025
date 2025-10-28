@@ -1,0 +1,44 @@
+{
+  "": {
+    "entityTypes": {
+      "User": {
+        "shape": {
+          "type": "Record",
+          "attributes": {
+            "department": {
+              "type": "String"
+            },
+            "role": {
+              "type": "String"
+            },
+            "clearance": {
+              "type": "String"
+            }
+          }
+        }
+      },
+      "Resource": {
+        "shape": {
+          "type": "Record",
+          "attributes": {
+            "owner": {
+              "type": "EntityUid"
+            },
+            "department": {
+              "type": "String"
+            },
+            "classification": {
+              "type": "String"
+            }
+          }
+        }
+      }
+    },
+    "actions": {
+      "read": {},
+      "write": {},
+      "delete": {},
+      "admin": {}
+    }
+  }
+}

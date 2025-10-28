@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.policyAdminClient.name }}
+  labels:
+    app: {{ .Values.policyAdminClient.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.policyAdminClient.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.policyAdminClient.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.policyAdminClient.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+    spec:
+      containers:
+        - name: {{ .Values.policyAdminClient.name }}
+          image: "{{ .Values.policyAdminClient.image.repository }}:{{ .Values.policyAdminClient.image.tag }}"
+          imagePullPolicy: {{ .Values.policyAdminClient.image.pullPolicy }}
+          ports:
+            - containerPort: {{ index .Values.policyAdminClient.service.ports 0 "port" }}
+            - containerPort: {{ index .Values.policyAdminClient.service.ports 1 "port" }}
+          env:
+            {{- range .Values.policyAdminClient.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.policyAdminClient.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.policyAdminClient.probes.readiness.path }}
+              port: {{ .Values.policyAdminClient.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.policyAdminClient.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminClient.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.policyAdminClient.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.policyAdminClient.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.policyAdminClient.probes.liveness.path }}
+              port: {{ .Values.policyAdminClient.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.policyAdminClient.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminClient.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.policyAdminClient.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.policyAdminClient.probes.liveness.failureThreshold }}

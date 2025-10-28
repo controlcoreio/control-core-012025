@@ -1,0 +1,45 @@
+# OPA Server Configuration
+# Control Core OPA Server Configuration
+
+# Server configuration
+server:
+  addr: "0.0.0.0:8181"
+  log_level: "info"
+  log_format: "json"
+  
+# Decision logging
+decision_logs:
+  console: true
+  service: "cc-opa-server"
+  
+# Status configuration
+status:
+  console: true
+  
+# Bundle configuration
+bundles:
+  cc-policies:
+    resource: "/bundles/cc-policies"
+    polling:
+      min_delay_seconds: 60
+      max_delay_seconds: 120
+      
+# Discovery configuration
+discovery:
+  name: "cc-opa-discovery"
+  resource: "/system/discovery"
+  polling:
+    min_delay_seconds: 60
+    max_delay_seconds: 120
+
+# Authorization configuration
+authorization:
+  default_decision: "allow"
+  
+# Metrics configuration
+metrics:
+  console: true
+  
+# Profiling configuration
+profiling:
+  enabled: true

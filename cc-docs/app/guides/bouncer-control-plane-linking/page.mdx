@@ -1,0 +1,596 @@
+# Bouncer-Control Plane Linking Guide
+
+## Overview
+
+This guide explains how bouncers (Policy Enforcement Points) establish and maintain connections with the Control Plane, including auto-registration, heartbeat mechanisms, and troubleshooting connection issues.
+
+## Connection Architecture
+
+```
+┌─────────────────┐         HTTPS/gRPC          ┌──────────────────┐
+│                 │ ────────────────────────────▶│                  │
+│     Bouncer     │   1. Registration           │  Control Plane   │
+│                 │   2. Heartbeat (30s)        │                  │
+│  (PEP)          │   3. Policy Queries         │  (PAP + PDP)     │
+│                 │   4. Metrics/Logs           │                  │
+│                 │◀────────────────────────────│                  │
+└─────────────────┘   Policy Decisions          └──────────────────┘
+```
+
+## Connection Lifecycle
+
+### 1. Bootstrap Phase
+
+When a bouncer starts, it:
+1. Loads configuration from `config.yaml` or environment variables
+2. Validates Control Plane URL and credentials
+3. Establishes network connectivity
+
+### 2. Registration Phase
+
+The bouncer registers itself with the Control Plane:
+
+**Request**: `POST /api/v1/peps/register`
+
+```json
+{
+  "bouncer_id": "bouncer-sandbox-api-1",
+  "bouncer_name": "Sandbox API Gateway Bouncer",
+  "bouncer_type": "reverse-proxy",
+  "tenant_id": "tenant-123",
+  "resource": {
+    "name": "Customer API",
+    "type": "api",
+    "target_host": "api-service:8000",
+    "original_host_url": "https://api.yourcompany.com",
+    "deployment_url": "https://bouncer-sandbox.yourcompany.com",
+    "default_security_posture": "deny-all"
+  },
+  "deployment_info": {
+    "platform": "docker",
+    "version": "v2.1.0",
+    "environment": "sandbox"
+  }
+}
+```
+
+**Response**: `200 OK`
+
+```json
+{
+  "id": 42,
+  "bouncer_id": "bouncer-sandbox-api-1",
+  "name": "Sandbox API Gateway Bouncer",
+  "status": "active",
+  "environment": "sandbox",
+  "is_connected": true,
+  "intercepting_traffic": true,
+  "last_heartbeat": "2025-01-24T10:30:00Z",
+  "created_at": "2025-01-24T10:30:00Z"
+}
+```
+
+**What Happens During Registration:**
+- Bouncer is added to the Control Plane database
+- Protected resource is auto-discovered and created
+- Initial connection status is set to "connected"
+- Bouncer receives its configuration back
+
+### 3. Heartbeat Phase
+
+Once registered, the bouncer sends periodic heartbeats:
+
+**Request**: `POST /api/v1/peps/{pep_id}/heartbeat?intercepting=true`
+
+**Frequency**: Every 30 seconds (configurable)
+
+**Response**: `200 OK`
+
+```json
+{
+  "message": "Heartbeat received",
+  "status": "active",
+  "is_connected": true,
+  "last_heartbeat": "2025-01-24T10:30:30Z"
+}
+```
+
+**Heartbeat Indicators:**
+- `is_connected`: true if heartbeat received in last 2 minutes
+- `intercepting_traffic`: true if bouncer is actively processing requests
+- `last_heartbeat`: timestamp of last successful heartbeat
+
+**If Heartbeat Fails:**
+- After 2 minutes without heartbeat, Control Plane marks bouncer as "disconnected"
+- Admin UI shows red indicator
+- Alerts can be triggered
+
+### 4. Policy Query Phase
+
+For each incoming request, the bouncer queries the Control Plane:
+
+**Request**: `POST /api/v1/decisions/evaluate`
+
+```json
+{
+  "input": {
+    "principal": {
+      "id": "user-123",
+      "roles": ["api-user"],
+      "attributes": {
+        "department": "engineering"
+      }
+    },
+    "action": "GET",
+    "resource": {
+      "type": "api",
+      "id": "customer-api",
+      "path": "/api/v1/customers"
+    },
+    "context": {
+      "ip": "192.168.1.100",
+      "time": "2025-01-24T10:30:00Z"
+    }
+  }
+}
+```
+
+**Response**: `200 OK`
+
+```json
+{
+  "decision": "ALLOW",
+  "reasons": ["Policy: api-access-policy evaluated to true"],
+  "obligations": [],
+  "advice": []
+}
+```
+
+## Authentication & Authorization
+
+### API Key Authentication
+
+Bouncers authenticate using API keys:
+
+```yaml
+control_plane:
+  api_key: "sk_live_abc123..."  # Tenant-specific API key
+  tenant_id: "tenant-123"
+```
+
+**API Key Headers:**
+```
+Authorization: Bearer sk_live_abc123...
+X-Tenant-ID: tenant-123
+```
+
+### Mutual TLS (Optional)
+
+For enhanced security, enable mutual TLS:
+
+```yaml
+control_plane:
+  url: "https://control-plane.company.com"
+  tls:
+    enabled: true
+    client_cert: "/etc/certs/bouncer-client.crt"
+    client_key: "/etc/certs/bouncer-client.key"
+    ca_cert: "/etc/certs/ca.crt"
+```
+
+## Environment Segregation
+
+### Sandbox Environment
+
+**Purpose**: Testing and policy validation
+
+**Configuration:**
+```yaml
+deployment:
+  environment: "sandbox"
+```
+
+**Characteristics:**
+- Connected to sandbox policy repository
+- Separate from production data
+- Safe for experimentation
+- Can be reset/cleared
+
+**In Admin UI:**
+- Green badge: 🟢 **Sandbox**
+- Policies must be explicitly promoted to production
+
+### Production Environment
+
+**Purpose**: Live traffic enforcement
+
+**Configuration:**
+```yaml
+deployment:
+  environment: "production"
+```
+
+**Characteristics:**
+- Connected to production policy repository
+- Enforces validated policies only
+- High availability requirements
+- Audit logging enabled
+
+**In Admin UI:**
+- Red badge: 🔴 **Production**
+- Policies are promoted from sandbox
+
+### Environment Isolation
+
+Bouncers are isolated by environment:
+- Sandbox bouncers cannot query production policies
+- Production bouncers cannot access sandbox resources
+- Policy promotion is one-way: sandbox → production
+- Separate metrics and logs per environment
+
+## Network Requirements
+
+### Outbound Connections (Bouncer → Control Plane)
+
+| Protocol | Port | Purpose |
+|----------|------|---------|
+| HTTPS | 443 | API calls, registration, heartbeat |
+| gRPC (optional) | 50051 | High-performance policy queries |
+
+### Firewall Rules
+
+Allow outbound traffic from bouncer to Control Plane:
+
+```bash
+# Allow HTTPS to Control Plane
+iptables -A OUTPUT -p tcp --dport 443 -d <control-plane-ip> -j ACCEPT
+
+# Allow gRPC (if enabled)
+iptables -A OUTPUT -p tcp --dport 50051 -d <control-plane-ip> -j ACCEPT
+```
+
+### DNS Resolution
+
+Ensure bouncer can resolve Control Plane hostname:
+
+```bash
+# Test DNS resolution
+nslookup control-plane.company.com
+
+# Test connectivity
+curl -I https://control-plane.company.com/health
+```
+
+### NAT and Load Balancers
+
+If Control Plane is behind NAT/Load Balancer:
+- Ensure load balancer passes through client IP
+- Configure timeout values appropriately
+- Use sticky sessions if stateful
+
+## Connection Monitoring
+
+### Check Connection Status in Admin UI
+
+1. Navigate to **Settings > Bouncers > Deployment Status**
+2. Look for connection indicators:
+   - ✅ Green pulsing dot = Connected
+   - ❌ Red dot = Disconnected
+   - ⚡ "Intercepting Traffic" badge = Active
+   - 🟢 "Sandbox" or 🔴 "Production" badge = Environment
+
+### Monitor Bouncer Logs
+
+**Successful Connection:**
+```
+INFO: Bouncer starting...
+INFO: Connecting to Control Plane at https://control-plane.company.com
+INFO: Registration successful - Bouncer ID: bouncer-sandbox-api-1
+INFO: Resource auto-discovered - Resource: Customer API
+INFO: Health check enabled - Heartbeat interval: 30s
+INFO: Bouncer ready - Listening on port 8080
+INFO: Status: Connected, Intercepting Traffic: true
+INFO: Heartbeat sent successfully (latency: 45ms)
+```
+
+**Connection Issues:**
+```
+ERROR: Failed to connect to Control Plane
+ERROR: Connection timeout after 10s
+ERROR: Authentication failed - Invalid API key
+WARN: Heartbeat failed - Retrying in 5s
+WARN: Control Plane unreachable - Cached policies in use
+```
+
+### Prometheus Metrics
+
+Monitor connection health via metrics:
+
+```
+# Connection status (1 = connected, 0 = disconnected)
+bouncer_control_plane_connected
+
+# Heartbeat success rate
+rate(bouncer_heartbeat_success_total[5m])
+
+# Control Plane latency
+bouncer_control_plane_latency_seconds
+
+# Failed requests to Control Plane
+rate(bouncer_control_plane_errors_total[5m])
+```
+
+### Health Check Endpoint
+
+Check bouncer-Control Plane connection:
+
+```bash
+curl http://localhost:8080/health
+```
+
+Response shows connection status:
+```json
+{
+  "status": "healthy",
+  "connected": true,
+  "control_plane_url": "https://control-plane.company.com",
+  "last_heartbeat": "2025-01-24T10:30:00Z",
+  "heartbeat_failures": 0
+}
+```
+
+## Troubleshooting Connection Issues
+
+### Issue: Bouncer Not Connecting
+
+**Symptoms:**
+- Bouncer shows "Disconnected" in Admin UI
+- Logs show connection errors
+- No heartbeat received
+
+**Diagnostic Steps:**
+
+1. **Test network connectivity:**
+   ```bash
+   # From bouncer host
+   curl -I https://control-plane.company.com/health
+   ```
+
+2. **Verify DNS resolution:**
+   ```bash
+   nslookup control-plane.company.com
+   ping control-plane.company.com
+   ```
+
+3. **Check firewall rules:**
+   ```bash
+   # Test outbound HTTPS
+   telnet control-plane.company.com 443
+   ```
+
+4. **Validate API credentials:**
+   ```bash
+   curl https://control-plane.company.com/api/v1/health \
+     -H "Authorization: Bearer your-api-key" \
+     -H "X-Tenant-ID: your-tenant-id"
+   ```
+
+5. **Check Control Plane status:**
+   ```bash
+   curl https://control-plane.company.com/status
+   ```
+
+**Solutions:**
+- Update firewall rules to allow outbound HTTPS
+- Verify API key is valid and not expired
+- Check Control Plane is running and accessible
+- Verify network path (no proxy blocking connections)
+
+### Issue: Intermittent Heartbeat Failures
+
+**Symptoms:**
+- Bouncer connects but heartbeat fails occasionally
+- Connection status flaps between connected/disconnected
+- Logs show "heartbeat timeout" errors
+
+**Diagnostic Steps:**
+
+1. **Check network stability:**
+   ```bash
+   # Monitor packet loss
+   ping -c 100 control-plane.company.com | tail -1
+   ```
+
+2. **Test latency:**
+   ```bash
+   # Measure round-trip time
+   time curl -s https://control-plane.company.com/health
+   ```
+
+3. **Review heartbeat interval:**
+   ```yaml
+   # Increase interval if network is slow
+   health:
+     heartbeat_interval: 60  # seconds (default: 30)
+     timeout: 15  # seconds (default: 10)
+   ```
+
+**Solutions:**
+- Increase heartbeat timeout if network is slow
+- Reduce heartbeat frequency if Control Plane is under load
+- Check for network congestion or packet loss
+- Verify Control Plane has sufficient capacity
+
+### Issue: Resource Not Auto-Discovered
+
+**Symptoms:**
+- Bouncer connects successfully
+- Heartbeat working
+- Resource doesn't appear in Admin UI
+
+**Diagnostic Steps:**
+
+1. **Check bouncer logs for registration:**
+   ```bash
+   docker logs cc-bouncer | grep -i "resource"
+   ```
+
+2. **Verify resource configuration:**
+   ```yaml
+   resource:
+     name: "Customer API"  # Must be set
+     type: "api"           # Must be valid type
+     original_host_url: "https://api.company.com"  # Must be set
+   ```
+
+3. **Check API response:**
+   ```bash
+   # Check if resource was created
+   curl https://control-plane.company.com/api/v1/resources \
+     -H "Authorization: Bearer your-api-key"
+   ```
+
+**Solutions:**
+- Ensure resource name and type are configured
+- Check logs for registration errors
+- Verify bouncer has permission to create resources
+- Manually refresh resources page in Admin UI
+
+### Issue: Authentication Failures
+
+**Symptoms:**
+- "401 Unauthorized" errors in logs
+- Registration fails immediately
+- Heartbeat returns authentication error
+
+**Diagnostic Steps:**
+
+1. **Verify API key format:**
+   ```bash
+   echo $CONTROL_PLANE_API_KEY
+   # Should start with sk_live_ or sk_test_
+   ```
+
+2. **Check tenant ID:**
+   ```bash
+   echo $TENANT_ID
+   # Should match your tenant in Control Plane
+   ```
+
+3. **Test credentials:**
+   ```bash
+   curl https://control-plane.company.com/api/v1/auth/validate \
+     -H "Authorization: Bearer $CONTROL_PLANE_API_KEY" \
+     -H "X-Tenant-ID: $TENANT_ID"
+   ```
+
+**Solutions:**
+- Regenerate API key in Admin UI (Settings > API Keys)
+- Verify tenant ID matches your account
+- Check API key hasn't expired
+- Ensure API key has bouncer registration permissions
+
+## High Availability Setup
+
+### Multiple Bouncers
+
+Deploy multiple bouncer instances for redundancy:
+
+```yaml
+# bouncer-1 config
+bouncer:
+  id: "bouncer-prod-api-1"
+  name: "Production API Bouncer 1"
+
+# bouncer-2 config
+bouncer:
+  id: "bouncer-prod-api-2"
+  name: "Production API Bouncer 2"
+
+# bouncer-3 config
+bouncer:
+  id: "bouncer-prod-api-3"
+  name: "Production API Bouncer 3"
+```
+
+**Load Balancer Configuration:**
+```yaml
+# HAProxy example
+backend bouncers
+    balance roundrobin
+    server bouncer1 bouncer-1:8080 check
+    server bouncer2 bouncer-2:8080 check
+    server bouncer3 bouncer-3:8080 check
+```
+
+### Connection Pooling
+
+Configure connection pooling for better performance:
+
+```yaml
+control_plane:
+  connection_pool:
+    size: 100
+    max_idle: 10
+    idle_timeout: 300  # seconds
+```
+
+### Circuit Breaker
+
+Enable circuit breaker to handle Control Plane outages:
+
+```yaml
+resilience:
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5  # failures before opening
+    success_threshold: 2   # successes before closing
+    timeout: 60           # seconds before retry
+```
+
+## Best Practices
+
+### Connection Management
+- ✅ Use connection pooling for high traffic
+- ✅ Enable circuit breaker for resilience
+- ✅ Monitor heartbeat success rate
+- ✅ Set appropriate timeout values
+- ✅ Deploy multiple bouncers for HA
+
+### Security
+- ✅ Use HTTPS for all connections
+- ✅ Rotate API keys regularly (every 90 days)
+- ✅ Enable mutual TLS for production
+- ✅ Restrict network access with firewalls
+- ✅ Use different API keys per environment
+
+### Monitoring
+- ✅ Alert on heartbeat failures
+- ✅ Track Control Plane latency
+- ✅ Monitor connection status
+- ✅ Log authentication failures
+- ✅ Set up dashboards for visibility
+
+### Operations
+- ✅ Test connectivity before deployment
+- ✅ Document network topology
+- ✅ Have rollback plan ready
+- ✅ Keep bouncer versions updated
+- ✅ Maintain environment segregation
+
+## Next Steps
+
+1. **Deploy Bouncers**: Follow the [Bouncer Deployment Guide](/guides/bouncer-deployment)
+2. **Create Policies**: Define authorization policies in Admin UI
+3. **Monitor Health**: Set up monitoring and alerts
+4. **Test Failover**: Verify HA setup works correctly
+5. **Scale**: Add more bouncers as traffic grows
+
+## Support
+
+Need help with connections?
+- 📧 Email: support@controlcore.io
+- 💬 Discord: discord.gg/controlcore
+- 📚 Docs: docs.controlcore.io
+- 🐛 Issues: github.com/controlcore/issues
+

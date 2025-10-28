@@ -1,0 +1,454 @@
+# IDE Integration API
+
+Control Core provides comprehensive IDE integration APIs that enable seamless policy development directly from your favorite development environments.
+
+## Overview
+
+The IDE Integration API supports:
+
+- **VS Code Extension** - Real-time policy validation and deployment
+- **JetBrains Plugin** - Code suggestions and inspections
+- **VS Code Server** - Browser-based development environments
+- **Git Webhooks** - Automatic policy synchronization
+- **WebSocket** - Real-time communication for live updates
+
+## Base URL
+
+```http
+https://your-control-core-instance.com/api/v1/ide-integration
+```
+
+## VS Code Extension Integration
+
+### Endpoints
+
+#### Validate Policy
+
+**POST** `/vscode`
+
+```json
+{
+  "action": "validate",
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "policy_path": "/workspace/policies/admin.rego",
+  "workspace_id": "workspace-123"
+}
+```
+
+#### Test Policy
+
+**POST** `/vscode`
+
+```json
+{
+  "action": "test",
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "policy_path": "/workspace/policies/admin.rego"
+}
+```
+
+#### Deploy Policy
+
+**POST** `/vscode`
+
+```json
+{
+  "action": "deploy",
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "policy_path": "/workspace/policies/admin.rego"
+}
+```
+
+#### Get Templates
+
+**POST** `/vscode`
+
+```json
+{
+  "action": "get_templates"
+}
+```
+
+### VS Code Extension Setup
+
+1. **Install the Extension**
+   ```bash
+   code --install-extension controlcore.policies
+   ```
+
+2. **Configure API Key**
+   ```json
+   {
+     "controlcore.apiKey": "your-api-key",
+     "controlcore.baseUrl": "https://your-instance.com/api/v1",
+     "controlcore.autoValidate": true,
+     "controlcore.defaultEnvironment": "sandbox"
+   }
+   ```
+
+3. **Open Policy File**
+   - Open any `.rego` file in VS Code
+   - The extension will automatically validate the policy
+   - Use `Ctrl+Shift+P` → "Control Core: Deploy Policy" to deploy
+
+### Extension Features
+
+- **Real-time Validation**: Automatic policy validation as you type
+- **Error Highlighting**: Syntax and semantic error highlighting
+- **Code Completion**: Intelligent autocomplete for Rego syntax
+- **Policy Templates**: Quick insertion of policy templates
+- **One-click Deployment**: Deploy policies directly from the editor
+- **Status Bar**: Real-time deployment status in the status bar
+
+## JetBrains Plugin Integration
+
+### Endpoints
+
+#### Validate Policy
+
+**POST** `/jetbrains`
+
+```json
+{
+  "action": "validate",
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "project_path": "/Users/dev/project",
+  "file_path": "policies/admin.rego"
+}
+```
+
+#### Get Suggestions
+
+**POST** `/jetbrains`
+
+```json
+{
+  "action": "get_suggestions",
+  "policy_content": "package access_control\n\nimport rego.v1\n\n",
+  "file_path": "policies/admin.rego"
+}
+```
+
+### JetBrains Plugin Setup
+
+1. **Install the Plugin**
+   - Go to `File` → `Settings` → `Plugins`
+   - Search for "Control Core"
+   - Install and restart IDE
+
+2. **Configure Settings**
+   - Go to `File` → `Settings` → `Tools` → `Control Core`
+   - Enter your API key and base URL
+   - Enable auto-validation and inspections
+
+3. **Use the Plugin**
+   - Open `.rego` files in your project
+   - Use `Ctrl+Alt+L` to validate policies
+   - Use `Ctrl+Alt+D` to deploy policies
+   - Get code suggestions with `Ctrl+Space`
+
+### Plugin Features
+
+- **Code Inspections**: Real-time policy validation
+- **Code Suggestions**: Intelligent autocomplete
+- **Quick Actions**: Validate and deploy policies
+- **Error Highlighting**: Syntax and semantic errors
+- **Policy Templates**: Code snippets for common patterns
+
+## VS Code Server Integration
+
+### Endpoints
+
+#### Sync Policy
+
+**POST** `/vscode-server`
+
+```json
+{
+  "action": "sync",
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "session_id": "session-123"
+}
+```
+
+#### Get Context
+
+**POST** `/vscode-server`
+
+```json
+{
+  "action": "get_context",
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "session_id": "session-123"
+}
+```
+
+### VS Code Server Setup
+
+1. **Install VS Code Server**
+   ```bash
+   curl -fsSL https://code-server.dev/install.sh | sh
+   ```
+
+2. **Configure Control Core Integration**
+   ```json
+   {
+     "extensions": ["controlcore.policies"],
+     "settings": {
+       "controlcore.apiKey": "your-api-key",
+       "controlcore.baseUrl": "https://your-instance.com/api/v1"
+     }
+   }
+   ```
+
+3. **Start VS Code Server**
+   ```bash
+   code-server --bind-addr 0.0.0.0:8080
+   ```
+
+## Git Webhook Integration
+
+### Endpoints
+
+#### Process Webhook
+
+**POST** `/webhook`
+
+```json
+{
+  "repository_url": "https://github.com/your-org/policies.git",
+  "branch": "main",
+  "commit_hash": "abc123def456",
+  "policy_files": ["policies/admin.rego", "policies/user.rego"],
+  "event_type": "push"
+}
+```
+
+### Webhook Setup
+
+1. **Configure Git Repository**
+   ```bash
+   # Add webhook to your repository
+   curl -X POST "https://api.github.com/repos/your-org/policies/hooks" \
+     -H "Authorization: token YOUR_GITHUB_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "web",
+       "active": true,
+       "events": ["push", "pull_request"],
+       "config": {
+         "url": "https://your-instance.com/api/v1/ide-integration/webhook",
+         "content_type": "json",
+         "secret": "your-webhook-secret"
+       }
+     }'
+   ```
+
+2. **Configure Control Core**
+   - Go to Settings → Integrations → Git
+   - Add your repository URL
+   - Configure webhook secret
+   - Enable automatic policy synchronization
+
+### Webhook Events
+
+- **Push Events**: Automatically sync and deploy policies
+- **Pull Request Events**: Validate policies in PRs
+- **Tag Events**: Deploy policies from specific tags
+
+## WebSocket Integration
+
+### Connection
+
+**WebSocket** `/ws/{user_id}`
+
+```javascript
+const ws = new WebSocket('wss://your-instance.com/api/v1/ide-integration/ws/123');
+
+ws.onopen = function() {
+  // Send ping to keep connection alive
+  ws.send(JSON.stringify({
+    type: 'ping',
+    data: {}
+  }));
+};
+
+ws.onmessage = function(event) {
+  const message = JSON.parse(event.data);
+  
+  if (message.type === 'validation_result') {
+    // Handle validation result
+    console.log('Validation result:', message.data);
+  }
+  
+  if (message.type === 'deployment_status') {
+    // Handle deployment status
+    console.log('Deployment status:', message.data);
+  }
+};
+```
+
+### Message Types
+
+#### Ping/Pong
+
+```json
+{
+  "type": "ping",
+  "data": {}
+}
+```
+
+#### Validation Request
+
+```json
+{
+  "type": "validate",
+  "data": {
+    "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}"
+  }
+}
+```
+
+#### Deployment Status Check
+
+```json
+{
+  "type": "deployment_status",
+  "data": {
+    "deployment_id": "deploy_123_1643123456"
+  }
+}
+```
+
+## Configuration
+
+### VS Code Settings
+
+```json
+{
+  "controlcore.apiKey": "your-api-key",
+  "controlcore.baseUrl": "https://your-instance.com/api/v1",
+  "controlcore.autoValidate": true,
+  "controlcore.autoFormat": true,
+  "controlcore.showSuggestions": true,
+  "controlcore.defaultEnvironment": "sandbox",
+  "controlcore.theme": "dark",
+  "controlcore.fontSize": 14
+}
+```
+
+### JetBrains Settings
+
+```json
+{
+  "controlcore.apiKey": "your-api-key",
+  "controlcore.baseUrl": "https://your-instance.com/api/v1",
+  "controlcore.autoValidate": true,
+  "controlcore.showInspections": true,
+  "controlcore.defaultEnvironment": "sandbox",
+  "controlcore.codeStyle": "standard"
+}
+```
+
+## Status Endpoint
+
+### Get Integration Status
+
+**GET** `/status`
+
+```json
+{
+  "status": {
+    "vscode_extension": {
+      "available": true,
+      "version": "1.0.0",
+      "features": ["validate", "test", "deploy", "templates"]
+    },
+    "jetbrains_plugin": {
+      "available": true,
+      "version": "1.0.0",
+      "features": ["validate", "suggestions", "inspections"]
+    },
+    "vscode_server": {
+      "available": true,
+      "features": ["sync", "context", "real-time"]
+    },
+    "webhook": {
+      "available": true,
+      "supported_events": ["push", "pull_request"],
+      "features": ["auto_sync", "validation", "deployment"]
+    }
+  }
+}
+```
+
+## Error Handling
+
+### Common Errors
+
+#### 401 Unauthorized
+
+```json
+{
+  "success": false,
+  "message": "Invalid API key",
+  "errors": ["Authentication failed"]
+}
+```
+
+#### 400 Bad Request
+
+```json
+{
+  "success": false,
+  "message": "Invalid request parameters",
+  "errors": ["Missing required field: policy_content"]
+}
+```
+
+#### 500 Internal Server Error
+
+```json
+{
+  "success": false,
+  "message": "Internal server error",
+  "errors": ["Policy validation service unavailable"]
+}
+```
+
+## Best Practices
+
+### IDE Integration
+
+1. **Enable Auto-validation** for real-time feedback
+2. **Use Policy Templates** for common patterns
+3. **Configure Environment** (sandbox for testing, production for live policies)
+4. **Set up Webhooks** for automated deployments
+5. **Use WebSocket** for real-time updates
+
+### Development Workflow
+
+1. **Write Policy** in your IDE
+2. **Validate** automatically or on-demand
+3. **Test** with comprehensive test cases
+4. **Deploy** to sandbox environment
+5. **Promote** to production when ready
+
+### Security
+
+1. **Secure API Keys** - Store in environment variables or secure keychain
+2. **Use HTTPS** for all communications
+3. **Validate Webhooks** with secrets
+4. **Monitor Usage** for unusual patterns
+5. **Rotate Keys** regularly
+
+## Support
+
+For IDE integration support:
+
+- **Documentation**: [docs.controlcore.io/ide-integration](https://docs.controlcore.io/ide-integration)
+- **VS Code Extension**: [marketplace.visualstudio.com/items?itemName=controlcore.policies](https://marketplace.visualstudio.com/items?itemName=controlcore.policies)
+- **JetBrains Plugin**: [plugins.jetbrains.com/plugin/controlcore](https://plugins.jetbrains.com/plugin/controlcore)
+- **Support Email**: ide-support@controlcore.io
+- **Community Forum**: [community.controlcore.io/ide-integration](https://community.controlcore.io/ide-integration)

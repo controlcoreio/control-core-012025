@@ -1,0 +1,215 @@
+version: '3.8'
+
+services:
+  # Control Core PAP API
+  cc-pap-api:
+    build:
+      context: ../../cc-pap-api
+      dockerfile: Dockerfile
+    container_name: cc-pap-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@cc-db:5432/control_core_db
+      - SECRET_KEY=your-secret-key-here
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    depends_on:
+      - cc-db
+    volumes:
+      - ../../cc-pap-api:/app
+      - ../../cc-pap-api/config:/app/config
+      - ../../cc-pap-api/policies:/app/policies
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Control Core Database
+  cc-db:
+    image: postgres:15
+    container_name: cc-db
+    environment:
+      - POSTGRES_DB=control_core_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - cc_postgres_data:/var/lib/postgresql/data
+      - ../../cc-pap-api/init:/docker-entrypoint-initdb.d
+      - ../../cc-data/postgres:/var/lib/postgresql/data
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Control Core Frontend (Policy Admin UI)
+  cc-frontend:
+    build:
+      context: ../../cc-pap
+      dockerfile: Dockerfile.dev
+    container_name: cc-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      - ../../cc-pap:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - cc-pap-api
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Control Core Bouncer - Sandbox Environment
+  cc-bouncer-sandbox:
+    build:
+      context: ../../cc-bouncer
+      dockerfile: Dockerfile
+    container_name: cc-bouncer-sandbox
+    ports:
+      - "8080:8080"
+    environment:
+      # Basic Configuration
+      - BOUNCER_PORT=8080
+      - TARGET_HOST=localhost:8000
+      - PAP_API_URL=http://cc-pap-api:8000
+      - OPAL_SERVER_URL=http://cc-opal:7000
+      - TENANT_ID=default
+      - API_KEY=your-sandbox-api-key-here
+      - LOG_ENABLED=true
+      - CACHE_ENABLED=true
+      
+      # Resource Auto-Discovery Configuration
+      - BOUNCER_ID=bouncer-demo-api-sandbox
+      - BOUNCER_NAME=Demo API Bouncer (Sandbox)
+      - BOUNCER_TYPE=reverse-proxy
+      - RESOURCE_NAME=Demo API (Sandbox)
+      - RESOURCE_TYPE=api
+      - ORIGINAL_HOST_URL=https://sandbox-api.demo.com
+      - SECURITY_POSTURE=deny-all
+      - DEPLOYMENT_PLATFORM=docker
+      - ENVIRONMENT=sandbox
+    depends_on:
+      - cc-pap-api
+      - cc-opal
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+  
+  # Control Core Bouncer - Production Environment
+  cc-bouncer-production:
+    build:
+      context: ../../cc-bouncer
+      dockerfile: Dockerfile
+    container_name: cc-bouncer-production
+    ports:
+      - "8081:8080"
+    environment:
+      # Basic Configuration
+      - BOUNCER_PORT=8080
+      - TARGET_HOST=localhost:8000
+      - PAP_API_URL=http://cc-pap-api:8000
+      - OPAL_SERVER_URL=http://cc-opal:7000
+      - TENANT_ID=default
+      - API_KEY=your-production-api-key-here
+      - LOG_ENABLED=true
+      - CACHE_ENABLED=true
+      
+      # Resource Auto-Discovery Configuration
+      - BOUNCER_ID=bouncer-demo-api-production
+      - BOUNCER_NAME=Demo API Bouncer (Production)
+      - BOUNCER_TYPE=reverse-proxy
+      - RESOURCE_NAME=Demo API (Production)
+      - RESOURCE_TYPE=api
+      - ORIGINAL_HOST_URL=https://api.demo.com
+      - SECURITY_POSTURE=deny-all
+      - DEPLOYMENT_PLATFORM=docker
+      - ENVIRONMENT=production
+    depends_on:
+      - cc-pap-api
+      - cc-opal
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # OPAL Server for Policy Synchronization
+  cc-opal:
+    image: permitio/opal-server:latest
+    container_name: cc-opal
+    ports:
+      - "7000:7000"
+    environment:
+      - OPAL_POLICY_REPO_URL=https://github.com/controlcore/policies
+      - OPAL_DATA_SOURCES_CONFIG=./config/data-sources.json
+      - PAP_API_URL=http://cc-pap-api:8000
+    volumes:
+      - ../../cc-opal/config:/app/config
+      - ../../cc-data/opal:/app/data
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Demo App API (for testing)
+  acme-demo-api:
+    build: ../../acme-consulting-demo-api
+    container_name: acme-demo-api
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@acme-db:5432/acme_demo_db
+    depends_on:
+      - acme-db
+    volumes:
+      - ../../acme-consulting-demo-api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Demo App Database
+  acme-db:
+    image: postgres:15
+    container_name: acme-db
+    environment:
+      - POSTGRES_DB=acme_demo_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5433:5432"
+    volumes:
+      - acme_postgres_data:/var/lib/postgresql/data
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Demo App Frontend
+  acme-demo-frontend:
+    build:
+      context: ../../acme-consulting-demo-frontend
+      dockerfile: Dockerfile.dev
+    container_name: acme-demo-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+    volumes:
+      - ../../acme-consulting-demo-frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - acme-demo-api
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+networks:
+  controlcore-network:
+    driver: bridge
+
+volumes:
+  cc_postgres_data:
+  acme_postgres_data:

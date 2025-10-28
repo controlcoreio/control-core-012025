@@ -1,0 +1,173 @@
+version: '3.8'
+
+services:
+  # Business Admin Frontend
+  cc-business-admin-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cc-business-admin-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - cc-business-admin-backend
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # Business Admin Backend
+  cc-business-admin-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cc-business-admin-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@cc-business-admin-db:5432/business_admin
+      - REDIS_URL=redis://cc-business-admin-redis:6379
+      - SECRET_KEY=your-secret-key-here
+      - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+      - STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
+      - SENDGRID_API_KEY=your_sendgrid_api_key
+      - CONTROL_CORE_API_URL=https://api.controlcore.io
+      - CONTROL_CORE_API_KEY=your_control_core_api_key
+      - LOG_LEVEL=info
+    volumes:
+      - ./backend:/app
+      - ./cc-logs:/app/logs
+    depends_on:
+      - cc-business-admin-db
+      - cc-business-admin-redis
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  cc-business-admin-db:
+    image: postgres:15
+    container_name: cc-business-admin-db
+    environment:
+      - POSTGRES_DB=business_admin
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - cc_business_admin_postgres_data:/var/lib/postgresql/data
+      - ./cc-data/postgres:/var/lib/postgresql/data
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # Redis Cache
+  cc-business-admin-redis:
+    image: redis:7-alpine
+    container_name: cc-business-admin-redis
+    command: redis-server --requirepass password
+    ports:
+      - "6379:6379"
+    volumes:
+      - cc_business_admin_redis_data:/data
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # Celery Worker for Background Tasks
+  cc-business-admin-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cc-business-admin-worker
+    command: celery -A app.core.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@cc-business-admin-db:5432/business_admin
+      - REDIS_URL=redis://cc-business-admin-redis:6379
+      - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+      - SENDGRID_API_KEY=your_sendgrid_api_key
+      - CONTROL_CORE_API_URL=https://api.controlcore.io
+      - CONTROL_CORE_API_KEY=your_control_core_api_key
+    volumes:
+      - ./backend:/app
+      - ./cc-logs:/app/logs
+    depends_on:
+      - cc-business-admin-db
+      - cc-business-admin-redis
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # Celery Beat for Scheduled Tasks
+  cc-business-admin-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cc-business-admin-beat
+    command: celery -A app.core.celery beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@cc-business-admin-db:5432/business_admin
+      - REDIS_URL=redis://cc-business-admin-redis:6379
+      - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+      - SENDGRID_API_KEY=your_sendgrid_api_key
+    volumes:
+      - ./backend:/app
+      - ./cc-logs:/app/logs
+    depends_on:
+      - cc-business-admin-db
+      - cc-business-admin-redis
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # Prometheus for Metrics
+  cc-business-admin-prometheus:
+    image: prom/prometheus:latest
+    container_name: cc-business-admin-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - cc_business_admin_prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+  # Grafana for Dashboards
+  cc-business-admin-grafana:
+    image: grafana/grafana:latest
+    container_name: cc-business-admin-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - cc_business_admin_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - cc-business-admin-prometheus
+    networks:
+      - business-admin-network
+    restart: unless-stopped
+
+volumes:
+  cc_business_admin_postgres_data:
+  cc_business_admin_redis_data:
+  cc_business_admin_prometheus_data:
+  cc_business_admin_grafana_data:
+
+networks:
+  business-admin-network:
+    driver: bridge

@@ -1,0 +1,78 @@
+# OPA Server Docker Compose Configuration
+# Standalone OPA Server for Control Core
+
+version: '3.8'
+
+services:
+  # OPA Server
+  cc-opa-server:
+    image: openpolicyagent/opa:1.9.0
+    container_name: cc-opa-server
+    ports:
+      - "8181:8181"
+    command: >
+      run
+      --server
+      --addr=0.0.0.0:8181
+      --log-level=info
+      --log-format=json
+      --config-file=/config/opa-server-config.yaml
+    volumes:
+      - ../opa/config:/config:ro
+      - ../opa/policies:/policies:ro
+      - ../opa/data:/data:ro
+      - opa_data:/data
+    environment:
+      - OPA_LOG_LEVEL=info
+      - OPA_LOG_FORMAT=json
+    networks:
+      - controlcore
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - opa  # Only start with --profile opa
+
+  # OPA Server with Bundle Server
+  cc-opa-bundle-server:
+    image: openpolicyagent/opa:1.9.0
+    container_name: cc-opa-bundle-server
+    ports:
+      - "8182:8181"
+    command: >
+      run
+      --server
+      --addr=0.0.0.0:8181
+      --log-level=info
+      --log-format=json
+      --config-file=/config/opa-server-config.yaml
+      --bundle=/bundles/cc-policies
+    volumes:
+      - ../opa/config:/config:ro
+      - ../opa/policies:/bundles/cc-policies:ro
+      - ../opa/data:/data:ro
+      - opa_bundle_data:/data
+    environment:
+      - OPA_LOG_LEVEL=info
+      - OPA_LOG_FORMAT=json
+    networks:
+      - controlcore
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - opa-bundle  # Only start with --profile opa-bundle
+
+networks:
+  controlcore:
+    external: true
+
+volumes:
+  opa_data:
+  opa_bundle_data:

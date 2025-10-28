@@ -1,0 +1,18 @@
+{
+  "principal": {
+    "type": "User",
+    "id": "admin"
+  },
+  "action": {
+    "type": "Action",
+    "id": "read"
+  },
+  "resource": {
+    "type": "Resource",
+    "id": "document1"
+  },
+  "context": {
+    "department": "IT",
+    "time": "2025-01-26T10:00:00Z"
+  }
+}

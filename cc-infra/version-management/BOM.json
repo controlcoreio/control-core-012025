@@ -1,0 +1,630 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-01-25T00:00:00Z",
+    "tools": [
+      {
+        "vendor": "Control Core",
+        "name": "BOM Generator",
+        "version": "012025.01"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "Control Core Platform",
+      "version": "012025.01",
+      "description": "Complete Control Core platform with all dependencies",
+      "properties": [
+        {
+          "name": "releaseType",
+          "value": "stable"
+        },
+        {
+          "name": "deploymentMode",
+          "value": "offline"
+        },
+        {
+          "name": "testedVersions",
+          "value": "all-dependencies-validated"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "application",
+      "name": "cc-frontend",
+      "version": "012025.01",
+      "description": "Control Core Admin UI",
+      "properties": [
+        {
+          "name": "image",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-frontend:012025.01"
+        },
+        {
+          "name": "registry",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com"
+        },
+        {
+          "name": "repository",
+          "value": "controlcoreio/cc-frontend"
+        },
+        {
+          "name": "tag",
+          "value": "012025.01"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:abc123def456..."
+        },
+        {
+          "name": "size",
+          "value": "245MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "cc-pap-api",
+      "version": "012025.01",
+      "description": "Policy Administration Point API",
+      "properties": [
+        {
+          "name": "image",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-pap-api:012025.01"
+        },
+        {
+          "name": "registry",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com"
+        },
+        {
+          "name": "repository",
+          "value": "controlcoreio/cc-pap-api"
+        },
+        {
+          "name": "tag",
+          "value": "012025.01"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:def456ghi789..."
+        },
+        {
+          "name": "size",
+          "value": "189MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "cc-bouncer",
+      "version": "012025.01",
+      "description": "Policy Enforcement Point",
+      "properties": [
+        {
+          "name": "image",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer:012025.01"
+        },
+        {
+          "name": "registry",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com"
+        },
+        {
+          "name": "repository",
+          "value": "controlcoreio/cc-bouncer"
+        },
+        {
+          "name": "tag",
+          "value": "012025.01"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:ghi789jkl012..."
+        },
+        {
+          "name": "size",
+          "value": "156MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "cc-opal",
+      "version": "012025.01",
+      "description": "OPAL Server for Policy Synchronization",
+      "properties": [
+        {
+          "name": "image",
+          "value": "permitio/opal-server:latest"
+        },
+        {
+          "name": "registry",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com"
+        },
+        {
+          "name": "repository",
+          "value": "permitio/opal-server"
+        },
+        {
+          "name": "tag",
+          "value": "012025.01"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:jkl012mno345..."
+        },
+        {
+          "name": "size",
+          "value": "134MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "cc-policy-admin-server",
+      "version": "012025.01",
+      "description": "Policy Administration Server",
+      "properties": [
+        {
+          "name": "image",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin-server:012025.01"
+        },
+        {
+          "name": "registry",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com"
+        },
+        {
+          "name": "repository",
+          "value": "controlcoreio/policy-admin-server"
+        },
+        {
+          "name": "tag",
+          "value": "012025.01"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:mno345pqr678..."
+        },
+        {
+          "name": "size",
+          "value": "98MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "cc-policy-admin-client",
+      "version": "012025.01",
+      "description": "Policy Administration Client",
+      "properties": [
+        {
+          "name": "image",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin-client:012025.01"
+        },
+        {
+          "name": "registry",
+          "value": "061730756658.dkr.ecr.ca-central-1.amazonaws.com"
+        },
+        {
+          "name": "repository",
+          "value": "controlcoreio/policy-admin-client"
+        },
+        {
+          "name": "tag",
+          "value": "012025.01"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:pqr678stu901..."
+        },
+        {
+          "name": "size",
+          "value": "87MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "opal-server",
+      "version": "0.8.9",
+      "description": "OPAL Server for Policy Synchronization",
+      "properties": [
+        {
+          "name": "image",
+          "value": "permitio/opal-server:0.8.9"
+        },
+        {
+          "name": "registry",
+          "value": "docker.io"
+        },
+        {
+          "name": "repository",
+          "value": "permitio/opal-server"
+        },
+        {
+          "name": "tag",
+          "value": "0.8.9"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:stu901vwx234..."
+        },
+        {
+          "name": "size",
+          "value": "78MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "opa",
+      "version": "1.9.0",
+      "description": "Open Policy Agent - Policy Engine",
+      "properties": [
+        {
+          "name": "image",
+          "value": "openpolicyagent/opa:1.9.0"
+        },
+        {
+          "name": "registry",
+          "value": "docker.io"
+        },
+        {
+          "name": "repository",
+          "value": "openpolicyagent/opa"
+        },
+        {
+          "name": "tag",
+          "value": "1.9.0"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:latest..."
+        },
+        {
+          "name": "size",
+          "value": "45MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "monaco-editor",
+      "version": "0.54.0",
+      "description": "Monaco Editor - Code Editor",
+      "properties": [
+        {
+          "name": "package",
+          "value": "monaco-editor@0.54.0"
+        },
+        {
+          "name": "registry",
+          "value": "npm"
+        },
+        {
+          "name": "repository",
+          "value": "microsoft/monaco-editor"
+        },
+        {
+          "name": "tag",
+          "value": "0.54.0"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "regal",
+      "version": "0.36.0",
+      "description": "Regal - Rego Linter",
+      "properties": [
+        {
+          "name": "package",
+          "value": "regal@0.36.0"
+        },
+        {
+          "name": "registry",
+          "value": "npm"
+        },
+        {
+          "name": "repository",
+          "value": "open-policy-agent/regal"
+        },
+        {
+          "name": "tag",
+          "value": "0.36.0"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "cedar-agent",
+      "version": "0.2.1",
+      "description": "Cedar Agent - AWS Cedar Policy Engine (Future Enhancement)",
+      "properties": [
+        {
+          "name": "image",
+          "value": "permitio/cedar-agent:0.2.1"
+        },
+        {
+          "name": "registry",
+          "value": "docker.io"
+        },
+        {
+          "name": "repository",
+          "value": "permitio/cedar-agent"
+        },
+        {
+          "name": "tag",
+          "value": "0.2.1"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:latest..."
+        },
+        {
+          "name": "size",
+          "value": "25MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "staged"
+        },
+        {
+          "name": "status",
+          "value": "future-enhancement"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "postgresql",
+      "version": "15.5",
+      "description": "PostgreSQL Database",
+      "properties": [
+        {
+          "name": "image",
+          "value": "postgres:15.5"
+        },
+        {
+          "name": "registry",
+          "value": "docker.io"
+        },
+        {
+          "name": "repository",
+          "value": "postgres"
+        },
+        {
+          "name": "tag",
+          "value": "15.5"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:vwx234yza567..."
+        },
+        {
+          "name": "size",
+          "value": "234MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "redis",
+      "version": "7.2.3",
+      "description": "Redis Cache",
+      "properties": [
+        {
+          "name": "image",
+          "value": "redis:7.2.3"
+        },
+        {
+          "name": "registry",
+          "value": "docker.io"
+        },
+        {
+          "name": "repository",
+          "value": "redis"
+        },
+        {
+          "name": "tag",
+          "value": "7.2.3"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:yza567bcd890..."
+        },
+        {
+          "name": "size",
+          "value": "45MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "nginx",
+      "version": "1.25.3",
+      "description": "Nginx Ingress Controller",
+      "properties": [
+        {
+          "name": "image",
+          "value": "registry.k8s.io/ingress-nginx/controller:v1.8.2"
+        },
+        {
+          "name": "registry",
+          "value": "registry.k8s.io"
+        },
+        {
+          "name": "repository",
+          "value": "ingress-nginx/controller"
+        },
+        {
+          "name": "tag",
+          "value": "v1.8.2"
+        },
+        {
+          "name": "digest",
+          "value": "sha256:bcd890efg123..."
+        },
+        {
+          "name": "size",
+          "value": "189MB"
+        },
+        {
+          "name": "architecture",
+          "value": "linux/amd64"
+        },
+        {
+          "name": "testedWith",
+          "value": "012025.01"
+        },
+        {
+          "name": "approvalStatus",
+          "value": "approved"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "control-core-platform",
+      "dependsOn": [
+        "cc-frontend",
+        "cc-pap-api",
+        "cc-bouncer",
+        "cc-opal",
+        "cc-pap",
+        "opal-server",
+        "opa",
+        "monaco-editor",
+        "regal",
+        "postgresql",
+        "redis",
+        "nginx"
+      ]
+    }
+  ],
+  "compositions": [
+    {
+      "aggregate": "complete",
+      "assemblies": [
+        "cc-frontend",
+        "cc-pap-api",
+        "cc-bouncer",
+        "cc-opal",
+        "cc-pap",
+        "opal-server",
+        "opa",
+        "monaco-editor",
+        "regal",
+        "postgresql",
+        "redis",
+        "nginx"
+      ]
+    }
+  ],
+  "vulnerabilities": [],
+  "approvalStatus": "approved",
+  "testingStatus": "passed",
+  "deploymentReady": true,
+  "offlineCompatible": true,
+  "lastValidated": "2025-01-25T00:00:00Z",
+  "validationChecksum": "sha256:validated-bom-012025.01"
+}

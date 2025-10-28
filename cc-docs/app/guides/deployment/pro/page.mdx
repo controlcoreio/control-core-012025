@@ -1,0 +1,1198 @@
+# Pro Deployment Guide
+
+The Pro deployment model provides a hybrid approach with a hosted Control Plane managed by Control Core and a self-hosted Policy Enforcement Point (Bouncer) deployed in your infrastructure. This guide will walk you through deploying Control Core Pro.
+
+## Overview
+
+**Pro deployment** is ideal for:
+- Production environments (up to 10,000 policy evaluations/min)
+- Teams wanting managed Control Plane without infrastructure overhead
+- Organizations requiring policy enforcement in their own infrastructure
+- Compliance scenarios requiring data to stay within customer network
+- Teams that want the best of both worlds
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│   Control Core Hosted Services               │
+│   (Managed by Control Core)                  │
+│                                              │
+│   ┌────────────────────────────────────────┐│
+│   │  Policy Administration Console          ││
+│   │  https://your-tenant.controlcore.io    ││
+│   └────────────────────────────────────────┘│
+│                                              │
+│   ┌────────────────────────────────────────┐│
+│   │  Policy Administration API              ││
+│   │  - Policy Management                    ││
+│   │  - User Management                      ││
+│   │  - Authentication                       ││
+│   └────────────────────────────────────────┘│
+│                                              │
+│   ┌────────────────────────────────────────┐│
+│   │  Policy Synchronization Server (OPAL)   ││
+│   │  - Policy Distribution                  ││
+│   │  - Real-time Updates                    ││
+│   └────────────────────────────────────────┘│
+│                                              │
+│   ┌────────────────────────────────────────┐│
+│   │  Managed Database & Cache               ││
+│   │  - PostgreSQL                           ││
+│   │  - Redis                                ││
+│   └────────────────────────────────────────┘│
+└──────────────────────────────────────────────┘
+                      │
+                      │ HTTPS/WebSocket (TLS 1.3)
+                      │ Policy Sync & Health Checks
+                      ▼
+┌──────────────────────────────────────────────┐
+│   Your Infrastructure                        │
+│   (Self-Hosted)                              │
+│                                              │
+│   ┌────────────────────────────────────────┐│
+│   │  Policy Enforcement Point (Bouncer)     ││
+│   │  - Request Interception                 ││
+│   │  - Policy Evaluation                    ││
+│   │  - Decision Caching                     ││
+│   │  - Audit Logging                        ││
+│   └─────────┬──────────────────────────────┘│
+│             │                                │
+│             │ Protects                       │
+│             ▼                                │
+│   ┌────────────────────────────────────────┐│
+│   │  Your Application/API                   ││
+│   │  - Protected Resources                  ││
+│   └────────────────────────────────────────┘│
+└──────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+### System Requirements
+
+**Minimum**:
+- **Memory**: 2GB RAM
+- **CPU**: 1 core
+- **Storage**: 10GB free space
+- **Network**: Stable internet connection (1 Mbps+)
+
+**Recommended**:
+- **Memory**: 4GB RAM
+- **CPU**: 2 cores
+- **Storage**: 20GB SSD
+- **Network**: High-speed internet (10 Mbps+)
+
+**Operating System**:
+- Linux (Ubuntu 20.04+, Debian 11+, RHEL 8+)
+- Docker-compatible OS
+- Windows Server 2019+ with Docker
+
+### Software Requirements
+
+- **Docker Engine**: 20.10.0 or higher
+- **Docker Compose**: 2.0.0 or higher (optional, for easier management)
+- **curl**: For API testing
+- **openssl**: For certificate management
+
+### Network Requirements
+
+**Outbound Access** (from your infrastructure to Control Core):
+- `https://*.controlcore.io:443` - Control Plane API
+- `wss://*.controlcore.io:443` - OPAL WebSocket connection
+- `https://downloads.controlcore.io:443` - Package downloads
+
+**Inbound Access** (to your Bouncer):
+- Port 8080 (or your configured port) - For client requests
+- Port 9090 (optional) - For metrics/monitoring
+
+**Firewall Rules**:
+```bash
+# Allow outbound HTTPS
+iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+
+# Allow inbound to Bouncer
+iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+
+# Allow Docker networking
+iptables -A FORWARD -i docker0 -j ACCEPT
+```
+
+### Prerequisites Checklist
+
+Before proceeding, ensure you have:
+
+- [ ] Active Control Core Pro account
+- [ ] Tenant ID and API key from Control Core
+- [ ] Docker installed and running
+- [ ] Outbound HTTPS access to `*.controlcore.io`
+- [ ] Target application/API to protect
+- [ ] SSL certificate (if using HTTPS for Bouncer)
+
+## Installation
+
+### Step 1: Create Control Core Account
+
+1. **Sign up** at [https://controlcore.io/signup](https://controlcore.io/signup)
+2. **Choose Pro Plan** during signup
+3. **Complete billing setup** (if applicable)
+4. **Verify email** address
+
+### Step 2: Access Your Tenant
+
+After signup, you'll receive:
+
+- **Tenant ID**: `your-company` (e.g., `acme-corp`)
+- **Control Plane URL**: `https://your-company.controlplane.controlcore.io`
+- **OPAL URL**: `wss://your-company.opal.controlcore.io`
+- **API Key**: Unique key for Bouncer authentication
+
+**Access your Control Plane**:
+1. Navigate to `https://your-company.controlplane.controlcore.io`
+2. Log in with your credentials
+3. You'll see the Getting Started wizard
+
+### Step 3: Download Bouncer Package
+
+**Via Control Plane UI**:
+1. Go to **Settings** → **Bouncers** → **Add Bouncer**
+2. Click **Download Package**
+3. Save `pro-bouncer-{tenant-id}.zip`
+
+**Via API**:
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://your-company.controlplane.controlcore.io/api/v1/bouncers/download \
+  -o pro-bouncer.zip
+```
+
+**Via Direct Download**:
+```bash
+wget https://downloads.controlcore.io/packages/pro-bouncer-{tenant-id}.zip
+```
+
+### Step 4: Extract and Configure
+
+```bash
+# Extract package
+unzip pro-bouncer-{tenant-id}.zip
+cd pro-bouncer-{tenant-id}
+
+# View included files
+ls -la
+# You should see:
+# - docker-compose.yml
+# - .env.example
+# - bouncer.conf
+# - start.sh
+# - stop.sh
+# - health-check.sh
+# - README.md
+```
+
+### Step 5: Configure Environment
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit configuration
+nano .env
+```
+
+**Key Configuration Options**:
+
+```bash
+# ============================================
+# TENANT CONFIGURATION (Pre-configured)
+# ============================================
+
+TENANT_ID=your-company
+API_KEY=your-tenant-api-key-from-controlcore
+
+# Control Plane URLs (Pre-configured)
+CONTROL_PLANE_URL=https://your-company.controlplane.controlcore.io
+OPAL_SERVER_URL=wss://your-company.opal.controlcore.io
+
+# ============================================
+# BOUNCER CONFIGURATION
+# ============================================
+
+# Port configuration
+BOUNCER_PORT=8080
+BOUNCER_HOST=0.0.0.0
+
+# Target application to protect
+TARGET_HOST=your-app.example.com:8000
+TARGET_PROTOCOL=http  # or https
+
+# If target uses HTTPS
+TARGET_SSL_VERIFY=true
+TARGET_SSL_CERT_PATH=/path/to/target-cert.pem
+
+# ============================================
+# CACHING CONFIGURATION
+# ============================================
+
+# Enable caching for better performance
+CACHE_ENABLED=true
+
+# Policy cache TTL (how long to cache policies)
+POLICY_CACHE_TTL=5m
+
+# Decision cache TTL (how long to cache decisions)
+DECISION_CACHE_TTL=1m
+
+# Maximum cache size (number of entries)
+CACHE_MAX_SIZE=10000
+
+# Cache eviction policy
+CACHE_EVICTION_POLICY=lru  # lru, lfu, or fifo
+
+# ============================================
+# PERFORMANCE TUNING
+# ============================================
+
+# Worker threads for request handling
+WORKER_THREADS=4
+
+# Connection pool size
+CONNECTION_POOL_SIZE=50
+
+# Request timeout
+REQUEST_TIMEOUT=30s
+
+# Max concurrent requests
+MAX_CONCURRENT_REQUESTS=1000
+
+# ============================================
+# LOGGING CONFIGURATION
+# ============================================
+
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
+LOG_FORMAT=json
+LOG_OUTPUT=stdout
+
+# Audit logging
+AUDIT_LOG_ENABLED=true
+AUDIT_LOG_DESTINATION=controlplane  # Send to Control Plane
+
+# Local audit log backup (optional)
+LOCAL_AUDIT_LOG_ENABLED=false
+LOCAL_AUDIT_LOG_PATH=/var/log/controlcore/audit.log
+
+# ============================================
+# HEALTH CHECK CONFIGURATION
+# ============================================
+
+HEALTH_CHECK_ENABLED=true
+HEALTH_CHECK_INTERVAL=30s
+HEALTH_CHECK_TIMEOUT=5s
+
+# Report health to Control Plane
+HEALTH_REPORT_TO_CONTROLPLANE=true
+HEALTH_REPORT_INTERVAL=1m
+
+# ============================================
+# SSL/TLS CONFIGURATION
+# ============================================
+
+# SSL for Bouncer endpoint (client-facing)
+SSL_ENABLED=false
+SSL_CERT_PATH=/path/to/cert.pem
+SSL_KEY_PATH=/path/to/key.pem
+SSL_CA_PATH=/path/to/ca.pem
+
+# Minimum TLS version
+TLS_MIN_VERSION=1.2
+
+# ============================================
+# ADVANCED CONFIGURATION
+# ============================================
+
+# Enable detailed metrics
+METRICS_ENABLED=true
+METRICS_PORT=9090
+
+# Enable profiling (for debugging)
+PROFILING_ENABLED=false
+PROFILING_PORT=6060
+
+# Custom headers to forward
+FORWARD_HEADERS=X-Request-ID,X-Correlation-ID,X-User-Agent
+
+# Rate limiting (local)
+RATE_LIMIT_ENABLED=false
+RATE_LIMIT_REQUESTS=1000
+RATE_LIMIT_WINDOW=60s
+```
+
+### Step 6: Start Bouncer
+
+```bash
+# Make scripts executable
+chmod +x start.sh stop.sh health-check.sh
+
+# Start Bouncer
+./start.sh
+
+# Or manually with Docker
+docker-compose up -d
+
+# Or with plain Docker
+docker run -d \
+  --name controlcore-bouncer \
+  --env-file .env \
+  -p 8080:8080 \
+  -p 9090:9090 \
+  controlcore/bouncer:latest
+```
+
+**Verify Bouncer is Running**:
+
+```bash
+# Check container status
+docker-compose ps
+# Should show bouncer as "Up"
+
+# Check logs
+docker-compose logs -f
+
+# Health check
+./health-check.sh
+# or
+curl http://localhost:8080/health
+# Expected: {"status": "healthy", "control_plane": "connected", "opal": "connected"}
+```
+
+### Step 7: Register Bouncer with Control Plane
+
+**Automatic Registration** (Recommended):
+
+Bouncer automatically registers on first startup using your API key.
+
+**Verify Registration**:
+1. Log in to Control Plane: `https://your-company.controlplane.controlcore.io`
+2. Navigate to **Settings** → **Bouncers**
+3. You should see your Bouncer listed with status "Connected"
+
+**Manual Registration** (if needed):
+
+```bash
+curl -X POST https://your-company.controlplane.controlcore.controlcore.io/api/v1/bouncers \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Production Bouncer",
+    "description": "Bouncer protecting main API",
+    "hostname": "bouncer.yourcompany.com",
+    "port": 8080,
+    "environment": "production"
+  }'
+```
+
+### Step 8: Configure Target Application
+
+Update your application routing to use the Bouncer:
+
+**Option 1: DNS Update**
+
+```bash
+# Before: Clients connect directly to your app
+api.yourcompany.com → Your Application (port 8000)
+
+# After: Clients connect through Bouncer
+api.yourcompany.com → Bouncer (port 8080) → Your Application (port 8000)
+```
+
+Update DNS A record:
+```
+api.yourcompany.com. IN A 10.0.1.100  # Bouncer IP
+```
+
+**Option 2: Load Balancer Update**
+
+```nginx
+# Update your load balancer to point to Bouncer
+upstream app_backend {
+    server bouncer:8080;  # Instead of your-app:8000
+}
+```
+
+**Option 3: Application Configuration**
+
+Update application to expect requests from Bouncer:
+```bash
+# Application trusts Bouncer IP
+TRUSTED_PROXY=10.0.1.100
+
+# Application reads user context from headers
+USER_HEADER=X-Control-Core-User
+DECISION_HEADER=X-Control-Core-Decision
+```
+
+## Policy Management
+
+### Create Your First Policy
+
+1. **Log in to Control Plane**:
+   - Navigate to `https://your-company.controlplane.controlcore.io`
+
+2. **Create Policy**:
+   - Click **Policies** → **Create Policy**
+   - Name: `api-authentication`
+   - Environment: Sandbox (for testing)
+
+3. **Write Policy**:
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Allow requests with valid API key
+allow if {
+    api_key := input.request.headers["X-API-Key"]
+    api_key in data.valid_api_keys
+}
+
+# Allow admin users
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+4. **Test Policy**:
+   - Click **Test** tab
+   - Add test cases
+   - Run tests
+
+5. **Deploy to Sandbox**:
+   - Click **Deploy** → **Deploy to Sandbox**
+
+6. **Test with Bouncer**:
+```bash
+# Should be denied (no API key)
+curl http://localhost:8080/api/users
+
+# Should be allowed (with valid API key)
+curl -H "X-API-Key: valid-key" http://localhost:8080/api/users
+```
+
+7. **Promote to Production**:
+   - Once tested, click **Promote to Production**
+   - Bouncer automatically receives update within seconds
+
+### Policy Synchronization
+
+Policies are automatically synchronized to your Bouncer:
+
+1. **You make changes** in Control Plane
+2. **Control Plane validates** the policy
+3. **OPAL Server** receives the update
+4. **Bouncer subscribes** to OPAL via WebSocket
+5. **Bouncer receives** policy within 1-2 seconds
+6. **Bouncer reloads** policy and starts using it
+
+**Monitor Synchronization**:
+
+```bash
+# Check Bouncer logs
+docker-compose logs -f | grep "policy"
+
+# Check OPAL connection
+curl http://localhost:8080/api/v1/opal/status
+```
+
+## Monitoring and Operations
+
+### Health Monitoring
+
+**Control Plane Dashboard**:
+1. Navigate to **Monitoring** → **Bouncers**
+2. View Bouncer health, metrics, and status
+3. Check policy sync status
+
+**Bouncer Health Endpoint**:
+
+```bash
+curl http://localhost:8080/health
+
+# Response:
+{
+  "status": "healthy",
+  "version": "2.0.0",
+  "uptime": "2h 15m 30s",
+  "connections": {
+    "control_plane": {
+      "status": "connected",
+      "last_check": "2025-01-25T10:30:00Z",
+      "latency_ms": 45
+    },
+    "opal": {
+      "status": "connected",
+      "last_sync": "2025-01-25T10:29:55Z",
+      "policy_version": "v123"
+    },
+    "target_app": {
+      "status": "reachable",
+      "last_check": "2025-01-25T10:30:00Z"
+    }
+  },
+  "cache": {
+    "policy_cache_hit_ratio": 0.95,
+    "decision_cache_hit_ratio": 0.87,
+    "cache_size": 1250
+  },
+  "performance": {
+    "avg_response_time_ms": 12,
+    "requests_per_second": 450,
+    "error_rate": 0.001
+  }
+}
+```
+
+**Automated Health Checks**:
+
+```bash
+# Create health check script
+cat > /usr/local/bin/bouncer-health.sh <<'EOF'
+#!/bin/bash
+
+HEALTH_URL="http://localhost:8080/health"
+ALERT_EMAIL="ops@yourcompany.com"
+
+response=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL)
+
+if [ "$response" != "200" ]; then
+    echo "Bouncer health check failed: HTTP $response" | \
+        mail -s "Bouncer Health Alert" $ALERT_EMAIL
+    exit 1
+fi
+
+# Check if control plane connected
+status=$(curl -s $HEALTH_URL | jq -r '.connections.control_plane.status')
+if [ "$status" != "connected" ]; then
+    echo "Bouncer not connected to Control Plane" | \
+        mail -s "Bouncer Connection Alert" $ALERT_EMAIL
+    exit 1
+fi
+
+exit 0
+EOF
+
+chmod +x /usr/local/bin/bouncer-health.sh
+
+# Add to cron (every 5 minutes)
+echo "*/5 * * * * /usr/local/bin/bouncer-health.sh" | crontab -
+```
+
+### Performance Metrics
+
+**Prometheus Metrics**:
+
+```bash
+# Access metrics endpoint
+curl http://localhost:9090/metrics
+
+# Key metrics:
+# bouncer_requests_total - Total requests processed
+# bouncer_request_duration_seconds - Request latency
+# bouncer_policy_evaluation_duration_seconds - Policy evaluation time
+# bouncer_cache_hits_total - Cache hit count
+# bouncer_cache_misses_total - Cache miss count
+# bouncer_opal_connection_status - OPAL connection status (1=connected, 0=disconnected)
+# bouncer_target_app_reachable - Target app reachability (1=yes, 0=no)
+```
+
+**Grafana Dashboard** (optional):
+
+Control Core provides a pre-built Grafana dashboard:
+
+1. In Control Plane, go to **Settings** → **Integrations**
+2. Click **Grafana Dashboard**
+3. Download `controlcore-bouncer-dashboard.json`
+4. Import into your Grafana instance
+
+### Log Management
+
+**View Logs**:
+
+```bash
+# Real-time logs
+docker-compose logs -f
+
+# Last 100 lines
+docker-compose logs --tail=100
+
+# Filter by level
+docker-compose logs | grep ERROR
+docker-compose logs | grep WARNING
+
+# Export logs
+docker-compose logs --since=24h > bouncer-logs-$(date +%Y%m%d).log
+```
+
+**Structured Logging**:
+
+Logs are in JSON format for easy parsing:
+
+```json
+{
+  "timestamp": "2025-01-25T10:30:00Z",
+  "level": "INFO",
+  "message": "Policy evaluation completed",
+  "request_id": "req-123-456",
+  "user_id": "user-789",
+  "resource": "/api/users",
+  "action": "GET",
+  "decision": "allow",
+  "policy": "api-authentication",
+  "evaluation_time_ms": 15,
+  "cache_hit": true
+}
+```
+
+**Centralized Logging** (optional):
+
+Forward logs to external service:
+
+```yaml
+# docker-compose.yml
+services:
+  bouncer:
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "fluentd.yourcompany.com:24224"
+        tag: "controlcore.bouncer"
+```
+
+### Audit Logs
+
+All authorization decisions are logged and sent to Control Plane:
+
+1. **View in Control Plane**:
+   - Navigate to **Monitoring** → **Audit Logs**
+   - Filter by time, user, resource, decision
+   - Export for compliance reporting
+
+2. **Query via API**:
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  "https://your-company.controlplane.controlcore.io/api/v1/audit-logs?start_date=2025-01-25&bouncer_id=bouncer-1"
+```
+
+3. **Local Audit Logs** (optional):
+
+Enable local audit log backup in `.env`:
+```bash
+LOCAL_AUDIT_LOG_ENABLED=true
+LOCAL_AUDIT_LOG_PATH=/var/log/controlcore/audit.log
+LOCAL_AUDIT_LOG_ROTATION=daily
+LOCAL_AUDIT_LOG_RETENTION=90  # days
+```
+
+## Scaling and High Availability
+
+### Horizontal Scaling
+
+Deploy multiple Bouncer instances behind a load balancer:
+
+```
+                  ┌─────────────────┐
+                  │  Load Balancer  │
+                  └────────┬────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+│  Bouncer #1   │  │  Bouncer #2   │  │  Bouncer #3   │
+│  10.0.1.10    │  │  10.0.1.11    │  │  10.0.1.12    │
+└───────────────┘  └───────────────┘  └───────────────┘
+```
+
+**Deploy Additional Bouncers**:
+
+```bash
+# On each new server
+wget https://downloads.controlcore.io/packages/pro-bouncer-{tenant-id}.zip
+unzip pro-bouncer-{tenant-id}.zip
+cd pro-bouncer-{tenant-id}
+
+# Configure with same TENANT_ID and API_KEY
+cp .env.example .env
+nano .env  # Use same tenant configuration
+
+# Start
+./start.sh
+```
+
+**Load Balancer Configuration** (Nginx example):
+
+```nginx
+upstream controlcore_bouncers {
+    least_conn;  # or ip_hash for sticky sessions
+    
+    server 10.0.1.10:8080 max_fails=3 fail_timeout=30s;
+    server 10.0.1.11:8080 max_fails=3 fail_timeout=30s;
+    server 10.0.1.12:8080 max_fails=3 fail_timeout=30s;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name api.yourcompany.com;
+    
+    ssl_certificate /etc/ssl/certs/api.yourcompany.com.crt;
+    ssl_certificate_key /etc/ssl/private/api.yourcompany.com.key;
+    
+    location / {
+        proxy_pass http://controlcore_bouncers;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Health check
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+    }
+    
+    # Health check endpoint
+    location /health {
+        proxy_pass http://controlcore_bouncers/health;
+        access_log off;
+    }
+}
+```
+
+### Auto-Scaling
+
+**AWS Auto Scaling Group**:
+
+```bash
+# Create launch template
+aws ec2 create-launch-template \
+  --launch-template-name controlcore-bouncer-template \
+  --version-description "Bouncer v1" \
+  --launch-template-data '{
+    "ImageId": "ami-0c55b159cbfafe1f0",
+    "InstanceType": "t3.medium",
+    "UserData": "'"$(base64 -w 0 startup-script.sh)"'",
+    "IamInstanceProfile": {
+      "Name": "controlcore-bouncer-role"
+    },
+    "SecurityGroupIds": ["sg-bouncer"],
+    "TagSpecifications": [{
+      "ResourceType": "instance",
+      "Tags": [{"Key": "Name", "Value": "controlcore-bouncer"}]
+    }]
+  }'
+
+# Create auto scaling group
+aws autoscaling create-auto-scaling-group \
+  --auto-scaling-group-name controlcore-bouncer-asg \
+  --launch-template LaunchTemplateName=controlcore-bouncer-template \
+  --min-size 2 \
+  --max-size 10 \
+  --desired-capacity 3 \
+  --target-group-arns arn:aws:elasticloadbalancing:... \
+  --health-check-type ELB \
+  --health-check-grace-period 300 \
+  --vpc-zone-identifier "subnet-xxx,subnet-yyy"
+
+# Create scaling policy
+aws autoscaling put-scaling-policy \
+  --auto-scaling-group-name controlcore-bouncer-asg \
+  --policy-name scale-on-cpu \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-configuration '{
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ASGAverageCPUUtilization"
+    },
+    "TargetValue": 70.0
+  }'
+```
+
+**GCP Managed Instance Group**:
+
+```bash
+# Create instance template
+gcloud compute instance-templates create controlcore-bouncer-template \
+  --machine-type=e2-medium \
+  --image-family=ubuntu-2204-lts \
+  --image-project=ubuntu-os-cloud \
+  --boot-disk-size=20GB \
+  --boot-disk-type=pd-ssd \
+  --tags=controlcore-bouncer \
+  --metadata-from-file=startup-script=startup-script.sh \
+  --scopes=https://www.googleapis.com/auth/cloud-platform
+
+# Create managed instance group
+gcloud compute instance-groups managed create controlcore-bouncer-mig \
+  --template=controlcore-bouncer-template \
+  --size=3 \
+  --zone=us-central1-a \
+  --health-check=controlcore-health-check \
+  --initial-delay=300
+
+# Set up autoscaling
+gcloud compute instance-groups managed set-autoscaling controlcore-bouncer-mig \
+  --zone=us-central1-a \
+  --min-num-replicas=2 \
+  --max-num-replicas=10 \
+  --target-cpu-utilization=0.7 \
+  --cool-down-period=60
+
+# Configure load balancer backend
+gcloud compute backend-services add-backend controlcore-backend \
+  --instance-group=controlcore-bouncer-mig \
+  --instance-group-zone=us-central1-a \
+  --global
+```
+
+**Azure Virtual Machine Scale Set**:
+
+```bash
+# Create scale set
+az vmss create \
+  --resource-group controlcore-rg \
+  --name controlcore-bouncer-vmss \
+  --image Ubuntu2204 \
+  --instance-count 3 \
+  --vm-sku Standard_B2s \
+  --upgrade-policy-mode automatic \
+  --load-balancer controlcore-lb \
+  --vnet-name controlcore-vnet \
+  --subnet default \
+  --custom-data startup-script.sh \
+  --admin-username azureuser \
+  --generate-ssh-keys
+
+# Configure autoscaling
+az monitor autoscale create \
+  --resource-group controlcore-rg \
+  --resource controlcore-bouncer-vmss \
+  --resource-type Microsoft.Compute/virtualMachineScaleSets \
+  --name controlcore-autoscale \
+  --min-count 2 \
+  --max-count 10 \
+  --count 3
+
+# Add scale-out rule (CPU > 70%)
+az monitor autoscale rule create \
+  --resource-group controlcore-rg \
+  --autoscale-name controlcore-autoscale \
+  --condition "Percentage CPU > 70 avg 5m" \
+  --scale out 1
+
+# Add scale-in rule (CPU < 30%)
+az monitor autoscale rule create \
+  --resource-group controlcore-rg \
+  --autoscale-name controlcore-autoscale \
+  --condition "Percentage CPU < 30 avg 5m" \
+  --scale in 1
+```
+
+**DigitalOcean Droplets with Load Balancer**:
+
+```bash
+# Create load balancer
+doctl compute load-balancer create \
+  --name controlcore-lb \
+  --region nyc1 \
+  --forwarding-rules "entry_protocol:https,entry_port:443,target_protocol:http,target_port:8080,certificate_id:your-cert-id" \
+  --health-check "protocol:http,port:8080,path:/health,check_interval_seconds:10,response_timeout_seconds:5,healthy_threshold:3,unhealthy_threshold:3" \
+  --tag-name controlcore-bouncer
+
+# Create multiple droplets (manual scaling)
+for i in {1..3}; do
+  doctl compute droplet create controlcore-bouncer-$i \
+    --image ubuntu-22-04-x64 \
+    --size s-2vcpu-4gb \
+    --region nyc1 \
+    --ssh-keys your-ssh-key-id \
+    --tag-names controlcore-bouncer \
+    --user-data-file startup-script.sh
+done
+
+# Droplets with tag automatically added to load balancer
+```
+
+## Security Configuration
+
+### SSL/TLS Setup
+
+**Generate SSL Certificate**:
+
+```bash
+# Using Let's Encrypt
+certbot certonly --standalone -d bouncer.yourcompany.com
+
+# Or self-signed (for testing)
+openssl req -x509 -newkey rsa:4096 -nodes \
+  -keyout bouncer-key.pem \
+  -out bouncer-cert.pem \
+  -days 365 \
+  -subj "/CN=bouncer.yourcompany.com"
+```
+
+**Configure SSL in `.env`**:
+
+```bash
+SSL_ENABLED=true
+SSL_CERT_PATH=/etc/controlcore/ssl/bouncer-cert.pem
+SSL_KEY_PATH=/etc/controlcore/ssl/bouncer-key.pem
+SSL_CA_PATH=/etc/controlcore/ssl/ca.pem
+TLS_MIN_VERSION=1.2
+```
+
+**Mount Certificates**:
+
+```yaml
+# docker-compose.yml
+services:
+  bouncer:
+    volumes:
+      - ./ssl:/etc/controlcore/ssl:ro
+```
+
+### Firewall Configuration
+
+```bash
+# Using UFW (Ubuntu)
+sudo ufw enable
+
+# Allow SSH
+sudo ufw allow ssh
+
+# Allow Bouncer port
+sudo ufw allow 8080/tcp
+
+# Allow HTTPS to Control Plane
+sudo ufw allow out 443/tcp
+
+# Deny all other inbound
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Check status
+sudo ufw status
+```
+
+### Network Isolation
+
+**Docker Network**:
+
+```yaml
+# docker-compose.yml
+networks:
+  controlcore:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+services:
+  bouncer:
+    networks:
+      controlcore:
+        ipv4_address: 172.28.0.10
+```
+
+## Troubleshooting
+
+### Bouncer Won't Start
+
+**Check Logs**:
+```bash
+docker-compose logs bouncer
+```
+
+**Common Issues**:
+
+1. **Port already in use**:
+```bash
+# Find process using port
+lsof -i :8080
+# Kill process or change BOUNCER_PORT in .env
+```
+
+2. **Invalid configuration**:
+```bash
+# Validate .env file
+docker-compose config
+```
+
+3. **Docker issues**:
+```bash
+# Restart Docker
+sudo systemctl restart docker
+# Remove old containers
+docker-compose down
+docker system prune -a
+```
+
+### Cannot Connect to Control Plane
+
+**Test Connectivity**:
+```bash
+# Test HTTPS connection
+curl -v https://your-company.controlplane.controlcore.io/health
+
+# Test DNS resolution
+nslookup your-company.controlplane.controlcore.io
+
+# Test with your API key
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  https://your-company.controlplane.controlcore.io/api/v1/health
+```
+
+**Check Firewall**:
+```bash
+# Ensure outbound HTTPS allowed
+sudo iptables -L OUTPUT -n | grep 443
+```
+
+### Policy Not Syncing
+
+**Check OPAL Connection**:
+```bash
+curl http://localhost:8080/api/v1/opal/status
+
+# Force sync
+curl -X POST http://localhost:8080/api/v1/opal/sync
+```
+
+**Check Logs**:
+```bash
+docker-compose logs | grep -i opal
+docker-compose logs | grep -i "policy"
+```
+
+### Performance Issues
+
+**Check Resource Usage**:
+```bash
+docker stats
+
+# If high CPU/memory:
+# 1. Increase cache TTL
+# 2. Add more worker threads
+# 3. Scale horizontally
+```
+
+**Optimize Configuration**:
+```bash
+# In .env
+WORKER_THREADS=8  # Increase
+CACHE_MAX_SIZE=50000  # Increase
+POLICY_CACHE_TTL=10m  # Increase
+CONNECTION_POOL_SIZE=100  # Increase
+```
+
+## Backup and Recovery
+
+### Configuration Backup
+
+```bash
+# Backup configuration
+tar -czf bouncer-backup-$(date +%Y%m%d).tar.gz .env docker-compose.yml
+
+# Backup to cloud storage
+# AWS S3
+aws s3 cp bouncer-backup-$(date +%Y%m%d).tar.gz \
+  s3://your-backup-bucket/controlcore/
+
+# GCP Cloud Storage
+gsutil cp bouncer-backup-$(date +%Y%m%d).tar.gz \
+  gs://your-backup-bucket/controlcore/
+
+# Azure Blob Storage
+az storage blob upload \
+  --account-name youraccount \
+  --container-name controlcore-backups \
+  --name bouncer-backup-$(date +%Y%m%d).tar.gz \
+  --file bouncer-backup-$(date +%Y%m%d).tar.gz
+
+# Automated daily backup (cron) - choose one:
+# AWS
+0 2 * * * cd /opt/controlcore-bouncer && tar -czf backup-$(date +\%Y\%m\%d).tar.gz .env docker-compose.yml && aws s3 cp backup-$(date +\%Y\%m\%d).tar.gz s3://your-backup-bucket/controlcore/
+
+# GCP
+0 2 * * * cd /opt/controlcore-bouncer && tar -czf backup-$(date +\%Y\%m\%d).tar.gz .env docker-compose.yml && gsutil cp backup-$(date +\%Y\%m\%d).tar.gz gs://your-backup-bucket/controlcore/
+
+# Azure
+0 2 * * * cd /opt/controlcore-bouncer && tar -czf backup-$(date +\%Y\%m\%d).tar.gz .env docker-compose.yml && az storage blob upload --account-name youraccount --container-name controlcore-backups --name backup-$(date +\%Y\%m\%d).tar.gz --file backup-$(date +\%Y\%m\%d).tar.gz
+```
+
+### Disaster Recovery
+
+**Recovery Procedure** (cloud-agnostic):
+
+```bash
+# 1. Download backup from cloud storage
+# AWS S3
+aws s3 cp s3://your-backup-bucket/controlcore/bouncer-backup-20250125.tar.gz .
+
+# GCP Cloud Storage
+gsutil cp gs://your-backup-bucket/controlcore/bouncer-backup-20250125.tar.gz .
+
+# Azure Blob Storage
+az storage blob download \
+  --account-name youraccount \
+  --container-name controlcore-backups \
+  --name bouncer-backup-20250125.tar.gz \
+  --file bouncer-backup-20250125.tar.gz
+
+# 2. Extract
+tar -xzf bouncer-backup-20250125.tar.gz
+
+# 3. Verify configuration
+cat .env
+
+# 4. Start Bouncer
+./start.sh
+
+# 5. Verify connection
+curl http://localhost:8080/health
+```
+
+## Upgrading
+
+### Minor Updates
+
+```bash
+# Pull latest image
+docker-compose pull
+
+# Restart with new image
+docker-compose up -d
+
+# Verify version
+curl http://localhost:8080/health | jq .version
+```
+
+### Major Upgrades
+
+1. **Backup current configuration**
+2. **Download new package** from Control Plane
+3. **Review changelog** for breaking changes
+4. **Test in separate environment** first
+5. **Update production** during maintenance window
+6. **Verify** functionality
+
+## Support
+
+- **[Troubleshooting Guide](/guides/troubleshooting)**: Common issues
+- **Control Plane**: Built-in support chat
+- **Email**: support@controlcore.io
+- **Priority Support**: Available for Pro plan
+
+## Next Steps
+
+- **[Administrator Guide](/guides/admin)**: Learn to manage policies and users
+- **[User Guide](/guides/user-guide)**: Create and test policies
+- **[Enterprise Deployment](/guides/deployment/enterprise)**: Consider upgrading for larger scale
+

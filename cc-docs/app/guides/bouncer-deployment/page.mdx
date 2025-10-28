@@ -1,0 +1,578 @@
+# Bouncer Deployment Guide
+
+## Overview
+
+Control Core Bouncers (Policy Enforcement Points) are the components that protect your resources by intercepting traffic and enforcing authorization policies. This guide walks you through deploying bouncers in your infrastructure and connecting them to the Control Plane.
+
+## Architecture
+
+Bouncers act as intelligent proxies or sidecars that:
+- Intercept all requests to protected resources
+- Query the Control Plane for authorization decisions
+- Enforce policies in real-time
+- Report metrics and health status
+- Auto-discover and register resources
+
+## Dual Environment Deployment (Default Architecture)
+
+**Control Core exclusively uses dual environment deployment** - this is not optional, but the core design:
+
+### Required: Sandbox Environment (Deploy First)
+- **Where you start**: All Control Core deployments begin with sandbox
+- **Policy development**: ALL policies are created and tested here
+- **Safe experimentation**: No impact on production traffic
+- **API Key**: Generate sandbox key (`sk_test_...`) in Settings > Environments
+- **Required configuration**: `ENVIRONMENT=sandbox`
+
+### Optional: Production Environment (Add When Ready)
+- **When ready**: Deploy after testing policies in sandbox
+- **Policy enforcement**: Enforces promoted policies only  
+- **Live traffic**: Protects production resources
+- **API Key**: Generate production key (`sk_live_...`) in Settings > Environments
+- **Required configuration**: `ENVIRONMENT=production`
+
+### Bouncer Pairing
+
+Bouncers protecting the same logical resource form a **pair**:
+
+```
+Resource: "Payment API"
+├── Sandbox Bouncer
+│   ├── ENVIRONMENT=sandbox
+│   ├── RESOURCE_NAME="Payment API"
+│   └── Protects: https://test-payment-api.com
+└── Production Bouncer (paired)
+    ├── ENVIRONMENT=production
+    ├── RESOURCE_NAME="Payment API" ← SAME NAME
+    └── Protects: https://payment-api.com
+```
+
+**Control Core automatically links them by matching RESOURCE_NAME!**
+
+### Intelligent Auto-Configuration
+
+When you deploy a bouncer, Control Core automatically:
+
+- ✅ Filters policies by environment (no manual configuration)
+- ✅ Routes data sources to correct endpoints (sandbox vs production)
+- ✅ Pairs bouncers by resource name
+- ✅ Optimizes cache settings per environment
+- ✅ Organizes policies in GitHub folders
+- ✅ Configures OPAL distribution
+
+**You just set 3 variables, Control Core handles the rest!**
+
+## Prerequisites
+
+Before deploying a bouncer, ensure you have:
+
+- [ ] Control Core Control Plane running and accessible
+- [ ] API credentials (API Key and Tenant ID)
+- [ ] Network connectivity from bouncer to Control Plane
+- [ ] One of the following deployment platforms:
+  - Docker / Docker Compose
+  - Kubernetes cluster with Helm
+  - Linux server for binary deployment
+
+## Step 1: Download Bouncer
+
+### From Control Core Admin UI
+
+1. Navigate to **Settings > Bouncers > Download Center**
+2. Select your bouncer type:
+   - **Reverse Proxy Bouncer** (Recommended) - Sits in front of your API/webapp
+   - **Sidecar Bouncer** - Runs alongside your service container
+   - **MCP Bouncer** - For AI agent protection
+   - **Agent-to-Agent Bouncer** - For Google A2A communication
+   - **IoT Bouncer** - For edge and IoT devices
+3. Choose deployment format (Docker Compose, Helm Chart, or Binary)
+4. Select version (v2.1.0 recommended)
+5. Choose environment (Sandbox or Production)
+6. Click **Download**
+
+### Package Contents
+
+The downloaded package includes:
+- Bouncer binary or container image
+- `config.yaml` - Configuration template
+- `docker-compose.yml` or `helm-values.yaml` - Deployment files
+- `setup.sh` - Auto-registration script
+- `README.md` - Quick start guide
+- Environment-specific examples
+
+## Step 2: Configuration
+
+### Extract the Package
+
+```bash
+# Extract the downloaded package
+tar -xzf control-core-bouncer-v2.1.0-sandbox.tar.gz
+cd control-core-bouncer-v2.1.0-sandbox
+```
+
+### Configure Connection Settings
+
+Edit the `config.yaml` file:
+
+```yaml
+# Control Plane Connection
+control_plane:
+  url: "https://your-control-plane.company.com"
+  api_key: "your-api-key-here"
+  tenant_id: "your-tenant-id"
+
+# Bouncer Identity
+bouncer:
+  id: "bouncer-sandbox-api-1"
+  name: "Sandbox API Gateway Bouncer"
+  type: "reverse-proxy"  # or sidecar, mcp, agent-to-agent, iot
+  version: "v2.1.0"
+
+# Environment
+deployment:
+  environment: "sandbox"  # or production
+  platform: "docker"      # kubernetes, docker, binary
+  region: "us-east-1"
+
+# Resource Protection
+resource:
+  name: "Customer API"
+  type: "api"  # api, webapp, database, ai-agent, mcp-server
+  original_host_url: "https://api.yourcompany.com"
+  target_host: "api-service:8000"  # Internal service address
+  security_posture: "deny-all"     # deny-all (recommended) or allow-all
+
+# Network Settings
+network:
+  listen_port: 8080
+  target_url: "http://api-service:8000"
+  proxy_url: "https://bouncer-sandbox.yourcompany.com"
+
+# Health Check
+health:
+  enabled: true
+  heartbeat_interval: 30  # seconds
+  timeout: 10
+
+# Logging
+logging:
+  level: "info"  # debug, info, warn, error
+  format: "json"
+  audit_enabled: true
+
+# Cache (optional)
+cache:
+  enabled: true
+  ttl: 300  # seconds
+  max_size: 1000
+
+# Rate Limiting (optional)
+rate_limit:
+  enabled: true
+  requests_per_minute: 1000
+  burst: 100
+```
+
+### Environment Variables
+
+Alternatively, configure using environment variables:
+
+```bash
+# Control Plane
+export CONTROL_PLANE_URL="https://your-control-plane.company.com"
+export CONTROL_PLANE_API_KEY="your-api-key-here"
+export TENANT_ID="your-tenant-id"
+
+# Bouncer
+export BOUNCER_ID="bouncer-sandbox-api-1"
+export BOUNCER_NAME="Sandbox API Gateway Bouncer"
+export BOUNCER_TYPE="reverse-proxy"
+export ENVIRONMENT="sandbox"
+
+# Resource
+export RESOURCE_NAME="Customer API"
+export RESOURCE_TYPE="api"
+export ORIGINAL_HOST_URL="https://api.yourcompany.com"
+export TARGET_HOST="api-service:8000"
+export SECURITY_POSTURE="deny-all"
+
+# Network
+export BOUNCER_PORT="8080"
+export TARGET_URL="http://api-service:8000"
+```
+
+## Step 3: Deploy the Bouncer
+
+### Docker Compose Deployment
+
+```bash
+# Review the docker-compose.yml
+cat docker-compose.yml
+
+# Start the bouncer
+docker-compose up -d
+
+# Check logs
+docker-compose logs -f cc-bouncer
+```
+
+### Kubernetes / Helm Deployment
+
+```bash
+# Update helm values
+vi helm-values.yaml
+
+# Install the helm chart
+helm install cc-bouncer-sandbox ./helm-chart \
+  --values helm-values.yaml \
+  --namespace control-core \
+  --create-namespace
+
+# Check status
+kubectl get pods -n control-core
+kubectl logs -n control-core deployment/cc-bouncer-sandbox -f
+```
+
+### Binary Deployment
+
+```bash
+# Make the binary executable
+chmod +x cc-bouncer
+
+# Run with configuration file
+./cc-bouncer --config config.yaml
+
+# Or run with environment variables
+./cc-bouncer
+```
+
+### Docker Run (Quick Test)
+
+```bash
+docker run -d \
+  --name cc-bouncer-sandbox \
+  -p 8080:8080 \
+  -e CONTROL_PLANE_URL="https://your-control-plane.company.com" \
+  -e CONTROL_PLANE_API_KEY="your-api-key-here" \
+  -e TENANT_ID="your-tenant-id" \
+  -e BOUNCER_ID="bouncer-sandbox-api-1" \
+  -e ENVIRONMENT="sandbox" \
+  -e RESOURCE_NAME="Customer API" \
+  -e TARGET_URL="http://api-service:8000" \
+  controlcore/cc-bouncer:v2.1.0
+```
+
+## Step 4: Verify Connection
+
+### Check Bouncer Logs
+
+Look for successful registration:
+
+```
+INFO: Bouncer starting...
+INFO: Connecting to Control Plane at https://your-control-plane.company.com
+INFO: Registration successful - Bouncer ID: bouncer-sandbox-api-1
+INFO: Resource auto-discovery complete - Resource: Customer API
+INFO: Health check enabled - Heartbeat interval: 30s
+INFO: Bouncer ready - Listening on port 8080
+INFO: Status: Connected, Intercepting Traffic: true
+```
+
+### Verify in Control Core Admin UI
+
+1. Navigate to **Settings > Bouncers > Deployment Status**
+2. You should see your bouncer listed with:
+   - ✅ **Connected** (green pulsing dot)
+   - ⚡ **Intercepting Traffic** badge
+   - 🟢 **Sandbox** or 🔴 **Production** environment badge
+   - Last seen timestamp (should be < 1 minute ago)
+
+3. Check the resource was auto-discovered:
+   - Navigate to **Settings > Resources**
+   - Filter by environment (Sandbox/Production)
+   - Your resource should be listed as "Auto-Discovered"
+
+### Test the Bouncer
+
+Send a test request through the bouncer:
+
+```bash
+# Make a request to the bouncer
+curl -X GET http://localhost:8080/api/v1/customers \
+  -H "Authorization: Bearer test-token"
+
+# Expected: 403 Forbidden (if no policies configured yet)
+# Or: 200 OK (if you have an allow policy)
+```
+
+## Step 5: Configure Routing
+
+### Reverse Proxy Mode
+
+Update DNS or load balancer to route traffic through the bouncer:
+
+**Option 1: DNS CNAME**
+```
+api.yourcompany.com -> bouncer-sandbox.yourcompany.com
+```
+
+**Option 2: Load Balancer**
+```
+Update ALB/NLB target to point to bouncer
+```
+
+**Option 3: Ingress Controller (Kubernetes)**
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-ingress
+spec:
+  rules:
+  - host: api.yourcompany.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: cc-bouncer-sandbox
+            port:
+              number: 8080
+```
+
+### Sidecar Mode
+
+The bouncer is already running alongside your service container. Update your application to route requests through localhost:
+
+```javascript
+// Before
+const API_BASE_URL = 'http://api-service:8000';
+
+// After (route through bouncer sidecar)
+const API_BASE_URL = 'http://localhost:8080';
+```
+
+## Step 6: Deploy Production Bouncer
+
+Repeat steps 1-5 for the production environment:
+
+1. Download bouncer package for **Production** environment
+2. Update configuration with production-specific settings:
+   - Different `bouncer_id` (e.g., "bouncer-prod-api-1")
+   - `environment: "production"`
+   - Production resource URLs
+3. Deploy to production infrastructure
+4. Verify connection in Admin UI
+5. Update production DNS/routing
+
+**Important**: Test policies thoroughly in Sandbox before promoting to Production!
+
+## Troubleshooting
+
+### Bouncer Not Connecting
+
+**Problem**: Bouncer shows as "Disconnected" in Admin UI
+
+**Solutions**:
+1. Check network connectivity:
+   ```bash
+   curl -I https://your-control-plane.company.com/health
+   ```
+
+2. Verify API credentials:
+   ```bash
+   # Check API key is valid
+   curl https://your-control-plane.company.com/api/v1/health \
+     -H "Authorization: Bearer your-api-key-here"
+   ```
+
+3. Check firewall rules allow outbound HTTPS (443)
+
+4. Review bouncer logs for errors:
+   ```bash
+   docker logs cc-bouncer-sandbox
+   # or
+   kubectl logs deployment/cc-bouncer-sandbox
+   ```
+
+### Heartbeat Failures
+
+**Problem**: Bouncer connects but heartbeat fails
+
+**Solutions**:
+1. Check Control Plane health endpoint is accessible
+2. Verify heartbeat interval isn't too aggressive (min 30s recommended)
+3. Check for network instability or timeouts
+4. Review Control Plane logs for errors
+
+### Resource Not Auto-Discovered
+
+**Problem**: Bouncer connects but resource doesn't appear
+
+**Solutions**:
+1. Verify resource configuration in `config.yaml`
+2. Check `RESOURCE_NAME` and `RESOURCE_TYPE` are set
+3. Review bouncer logs for registration errors
+4. Manually refresh the resources page
+
+### 403 Forbidden on All Requests
+
+**Problem**: All requests return 403 even with valid tokens
+
+**Solutions**:
+1. Check that policies are created and enabled
+2. Verify policies are assigned to the correct environment
+3. Check policy evaluation logs in Admin UI
+4. Temporarily set `security_posture: "allow-all"` for testing (NOT for production!)
+
+### High Latency
+
+**Problem**: Requests through bouncer are slow
+
+**Solutions**:
+1. Enable and tune cache settings:
+   ```yaml
+   cache:
+     enabled: true
+     ttl: 300
+     max_size: 5000
+   ```
+
+2. Increase timeout values:
+   ```yaml
+   network:
+     timeout_seconds: 30
+   ```
+
+3. Check Control Plane performance and scaling
+4. Deploy bouncer closer to your application (reduce network hops)
+5. Monitor bouncer resource usage (CPU/memory)
+
+## Advanced Configuration
+
+### TLS/SSL Configuration
+
+```yaml
+ssl:
+  enabled: true
+  cert_path: "/etc/certs/tls.crt"
+  key_path: "/etc/certs/tls.key"
+  auto_renew: true
+  certificate_type: "letsencrypt"
+```
+
+### Load Balancing (Multiple Bouncers)
+
+Deploy multiple bouncer instances behind a load balancer for high availability:
+
+```yaml
+# bouncer-1
+bouncer:
+  id: "bouncer-sandbox-api-1"
+  name: "Sandbox API Bouncer 1"
+
+# bouncer-2
+bouncer:
+  id: "bouncer-sandbox-api-2"
+  name: "Sandbox API Bouncer 2"
+```
+
+### Custom Headers
+
+```yaml
+headers:
+  request:
+    - name: "X-Control-Core-Enforced"
+      value: "true"
+  response:
+    - name: "X-Protected-By"
+      value: "Control Core"
+```
+
+### Traffic Routing Rules
+
+```yaml
+routing:
+  rules:
+    - path: "/api/v1/*"
+      target: "http://api-v1:8000"
+    - path: "/api/v2/*"
+      target: "http://api-v2:9000"
+```
+
+## Monitoring and Observability
+
+### Metrics Endpoints
+
+The bouncer exposes Prometheus-compatible metrics:
+
+```
+http://localhost:8080/metrics
+```
+
+Key metrics:
+- `bouncer_requests_total` - Total requests processed
+- `bouncer_request_duration_seconds` - Request latency
+- `bouncer_policy_decisions_total` - Policy evaluation outcomes
+- `bouncer_control_plane_latency_seconds` - Control Plane response time
+
+### Health Check Endpoint
+
+```bash
+curl http://localhost:8080/health
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "bouncer_id": "bouncer-sandbox-api-1",
+  "environment": "sandbox",
+  "connected": true,
+  "intercepting_traffic": true,
+  "last_heartbeat": "2025-01-24T10:30:00Z",
+  "control_plane_url": "https://your-control-plane.company.com",
+  "uptime_seconds": 3600
+}
+```
+
+## Best Practices
+
+### Security
+- ✅ Use deny-all as default security posture
+- ✅ Rotate API keys regularly
+- ✅ Use TLS/SSL for all connections
+- ✅ Run bouncers with minimal privileges
+- ✅ Keep bouncers updated to latest version
+
+### Deployment
+- ✅ Deploy sandbox and production bouncers separately
+- ✅ Test policies in sandbox before promoting to production
+- ✅ Deploy multiple bouncer instances for high availability
+- ✅ Monitor bouncer health and performance
+- ✅ Use infrastructure as code (Helm/Terraform)
+
+### Operations
+- ✅ Enable audit logging
+- ✅ Set up alerting for bouncer disconnections
+- ✅ Monitor request latency and error rates
+- ✅ Review policy evaluation logs regularly
+- ✅ Keep configuration in version control
+
+## Next Steps
+
+1. **Create Policies**: Define authorization policies in the Admin UI
+2. **Test in Sandbox**: Verify policies work as expected with sandbox bouncer
+3. **Promote to Production**: Apply tested policies to production environment
+4. **Monitor**: Set up dashboards and alerts for bouncer health
+5. **Scale**: Deploy additional bouncers as your traffic grows
+
+## Support
+
+Need help? Contact us:
+- 📧 Email: support@controlcore.io
+- 💬 Discord: discord.gg/controlcore
+- 📚 Docs: docs.controlcore.io
+- 🐛 Issues: github.com/controlcore/issues
+

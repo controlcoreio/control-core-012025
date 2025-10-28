@@ -1,0 +1,609 @@
+# Enterprise Architecture
+
+This guide provides advanced architecture patterns for enterprise-scale Control Core deployments across multiple cloud providers, with emphasis on high availability, disaster recovery, and regulatory compliance.
+
+## Enterprise Architecture Principles
+
+### Multi-Region Design
+
+Deploy Control Core across multiple geographic regions for:
+- **Low latency**: Users connect to nearest region
+- **High availability**: Survive regional outages
+- **Disaster recovery**: Automatic failover
+- **Data residency**: Comply with jurisdictional requirements (FINTRAC, OSFI, GDPR)
+- **Performance**: Distribute load globally
+
+### Cloud-Agnostic Approach
+
+Design principles for multi-cloud deployments:
+- Use Kubernetes for consistent deployment across clouds
+- Leverage managed services where beneficial
+- Maintain ability to migrate between providers
+- Avoid vendor lock-in
+- Use open standards (Prometheus, NGINX, cert-manager)
+
+## Enterprise Deployment Patterns
+
+### Pattern 1: Active-Active Multi-Region
+
+```
+US-EAST Region (Primary)          EU-WEST Region (Active)
+┌──────────────────────────┐     ┌──────────────────────────┐
+│ Control Plane            │     │ Control Plane            │
+│ ├─ Console x3            │     │ ├─ Console x3            │
+│ ├─ API x5                │◄───►│ ├─ API x5                │
+│ ├─ OPAL x3               │Sync │ ├─ OPAL x3               │
+│ ├─ DB Primary            │─────│ ├─ DB Replica (RO)       │
+│ └─ Bouncer x10           │     │ └─ Bouncer x10           │
+└────────┬─────────────────┘     └────────┬─────────────────┘
+         │                                 │
+         │                                 │
+    Users in                          Users in
+  North America                         Europe
+
+Global Load Balancer (GeoDNS)
+├─ US users → US-EAST
+├─ EU users → EU-WEST
+└─ Automatic failover if region down
+```
+
+**Benefits**:
+- Regional failover (< 30 seconds)
+- Optimal latency for all users
+- GDPR data residency compliance
+- Load distribution
+
+**Implementation**:
+- Database replication (PostgreSQL streaming replication)
+- OPAL data synchronization
+- GeoDNS routing (Route 53, Cloud DNS, Azure Traffic Manager)
+- Cross-region VPN/peering
+
+### Pattern 2: Hub-and-Spoke
+
+```
+Central Hub (Primary Control Plane)
+┌──────────────────────────────────┐
+│ ┌──────────┐    ┌──────────┐     │
+│ │ Console  │    │   API    │     │
+│ └────┬─────┘    └────┬─────┘     │
+│      │               │            │
+│      └───────┬───────┘            │
+│              ▼                    │
+│         ┌─────────┐               │
+│         │  OPAL   │               │
+│         └────┬────┘               │
+└──────────────┼───────────────────┘
+               │
+    ┌──────────┼──────────┬─────────────┐
+    │          │          │             │
+    ▼          ▼          ▼             ▼
+┌────────┐ ┌────────┐ ┌────────┐  ┌────────┐
+│Region 1│ │Region 2│ │Region 3│  │On-Prem │
+│        │ │        │ │        │  │        │
+│Bouncer │ │Bouncer │ │Bouncer │  │Bouncer │
+│ x5     │ │ x5     │ │ x5     │  │ x3     │
+└────────┘ └────────┘ └────────┘  └────────┘
+```
+
+**Benefits**:
+- Centralized policy management
+- Distributed enforcement
+- Hybrid cloud support
+- Lower regional infrastructure costs
+
+**Use Case**: Organizations with central IT but distributed applications
+
+### Pattern 3: Federated
+
+```
+Region A (Independent)    Region B (Independent)    Region C (Independent)
+┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│ Full Stack       │      │ Full Stack       │      │ Full Stack       │
+│ ├─ Console       │      │ ├─ Console       │      │ ├─ Console       │
+│ ├─ API           │      │ ├─ API           │      │ ├─ API           │
+│ ├─ OPAL          │      │ ├─ OPAL          │      │ ├─ OPAL          │
+│ ├─ Database      │      │ ├─ Database      │      │ ├─ Database      │
+│ └─ Bouncer       │      │ └─ Bouncer       │      │ └─ Bouncer       │
+└──────────────────┘      └──────────────────┘      └──────────────────┘
+
+        Policy Sync (Optional)
+        ◄────────────────────────────►
+```
+
+**Benefits**:
+- Complete regional independence
+- Data sovereignty (each region isolated)
+- Survive complete control plane failure
+- Regulatory compliance (data never leaves region)
+
+**Use Case**: Multi-national organizations with strict data residency (FINTRAC, GDPR)
+
+## Cloud Provider Architectures
+
+### AWS Enterprise Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Route 53 (Global DNS)                 │
+│               GeoDNS Routing / Health Checks                │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ us-east-1    │  │ eu-west-1    │  │ ap-south-1   │
+│              │  │              │  │              │
+│ EKS Cluster  │  │ EKS Cluster  │  │ EKS Cluster  │
+│ ├─ Console   │  │ ├─ Console   │  │ ├─ Console   │
+│ ├─ API       │  │ ├─ API       │  │ ├─ API       │
+│ ├─ Bouncer   │  │ ├─ Bouncer   │  │ ├─ Bouncer   │
+│ └─ OPAL      │  │ └─ OPAL      │  │ └─ OPAL      │
+│              │  │              │  │              │
+│ RDS Primary  │◄─┤ RDS Replica  │◄─┤ RDS Replica  │
+│              │  │              │  │              │
+│ ElastiCache  │  │ ElastiCache  │  │ ElastiCache  │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+**Key Services**:
+- **EKS**: Managed Kubernetes
+- **RDS**: Managed PostgreSQL with Multi-AZ
+- **ElastiCache**: Managed Redis cluster
+- **ALB/NLB**: Load balancing
+- **Route 53**: DNS and health checks
+- **Secrets Manager**: Credential storage
+- **CloudWatch**: Monitoring and logging
+
+### Google Cloud Enterprise Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Cloud DNS (Global)                       │
+│           Traffic Director / Global Load Balancing          │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ us-central1  │  │ europe-west1 │  │asia-south1   │
+│              │  │              │  │              │
+│ GKE Cluster  │  │ GKE Cluster  │  │ GKE Cluster  │
+│ ├─ Console   │  │ ├─ Console   │  │ ├─ Console   │
+│ ├─ API       │  │ ├─ API       │  │ ├─ API       │
+│ ├─ Bouncer   │  │ ├─ Bouncer   │  │ ├─ Bouncer   │
+│ └─ OPAL      │  │ └─ OPAL      │  │ └─ OPAL      │
+│              │  │              │  │              │
+│Cloud SQL Pri │◄─┤Cloud SQL Rep │◄─┤Cloud SQL Rep │
+│              │  │              │  │              │
+│ Memorystore  │  │ Memorystore  │  │ Memorystore  │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+**Key Services**:
+- **GKE**: Managed Kubernetes (Autopilot or Standard)
+- **Cloud SQL**: Managed PostgreSQL with HA
+- **Memorystore**: Managed Redis
+- **Cloud Load Balancing**: Global and regional LB
+- **Cloud DNS**: DNS management
+- **Secret Manager**: Credential storage
+- **Cloud Monitoring**: Observability
+
+### Azure Enterprise Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Azure Traffic Manager                     │
+│            Global Load Balancing / Health Probes            │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ East US      │  │ West Europe  │  │ Southeast    │
+│              │  │              │  │ Asia         │
+│ AKS Cluster  │  │ AKS Cluster  │  │ AKS Cluster  │
+│ ├─ Console   │  │ ├─ Console   │  │ ├─ Console   │
+│ ├─ API       │  │ ├─ API       │  │ ├─ API       │
+│ ├─ Bouncer   │  │ ├─ Bouncer   │  │ ├─ Bouncer   │
+│ └─ OPAL      │  │ └─ OPAL      │  │ └─ OPAL      │
+│              │  │              │  │              │
+│ Azure DB Pri │◄─┤ Azure DB Rep │◄─┤ Azure DB Rep │
+│              │  │              │  │              │
+│ Azure Cache  │  │ Azure Cache  │  │ Azure Cache  │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+**Key Services**:
+- **AKS**: Managed Kubernetes
+- **Azure Database for PostgreSQL**: Managed database with HA
+- **Azure Cache for Redis**: Managed Redis
+- **Azure Load Balancer**: Layer 4 and Application Gateway (Layer 7)
+- **Azure DNS**: DNS management
+- **Azure Key Vault**: Secrets management
+- **Azure Monitor**: Monitoring and logging
+
+## High Availability Architecture
+
+### Database High Availability
+
+**PostgreSQL Replication Across Clouds**:
+
+| Cloud | HA Solution | Failover Time | Data Loss |
+|-------|-------------|---------------|-----------|
+| **AWS** | RDS Multi-AZ + Read Replicas | 30-60s | None |
+| **GCP** | Cloud SQL HA + Replicas | 30-60s | None |
+| **Azure** | Flexible Server HA + Replicas | 30-60s | None |
+| **Self-Hosted** | Patroni/Stolon + Streaming Replication | 10-30s | None |
+
+**Configuration Example (Cloud-Agnostic)**:
+
+```yaml
+# Database HA Configuration
+database:
+  primary:
+    host: db-primary.controlcore.internal
+    port: 5432
+  
+  read_replicas:
+    - host: db-replica-1.controlcore.internal
+      port: 5432
+      weight: 1
+    - host: db-replica-2.controlcore.internal
+      port: 5432
+      weight: 1
+  
+  connection_pool:
+    size: 50
+    max_overflow: 20
+  
+  failover:
+    enabled: true
+    detection_threshold: 3  # Failed health checks
+    failover_timeout: 30    # Seconds
+```
+
+### Redis High Availability
+
+**Redis Cluster vs Sentinel**:
+
+| Approach | Nodes | Failover | Use Case |
+|----------|-------|----------|----------|
+| **Sentinel** | 3+ | 10-30s | Small-medium deployments |
+| **Cluster** | 6+ | Immediate | Large-scale, high throughput |
+
+**Cloud Provider Options**:
+
+| Cloud | Service | HA Mode | Max Throughput |
+|-------|---------|---------|----------------|
+| **AWS** | ElastiCache | Cluster mode | 100M+ ops/sec |
+| **GCP** | Memorystore | Standard tier | 12GB, 12K ops/sec |
+| **Azure** | Azure Cache | Premium tier | 100K ops/sec |
+| **Self-Hosted** | Redis Sentinel/Cluster | Both | Unlimited |
+
+### Load Balancer Architecture
+
+**Multi-Cloud Load Balancing**:
+
+```
+Global DNS (Any Provider)
+├─ Geolocation routing
+├─ Latency-based routing
+├─ Weighted routing
+└─ Health check failover
+         │
+    ┌────┼────┬────────┐
+    ▼    ▼    ▼        ▼
+┌─────────────────────────────────────────┐
+│  AWS ALB  │ GCP CLB │ Azure LB │ NGINX  │
+│           │         │          │        │
+│ Bouncers  │Bouncers │ Bouncers │Bouncers│
+└─────────────────────────────────────────┘
+```
+
+**Layer 7 (Application) Load Balancing**:
+- **AWS**: Application Load Balancer (ALB)
+- **GCP**: Cloud Load Balancing (HTTP(S))
+- **Azure**: Application Gateway
+- **Self-Hosted**: NGINX, HAProxy, Traefik
+
+**Layer 4 (Network) Load Balancing**:
+- **AWS**: Network Load Balancer (NLB)
+- **GCP**: Cloud Load Balancing (TCP/UDP)
+- **Azure**: Azure Load Balancer
+- **Self-Hosted**: NGINX Stream, HAProxy TCP
+
+## Disaster Recovery Architecture
+
+### Cross-Region DR
+
+**RPO and RTO Targets**:
+
+| Deployment | RPO | RTO | Cost |
+|------------|-----|-----|------|
+| **Single Region** | 1 hour | 4 hours | $ |
+| **Multi-Region (Hot Standby)** | 15 min | 30 min | $$$ |
+| **Multi-Region (Active-Active)** | None | 30 sec | $$$$ |
+
+### Backup Architecture
+
+**Multi-Cloud Backup Strategy**:
+
+```
+Primary Region                    Backup Regions
+┌──────────────────┐             ┌──────────────────┐
+│ PostgreSQL       │             │ S3 / GCS / Blob  │
+│ ├─ Continuous    │────────────►│ ├─ Daily Full    │
+│ │  WAL Archive   │   Backup    │ ├─ Incremental   │
+│ └─ Snapshots     │             │ └─ Point-in-Time │
+└──────────────────┘             └──────────────────┘
+                                          │
+                                          │ Replication
+                                          ▼
+                                 ┌──────────────────┐
+                                 │ Different Cloud  │
+                                 │ (Disaster Recov) │
+                                 └──────────────────┘
+```
+
+**Backup to Multiple Clouds**:
+```bash
+# Backup to AWS S3
+pg_basebackup | aws s3 cp - s3://backup-bucket/
+
+# Replicate to GCP
+gsutil rsync -r s3://backup-bucket gs://backup-bucket-gcp/
+
+# Replicate to Azure
+azcopy sync s3://backup-bucket https://backupaccount.blob.core.windows.net/backups
+```
+
+## Security Architecture
+
+### Zero Trust Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                 Identity Provider                   │
+│              (Okta, Azure AD, etc.)                 │
+└────────────────────┬────────────────────────────────┘
+                     │ SAML/OIDC
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│              Policy Administration                  │
+│              (Strong Authentication)                │
+└────────────────────┬────────────────────────────────┘
+                     │ mTLS
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│            Policy Enforcement Points                │
+│         (Verify every request, trust nothing)       │
+└────────────────────┬────────────────────────────────┘
+                     │ Application-specific auth
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│              Protected Applications                 │
+└─────────────────────────────────────────────────────┘
+```
+
+**Principles**:
+- Never trust, always verify
+- Least privilege access
+- Assume breach
+- Verify explicitly
+- Continuous monitoring
+
+### Compliance Architecture
+
+**For Financial Services (FINTRAC, OSFI)**:
+
+```
+┌────────────────────────────────────────────────┐
+│          Canadian Data Residency               │
+│                                                │
+│  ┌──────────────────────────────────────────┐ │
+│  │  Control Core (Canada Region Only)       │ │
+│  │  ├─ Policies stored in Canada            │ │
+│  │  ├─ Audit logs retained 5-7 years        │ │
+│  │  └─ Customer data never leaves Canada    │ │
+│  └──────────────────────────────────────────┘ │
+│                                                │
+│  ┌──────────────────────────────────────────┐ │
+│  │  FINTRAC Compliance                      │ │
+│  │  ├─ LCTR automatic detection             │ │
+│  │  ├─ STR pattern monitoring               │ │
+│  │  └─ Audit trail for all transactions     │ │
+│  └──────────────────────────────────────────┘ │
+│                                                │
+│  ┌──────────────────────────────────────────┐ │
+│  │  OSFI Compliance                         │ │
+│  │  ├─ Segregation of duties enforced       │ │
+│  │  ├─ MFA for sensitive operations         │ │
+│  │  └─ Privileged access monitored          │ │
+│  └──────────────────────────────────────────┘ │
+└────────────────────────────────────────────────┘
+```
+
+## Performance Architecture
+
+### Global Performance Optimization
+
+**Edge Caching Strategy**:
+
+```
+User Request
+     │
+     ▼
+┌─────────────┐
+│  CDN Edge   │ ← Static assets cached
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│Regional LB  │
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│  Bouncer    │ ← Policy cache (5-15min)
+│             │ ← Decision cache (1-5min)
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│ Redis Cache │ ← PIP data cache (5-60min)
+└─────┬───────┘
+      │
+      ▼
+┌─────────────┐
+│  Database   │ ← Read replicas for queries
+└─────────────┘
+```
+
+**Latency by Region**:
+
+| User Location | Nearest Region | Latency |
+|---------------|----------------|---------|
+| North America | us-east/us-west | 10-30ms |
+| Europe | eu-west | 10-30ms |
+| Asia | asia-south | 10-30ms |
+| Cross-region | Secondary region | 50-150ms |
+
+## Network Architecture
+
+### Private Network Design
+
+**Multi-Cloud Private Connectivity**:
+
+```
+AWS VPC              GCP VPC              Azure VNet
+┌────────────┐      ┌────────────┐      ┌────────────┐
+│ 10.1.0.0/16│      │ 10.2.0.0/16│      │ 10.3.0.0/16│
+└─────┬──────┘      └─────┬──────┘      └─────┬──────┘
+      │                   │                    │
+      │ VPN/             │ VPN/               │ VPN/
+      │ Direct Connect   │ Interconnect       │ ExpressRoute
+      │                   │                    │
+      └───────────────────┼────────────────────┘
+                          │
+                    ┌─────▼──────┐
+                    │  On-Prem   │
+                    │ 10.0.0.0/16│
+                    └────────────┘
+```
+
+**Network Segmentation**:
+
+```
+Public Subnet (0.0.1.0/24)
+├─ Load Balancers
+├─ Bastion hosts
+└─ NAT Gateway
+
+Private Subnet - Application (0.0.2.0/24)
+├─ Console pods/containers
+├─ API pods/containers
+├─ Bouncer pods/containers
+└─ OPAL pods/containers
+
+Private Subnet - Data (0.0.3.0/24)
+├─ PostgreSQL
+├─ Redis
+└─ No internet access
+
+Management Subnet (0.0.4.0/24)
+├─ Monitoring (Prometheus, Grafana)
+├─ Logging (ELK/EFK)
+└─ Jump boxes
+```
+
+## Monitoring Architecture
+
+### Observability Stack
+
+**Cloud-Agnostic Monitoring**:
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Metrics Collection                     │
+│                                                     │
+│ ┌─────────────┐   ┌─────────────┐  ┌────────────┐ │
+│ │ Prometheus  │   │  Datadog    │  │ New Relic  │ │
+│ │ (Self-Host) │   │  (SaaS)     │  │  (SaaS)    │ │
+│ └──────┬──────┘   └──────┬──────┘  └─────┬──────┘ │
+└────────┼─────────────────┼────────────────┼────────┘
+         │                 │                │
+         └─────────────────┴────────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│   Grafana    │  │   Datadog    │  │  New Relic   │
+│  Dashboards  │  │  Dashboards  │  │  Dashboards  │
+└──────────────┘  └──────────────┘  └──────────────┘
+```
+
+### Centralized Logging
+
+**Multi-Cloud Log Aggregation**:
+
+```
+All Regions/Clouds
+     │
+     ▼
+┌─────────────────────────────┐
+│    Log Aggregation          │
+│                             │
+│ Option 1: ELK Stack         │
+│ Option 2: Splunk            │
+│ Option 3: Datadog           │
+│ Option 4: Cloud-native      │
+│    (CloudWatch, Cloud       │
+│     Logging, Azure Monitor) │
+└─────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────┐
+│    Long-Term Storage        │
+│  (7 years for compliance)   │
+│                             │
+│ - S3 / GCS / Azure Blob     │
+│ - Glacier / Coldline        │
+│ - Immutable storage         │
+└─────────────────────────────┘
+```
+
+## Cost Optimization Architecture
+
+### Right-Sizing Strategy
+
+**Cost by Deployment Size**:
+
+| Size | Users | Req/Day | Monthly Cost (AWS) | Monthly Cost (GCP) | Monthly Cost (Azure) |
+|------|-------|---------|-------------------|-------------------|---------------------|
+| **Small** | 50 | 1M | $500-800 | $450-750 | $550-850 |
+| **Medium** | 500 | 10M | $2K-4K | $1.8K-3.5K | $2.2K-4.2K |
+| **Large** | 5000 | 100M | $10K-20K | $9K-18K | $11K-22K |
+| **Enterprise** | 50K+ | 1B+ | Custom | Custom | Custom |
+
+**Cost Optimization Tips**:
+1. **Use spot/preemptible instances** for non-critical workloads
+2. **Right-size resources** based on actual usage
+3. **Enable auto-scaling** to scale down during low traffic
+4. **Use reserved instances** for predictable workloads
+5. **Optimize storage** (use appropriate tiers)
+6. **Monitor costs** with cloud cost management tools
+
+## Next Steps
+
+- **[Enterprise Deployment Guide](/guides/deployment/enterprise)**: Deploy on Kubernetes
+- **[Enterprise Configuration](/enterprise/configure)**: Post-deployment configuration
+- **[Security Best Practices](/guides/security)**: Harden your deployment
+- **[Troubleshooting](/troubleshooting)**: Common issues
+
+---
+
+**Enterprise architecture requires careful planning. Consider engaging Control Core professional services for complex deployments.**

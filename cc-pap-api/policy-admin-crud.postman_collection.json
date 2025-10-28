@@ -1,0 +1,452 @@
+{
+  "info": {
+    "_postman_id": "cc-policy-admin-api-collection",
+    "name": "ControlCore Policy Admin API - OPA Integration",
+    "description": "API collection for testing ControlCore Policy Admin API with OPA REST API integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List All Policies from OPA",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has policies array\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('policies');",
+              "    pm.expect(jsonData.policies).to.be.an('array');",
+              "});",
+              "",
+              "pm.test(\"Each policy has required PolicyWidget fields\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    if (jsonData.policies.length > 0) {",
+              "        const policy = jsonData.policies[0];",
+              "        pm.expect(policy).to.have.property('id');",
+              "        pm.expect(policy).to.have.property('name');",
+              "        pm.expect(policy).to.have.property('description');",
+              "        pm.expect(policy).to.have.property('status');",
+              "        pm.expect(policy).to.have.property('scope');",
+              "        pm.expect(policy).to.have.property('lastModified');",
+              "        pm.expect(policy).to.have.property('modifiedBy');",
+              "        pm.expect(policy).to.have.property('version');",
+              "        pm.expect(policy).to.have.property('createdAt');",
+              "        pm.expect(policy).to.have.property('createdBy');",
+              "        pm.expect(policy).to.have.property('content');",
+              "        ",
+              "        // Validate data types",
+              "        pm.expect(policy.scope).to.be.an('array');",
+              "        pm.expect(policy.status).to.be.oneOf(['enabled', 'disabled', 'archived', 'draft']);",
+              "    }",
+              "});",
+              "",
+              "pm.test(\"Policies contain expected main and mask policies\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    const policyIds = jsonData.policies.map(p => p.id);",
+              "    pm.expect(policyIds).to.include('main');",
+              "    pm.expect(policyIds).to.include('mask');",
+              "});",
+              "",
+              "// Store first policy ID for individual policy test",
+              "const jsonData = pm.response.json();",
+              "if (jsonData.policies.length > 0) {",
+              "    pm.environment.set('test_policy_id', jsonData.policies[0].id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Specific Policy from OPA",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response is a PolicyWidget object\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('id');",
+              "    pm.expect(jsonData).to.have.property('name');",
+              "    pm.expect(jsonData).to.have.property('description');",
+              "    pm.expect(jsonData).to.have.property('status');",
+              "    pm.expect(jsonData).to.have.property('scope');",
+              "    pm.expect(jsonData).to.have.property('lastModified');",
+              "    pm.expect(jsonData).to.have.property('modifiedBy');",
+              "    pm.expect(jsonData).to.have.property('version');",
+              "    pm.expect(jsonData).to.have.property('createdAt');",
+              "    pm.expect(jsonData).to.have.property('createdBy');",
+              "    pm.expect(jsonData).to.have.property('content');",
+              "});",
+              "",
+              "pm.test(\"Policy ID matches requested ID\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    const requestedId = pm.environment.get('test_policy_id') || 'main';",
+              "    pm.expect(jsonData.id).to.equal(requestedId);",
+              "});",
+              "",
+              "pm.test(\"Policy content is not empty\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.content).to.not.be.empty;",
+              "    pm.expect(jsonData.content).to.include('package');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies/{{test_policy_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies",
+            "{{test_policy_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Main Policy",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Policy is main policy\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.id).to.equal('main');",
+              "    pm.expect(jsonData.name).to.equal('Main Access Policy');",
+              "    pm.expect(jsonData.status).to.equal('enabled');",
+              "});",
+              "",
+              "pm.test(\"Main policy has expected content\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.content).to.include('package main');",
+              "    pm.expect(jsonData.content).to.include('default allow = false');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies/main",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies",
+            "main"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Mask Policy",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Policy is mask policy\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.id).to.equal('mask');",
+              "    pm.expect(jsonData.name).to.equal('Data Masking Policy');",
+              "    pm.expect(jsonData.status).to.equal('enabled');",
+              "});",
+              "",
+              "pm.test(\"Mask policy has expected content and scope\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.content).to.include('mask_record');",
+              "    pm.expect(jsonData.content).to.include('mask_phone');",
+              "    pm.expect(jsonData.scope).to.include('Data Privacy');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies/mask",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies",
+            "mask"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Non-existent Policy",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 404\", function () {",
+              "    pm.response.to.have.status(404);",
+              "});",
+              "",
+              "pm.test(\"Error message indicates policy not found\", function () {",
+              "    pm.expect(pm.response.text()).to.include('Policy not found');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies/nonexistent",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies",
+            "nonexistent"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Disable Mask Policy",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Wait a moment for OPAL to sync the change",
+              "setTimeout(() => {}, 2000);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"commit_message\": \"Disable mask policy for testing\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies/disable/mask",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies",
+            "disable",
+            "mask"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Enable Mask Policy",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "// Wait a moment for OPAL to sync the change",
+              "setTimeout(() => {}, 2000);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"commit_message\": \"Re-enable mask policy after testing\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/policies/enable/mask",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "policies",
+            "enable",
+            "mask"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8082",
+      "type": "string"
+    },
+    {
+      "key": "test_policy_id",
+      "value": "main",
+      "type": "string"
+    }
+  ]
+} 

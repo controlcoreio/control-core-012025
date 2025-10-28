@@ -1,0 +1,78 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: cc-demoapp-db
+    environment:
+      - POSTGRES_DB=consulting_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - demoapp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ./cc-demoapp-api
+      dockerfile: Dockerfile
+    container_name: cc-demoapp-api
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/consulting_db
+      - SECRET_KEY=cc-demoapp-secret-key-change-in-production
+      - PYTHONPATH=/app
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./cc-demoapp-api:/app
+    networks:
+      - demoapp-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./cc-demoapp
+      dockerfile: Dockerfile
+    container_name: cc-demoapp-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_API_BASE_URL=http://api:8000
+    depends_on:
+      - api
+    networks:
+      - demoapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+
+networks:
+  demoapp-network:
+    driver: bridge

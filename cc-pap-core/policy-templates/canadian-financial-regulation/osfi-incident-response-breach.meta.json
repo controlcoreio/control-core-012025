@@ -1,0 +1,177 @@
+{
+  "version": "1.0.0",
+  "summary": "OSFI incident response and breach notification with PIPEDA privacy breach requirements for Canadian FRFIs",
+  "detailed_description": "This policy template enforces incident response and breach notification requirements under OSFI oversight and PIPEDA privacy law. OSFI requires financial institutions to notify the regulator of material technology or cyber security incidents that could impact operations, customers, or financial stability. PIPEDA requires notification to the Privacy Commissioner of Canada and affected individuals for breaches creating real risk of significant harm. The policy enforces OSFI notification triggers for critical incidents (10,000+ customers impacted), executive crisis team activation for major incidents (4+ hour business impact), customer notification for data breaches (500+ records), Privacy Commissioner notification for harmful breaches, mandatory forensic investigation for data exfiltration events, and post-incident review requirements within 30 days. Ensures coordinated incident response across technology, risk, legal, privacy, and executive leadership.",
+  "use_cases": [
+    {
+      "title": "RBC: Ransomware Attack Response and OSFI Notification",
+      "description": "Deploy osfi-incident-response-breach for coordinated cyber incident management",
+      "scenario": "RBC experiences ransomware attack on wealth management platform affecting 50,000 client accounts. OSFI notification requirement: Material incidents reported within 72 hours. Response timeline: Ransomware detected 2:15 AM (automated EDR alert), executive crisis team activated 2:45 AM (CISO, CIO, COO, CRO, General Counsel), OSFI preliminary notification 8:00 AM (5h 45m - within requirement), containment: affected servers isolated within 1 hour, recovery: Systems restored from backups by 6:00 PM (16 hours total downtime), customer impact: Wealth management online access unavailable 16 hours (mobile app, phone service functional - limited impact), forensic investigation: CrowdStrike engaged (determined ransomware entry via phishing, no data exfiltration detected), PIPEDA assessment: No personal data accessed (ransomware encrypted but didn't steal), no Privacy Commissioner notification required, ransom not paid (against policy). OSFI detailed report Day 3: Root cause, timeline, customer impact, remediation, control enhancements. Results: Client impact minimal (16 hours inconvenience, no financial losses), regulatory relationship strong (transparent notification appreciated), post-incident improvements: Enhanced email filtering, mandatory phishing training, ransomware recovery exercises quarterly. OSFI response: No regulatory action, commended for rapid notification and effective response, incident used as case study in OSFI industry guidance."
+    },
+    {
+      "title": "Scotiabank: Data Breach Privacy Commissioner Notification",
+      "description": "Implement osfi-incident-response-breach for PIPEDA breach notification compliance",
+      "scenario": "Scotiabank discovers database misconfiguration exposed 75,000 customer records (names, addresses, SINs) for 12 hours before detection. PIPEDA analysis: Does breach create real risk of significant harm? Assessment: YES - SINs exposed create identity theft risk, financial harm likely. Notification requirements: Privacy Commissioner within 72 hours + affected individuals 'as soon as feasible'. Timeline: Breach discovered 3:00 PM Friday (automated security scan), privacy officer notified 3:15 PM, assessment completed 5:00 PM (real risk of significant harm confirmed), Privacy Commissioner notification 11:00 AM Monday (68 hours), customer notification plan: Letter mailed Tuesday (72 hours), credit monitoring offered (free for 2 years, cost $2.8M). Customer notification: 75,000 letters mailed, toll-free hotline established (received 8,500 calls in first week), FAQ published online, social media monitoring for customer sentiment. Privacy Commissioner review: Notification timing acceptable, customer communication clear, credit monitoring appropriate mitigation. Regulatory outcome: No enforcement action, breach reported in Commissioner's annual report (public disclosure), customer impact: 2,000 customers closed accounts (2.7% voluntary attrition - acceptable given breach severity), reputation recovery: 6-8 months to return to pre-breach NPS scores. Lessons: Notification transparency maintains trust better than concealment, proactive mitigation (credit monitoring) reduces customer anger, rapid response limits damage."
+    },
+    {
+      "title": "CIBC: Major Incident Crisis Team Activation Protocol",
+      "description": "Use osfi-incident-response-breach for executive crisis management",
+      "scenario": "CIBC prepares crisis team activation procedures for various incident severities. Severity 1 (Critical): Customer impact >100K, business disruption >4 hours, data breach with harm risk, executive team activation required (CEO, COO, CIO, CISO, CRO, CCO, General Counsel). Severity 2 (Major): Customer impact 10K-100K, disruption 1-4 hours, executive team optional. Severity 3 (Moderate): Customer impact <10K, disruption <1 hour, business unit response only. Policy enforces: Automated severity calculation based on customer impact + duration, executive team activation for Sev 1 within 30 minutes (automated phone/SMS to executives), crisis management bridge established (dedicated conference line), status updates every hour to executive team and every 4 hours to board, regulator notification workflow (OSFI for operational incidents, Privacy Commissioner for breaches, police for criminal activity), customer communication approval by executive team. 2024 incidents: 3 Severity 1 incidents (DDoS attack, data center power failure, payment processing outage), executive team activated all 3 times (average activation time 22 minutes), OSFI notified for 2 of 3 (1 was <4 hour duration, not material), board briefed within 24 hours for all Sev 1 events. Crisis team effectiveness: All incidents resolved within RTO targets, customer communication coordinated and consistent, zero regulatory criticism of incident handling. OSFI feedback: Well-defined severity criteria, appropriate executive engagement, strong crisis management procedures."
+    },
+    {
+      "title": "National Bank: Post-Incident Review and Lessons Learned",
+      "description": "Deploy osfi-incident-response-breach for continuous improvement culture",
+      "scenario": "National Bank mandates post-incident reviews for all major incidents to identify root causes and prevent recurrence. Review process: Incident timeline reconstruction, root cause analysis (5 Whys methodology), control effectiveness evaluation, recommendations for improvements, action plan with owners and deadlines. Example incident: Mobile banking outage (3 hours, 200K customers affected), PIR findings: Root cause: Database backup job scheduled during peak hours (poor change management), contributing factors: Insufficient load testing of backup job impact, lack of database connection pool monitoring. Recommendations: (1) Reschedule backups to off-peak (2 AM-4 AM), (2) Load testing for all database changes (mandatory), (3) Database monitoring enhanced (connection pool utilization alerts), (4) Runbook for backup job issues (recovery procedure). Action plan: All 4 recommendations implemented within 30 days, retest scheduled (simulate backup job during business hours - confirmed no impact), quarterly PIR review with CTO (trending incident causes, recurrence prevention). Policy enforces: PIR must be completed within 30 days of incident resolution, executive review of PIR findings, action plan tracking until complete, quarterly PIR trending analysis. Results: Recurrence rate decreased from 15% (2023) to 5% (2024) as PIRs drive preventive actions, culture of continuous improvement (blameless PIRs encourage transparency), regulatory confidence (OSFI examinations reference strong incident learning process). OSFI: Exemplary post-incident review program, effective at preventing recurrence, model for industry."
+    },
+    {
+      "title": "BMO: Forensic Investigation for Suspected Data Exfiltration",
+      "description": "Apply osfi-incident-response-breach for cyber forensics capabilities",
+      "scenario": "BMO detects unusual database activity suggesting potential data exfiltration by external attacker (large query returning 500K customer records, executed at 3 AM from suspicious IP). Forensic response: System isolated within 5 minutes (network disconnected to prevent further exfiltration), forensic investigation firm engaged within 1 hour (Mandiant - specialized cyber forensics), forensic image captured (preserve evidence for potential law enforcement), memory dump collected (analyze attacker tools/techniques), log analysis (reconstruct attack timeline), malware analysis (identify attacker tools). Forensic findings (48-hour investigation): Attacker gained access via stolen admin credentials (phishing attack on DBA 3 days prior), credential used to access database (authentication logs confirmed), 500K customer records queried (names, addresses, account balances - no SINs, no passwords), data exfiltration confirmed (network logs show 50MB upload to external IP - matches query result size), attacker IP traced to known criminal infrastructure. Breach classification: 500K customers affected, SINs not exposed (moderate harm risk), credit monitoring offered (proactive customer protection). Notifications: Privacy Commissioner (Day 2), OSFI (Day 2), customers (Day 5 by mail), RCMP (Day 1 - criminal investigation). Recovery: Password reset for all admin accounts, MFA enforced for all database access, phishing-resistant authentication implemented (FIDO2 hardware keys). Results: Criminal investigation ongoing (RCMP collaboration), customer impact: 8% attrition (40,000 accounts closed), reputation recovery: 9-12 months, estimated total cost $15M (forensics, notifications, credit monitoring, security improvements). Lessons: Forensic investigation critical for understanding breach scope, rapid response limits damage, transparency with regulators builds trust despite severity."
+    },
+    {
+      "title": "Desjardins: Crisis Communication for Major Privacy Breach",
+      "description": "Implement osfi-incident-response-breach for stakeholder communication management",
+      "scenario": "Based on Desjardins' 2019 breach experience (9.7M members affected), policy now enforces coordinated crisis communication. Stakeholders requiring communication: Affected customers, regulators (AMF, OSFI, Privacy Commissioner), media, employees, board of directors, law enforcement, business partners. Communication policy: Regulator notification first (legal obligation), board notification within 24 hours (governance), customer notification (PIPEDA timeline: as soon as feasible), media statement (control narrative), employee briefing (internal transparency prevents leaks), partner notification (if partner data affected). Communication principles: Transparency (don't minimize breach), empathy (acknowledge customer impact), action-oriented (here's what we're doing to protect you), ongoing updates (not one-time). Desjardins 2019 execution: Privacy Commissioner notified promptly, customers notified in phases (all 9.7M within 6 months - phased to manage call center volume of 300K calls), CEO public apology (video message - took accountability), credit monitoring (offered to all affected, $70M cost), ongoing communication (quarterly updates to customers, annual reports to regulators on improvements). Outcomes: Reputation damage significant but recoverable (took 18 months to return to pre-breach customer satisfaction), regulator relationship maintained through transparency, member retention better than expected (93% stayed - loyalty to cooperative model), estimated total cost $200M+ (notifications, credit monitoring, legal fees, security improvements, reputation damage). Policy improvements post-breach: Mandatory crisis communication plan for all Severity 1 incidents, executive media training (CEO, spokesperson), pre-approved communication templates for various breach scenarios, social media monitoring and response team. Regulatory: Privacy Commissioner penalty $200K (modest - transparent cooperation considered), AMF enhanced monitoring 2 years (no ongoing sanctions), case study used globally for breach response lessons."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Incident response action",
+      "required": true,
+      "example_values": [
+        "classify_security_incident",
+        "manage_security_incident",
+        "respond_to_data_breach"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Incident resource type",
+      "required": true,
+      "example_values": [
+        "security_incident",
+        "privacy_breach",
+        "major_incident",
+        "cyber_attack"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.incident_severity",
+      "type": "string",
+      "description": "Incident severity classification",
+      "required": true,
+      "example_values": [
+        "critical",
+        "major",
+        "moderate",
+        "minor"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "context.customer_impact_count",
+      "type": "number",
+      "description": "Number of customers affected",
+      "required": true,
+      "example_values": [
+        100,
+        10000,
+        500000
+      ],
+      "example_value": "10"
+    },
+    {
+      "name": "context.osfi_notification_sent",
+      "type": "boolean",
+      "description": "OSFI notification status",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "user.role",
+      "type": "string",
+      "description": "User role",
+      "required": true,
+      "example_values": [
+        "ciso",
+        "security_operations_manager",
+        "incident_commander",
+        "privacy_officer"
+      ],
+      "example_value": "user"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Incident Management (ServiceNow, PagerDuty)",
+      "SIEM (Splunk, QRadar)",
+      "Forensic Tools",
+      "Communication Platforms",
+      "Regulator Notification Systems"
+    ],
+    "complexity_score": "Critical - Enterprise incident response with multi-stakeholder coordination"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Define incident severity criteria",
+      "Configure OSFI notification workflows",
+      "Integrate SIEM for detection",
+      "Setup crisis team activation procedures"
+    ],
+    "sandbox_testing": [
+      "Test Sev 1 incident → executive team activation",
+      "Test data breach >500 records → customer notification workflow",
+      "Test OSFI notification triggers"
+    ],
+    "production_deployment": [
+      "Deploy incident classification first",
+      "Add automated notification workflows",
+      "Enable executive team activation",
+      "Conduct tabletop exercises"
+    ],
+    "monitoring_setup": [
+      "Track incident response times (detection to containment)",
+      "Monitor notification SLA compliance (OSFI 72hr, Privacy Commissioner 72hr)",
+      "Alert on critical incidents for executive awareness"
+    ]
+  },
+  "compliance_frameworks": [
+    "OSFI Technology Risk Guidance",
+    "PIPEDA Breach Notification",
+    "PCMLTFA",
+    "CSA NI 11-102"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "osfi",
+    "incident-response",
+    "breach-notification",
+    "pipeda",
+    "crisis-management",
+    "privacy"
+  ],
+  "related_templates": [
+    "osfi-b13-technology-cyber-risk",
+    "pipeda-breach-notification",
+    "osfi-e21-operational-risk"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 9,
+    "user_attributes": 1,
+    "resource_attributes": 2,
+    "context_attributes": 6
+  },
+  "integration_guide": {
+    "overview": "Integrate with incident management, SIEM, and notification platforms for coordinated response",
+    "steps_by_system": []
+  }
+}

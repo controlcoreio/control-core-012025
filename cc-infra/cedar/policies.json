@@ -1,0 +1,54 @@
+{
+  "policies": [
+    {
+      "id": "admin-policy",
+      "effect": "Permit",
+      "principal": {
+        "op": "In",
+        "entity": {
+          "type": "User",
+          "id": "admin"
+        }
+      },
+      "action": {
+        "op": "In",
+        "entity": {
+          "type": "Action",
+          "id": "admin"
+        }
+      },
+      "resource": {
+        "op": "In",
+        "entity": {
+          "type": "Resource",
+          "id": "*"
+        }
+      }
+    },
+    {
+      "id": "read-policy",
+      "effect": "Permit",
+      "principal": {
+        "op": "In",
+        "entity": {
+          "type": "User",
+          "id": "*"
+        }
+      },
+      "action": {
+        "op": "In",
+        "entity": {
+          "type": "Action",
+          "id": "read"
+        }
+      },
+      "resource": {
+        "op": "In",
+        "entity": {
+          "type": "Resource",
+          "id": "*"
+        }
+      }
+    }
+  ]
+}

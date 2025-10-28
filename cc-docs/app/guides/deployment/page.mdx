@@ -1,0 +1,280 @@
+# Deployment Guide
+
+This guide covers deploying Control Core components in your infrastructure.
+
+## Overview
+
+Control Core uses a **dual environment deployment model** by default (like Stripe's test/live mode):
+
+- **Control Plane**: Single instance managing both Sandbox and Production environments
+- **Sandbox Bouncer**: Required first bouncer for policy development (deploys with Control Plane)
+- **Production Bouncers**: Optional bouncers deployed when ready for live enforcement
+- **Bouncer Pairs**: Each logical resource has sandbox + production bouncer pair
+- **Supporting Services**: Database, Redis, OPAL for policy synchronization
+
+### Deployment Sequence
+
+1. **Step 1**: Deploy Control Plane (includes all management components)
+2. **Step 2**: Deploy Sandbox Bouncer (your first bouncer - REQUIRED)
+3. **Step 3**: Create and test policies in Sandbox
+4. **Step 4** (Later): Deploy Production Bouncer when ready
+5. **Step 5** (Later): Promote tested policies from Sandbox to Production
+
+**Important**: Never deploy a production bouncer without a sandbox bouncer first. Policy creation only happens in sandbox.
+
+## Prerequisites
+
+### System Requirements
+
+**Minimum Requirements:**
+- 2GB RAM
+- 2 CPU cores
+- 10GB storage
+- Network connectivity between components
+
+**Recommended Requirements:**
+- 4GB RAM
+- 4 CPU cores
+- 50GB storage
+- High-speed network
+
+### Software Requirements
+
+**For Kubernetes Deployment:**
+- Kubernetes 1.20+
+- Helm 3.0+
+- kubectl configured
+
+**For Docker Compose Deployment:**
+- Docker 20.10+
+- Docker Compose 2.0+
+
+## Deployment Methods
+
+### 1. Kubernetes with Helm (Recommended)
+
+**Step 1: Download Helm Charts**
+```bash
+# Download Control Plane
+curl -O https://releases.controlcore.io/helm/control-core-control-plane-012025.tgz
+
+# Download Bouncer
+curl -O https://releases.controlcore.io/helm/control-core-bouncer-012025.tgz
+
+# Download Demo App (optional)
+curl -O https://releases.controlcore.io/helm/control-core-demo-app-012025.tgz
+```
+
+**Step 2: Install Control Plane**
+```bash
+# Extract and install
+tar -xzf control-core-control-plane-012025.tgz
+helm install control-core ./control-core-control-plane \
+  --namespace control-core \
+  --create-namespace \
+  --set database.password=your-secure-password \
+  --set redis.password=your-redis-password
+```
+
+**Step 3: Install Bouncer**
+```bash
+# Extract and install
+tar -xzf control-core-bouncer-012025.tgz
+helm install bouncer ./control-core-bouncer \
+  --namespace control-core \
+  --set controlPlane.url=http://control-core-control-plane:8000
+```
+
+**Step 4: Install Demo App (Optional)**
+```bash
+# Extract and install
+tar -xzf control-core-demo-app-012025.tgz
+helm install demo-app ./control-core-demo-app \
+  --namespace control-core \
+  --set controlPlane.url=http://control-core-control-plane:8000
+```
+
+### 2. Docker Compose
+
+**Step 1: Download Docker Compose Files**
+```bash
+# Download Control Plane
+curl -O https://releases.controlcore.io/docker/control-core-control-plane-012025.yml
+
+# Download Bouncer
+curl -O https://releases.controlcore.io/docker/control-core-bouncer-012025.yml
+
+# Download Demo App (optional)
+curl -O https://releases.controlcore.io/docker/control-core-demo-app-012025.yml
+```
+
+**Step 2: Configure Environment**
+```bash
+# Create .env file
+cat > .env << EOF
+DATABASE_URL=postgresql://controlcore:your-password@localhost:5432/controlcore
+REDIS_URL=redis://localhost:6379
+SECRET_KEY=your-secret-key-here
+CONTROL_PLANE_URL=http://localhost:8000
+EOF
+```
+
+**Step 3: Start Services**
+```bash
+# Start Control Plane
+docker-compose -f control-core-control-plane-012025.yml up -d
+
+# Start Bouncer
+docker-compose -f control-core-bouncer-012025.yml up -d
+
+# Start Demo App (optional)
+docker-compose -f control-core-demo-app-012025.yml up -d
+```
+
+### 3. Kubernetes with YAML
+
+**Step 1: Download Kubernetes Manifests**
+```bash
+# Download Control Plane
+curl -O https://releases.controlcore.io/k8s/control-core-control-plane-012025.yaml
+
+# Download Bouncer
+curl -O https://releases.controlcore.io/k8s/control-core-bouncer-012025.yaml
+
+# Download Demo App (optional)
+curl -O https://releases.controlcore.io/k8s/control-core-demo-app-012025.yaml
+```
+
+**Step 2: Apply Manifests**
+```bash
+# Apply Control Plane
+kubectl apply -f control-core-control-plane-012025.yaml
+
+# Apply Bouncer
+kubectl apply -f control-core-bouncer-012025.yaml
+
+# Apply Demo App (optional)
+kubectl apply -f control-core-demo-app-012025.yaml
+```
+
+## Configuration
+
+### Control Plane Configuration
+
+**Environment Variables:**
+```bash
+# Database
+DATABASE_URL=postgresql://username:password@host:port/database
+
+# Redis
+REDIS_URL=redis://host:port
+
+# Security
+SECRET_KEY=your-secret-key-here
+JWT_SECRET_KEY=your-jwt-secret-key
+
+# OPAL
+OPAL_SERVER_URL=http://opal:7000
+OPAL_POLICY_REPO_URL=https://github.com/your-org/policies
+
+# Logging
+LOG_LEVEL=info
+```
+
+### Bouncer Configuration
+
+**Environment Variables:**
+```bash
+# Control Plane Connection
+CONTROL_PLANE_URL=http://control-plane:8000
+
+# OPA Configuration
+OPA_URL=http://localhost:8181
+
+# Logging
+LOG_LEVEL=info
+```
+
+### Demo App Configuration
+
+**Environment Variables:**
+```bash
+# API Connection
+REACT_APP_API_URL=http://localhost:8001
+REACT_APP_CONTROL_PLANE_URL=http://localhost:8000
+
+# Backend Configuration
+DATABASE_URL=postgresql://demo:demo123@postgres:5432/demo_app
+REDIS_URL=redis://redis:6379
+```
+
+## Verification
+
+### Health Checks
+
+After deployment, verify all components are healthy:
+
+```bash
+# Check Control Plane
+curl http://localhost:8000/health
+
+# Check Bouncer
+curl http://localhost:8080/health
+
+# Check Demo App
+curl http://localhost:3001/health
+```
+
+### Dashboard Access
+
+1. **Control Plane Dashboard**: http://localhost:8000
+2. **Demo App**: http://localhost:3001
+3. **API Documentation**: http://localhost:8000/docs
+
+## Security Considerations
+
+### Network Security
+
+- Use TLS/SSL for all external communications
+- Implement network policies to restrict traffic
+- Use private networks for internal communication
+
+### Authentication
+
+- Configure strong passwords for database and Redis
+- Use secure secret management (Kubernetes secrets, etc.)
+- Enable authentication for all services
+
+### Data Protection
+
+- Encrypt data at rest
+- Use secure backup strategies
+- Implement proper access controls
+
+## Monitoring
+
+### Health Monitoring
+
+Set up monitoring for:
+- Service availability
+- Resource usage (CPU, memory, disk)
+- Database performance
+- Network connectivity
+
+### Logging
+
+Configure centralized logging:
+- Application logs
+- System logs
+- Security logs
+- Performance metrics
+
+## Troubleshooting
+
+For common issues, see the [Troubleshooting Guide](/troubleshooting).
+
+## Support
+
+- **Documentation**: [https://docs.controlcore.io](https://docs.controlcore.io)
+- **Community**: [GitHub Discussions](https://github.com/controlcore/control-core/discussions)
+- **Support**: [support@controlcore.io](mailto:support@controlcore.io)

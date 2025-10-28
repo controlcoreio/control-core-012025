@@ -1,0 +1,167 @@
+{
+  "version": "1.0.0",
+  "summary": "Payments Canada oversight and Real-Time Rail (RTR) compliance for payment system participants",
+  "detailed_description": "This policy template enforces Payments Canada rules and Real-Time Rail (RTR) compliance requirements for Canadian payment system participants. Payments Canada operates Canada's clearing and settlement infrastructure including LVTS, ACSS, and the new RTR system. The policy enforces RTR participant requirements, payment finality and irrevocability, liquidity requirements for real-time payments, fraud controls for high-value payments, and bulk clearing file validation. Ensures financial institutions comply with Payments Canada by-laws and RTR operational rules while maintaining payment system integrity and stability.",
+  "use_cases": [
+    {
+      "title": "RBC: Real-Time Rail Launch as Founding Participant",
+      "description": "Deploy payments-canada-oversight for RTR system participation",
+      "scenario": "RBC joins Real-Time Rail as founding participant (launched 2022) enabling instant payments for 10M customers. Payments Canada requirements: (1) Minimum liquidity ($50M CAD in settlement account), (2) Real-time fraud monitoring, (3) Payment finality compliance (no reversals except errors), (4) System availability 99.95%+. Policy enforces: RTR payment blocked if settlement account balance < payment amount + buffer, fraud screening <2 seconds (within RTR 3-second total time limit), payment reversal prohibited unless authorized exception (error correction, fraud chargeback with documentation). Implementation: Real-time liquidity monitoring with automated funding from Bank of Canada account, ML-based fraud detection processing 10,000 payments/second with 99.7% accuracy (30 basis point false positive rate acceptable for instant payments), payment finality enforced in core banking (payment cannot be reversed by branch staff, requires fraud investigation team approval). Results: 500,000 RTR payments/day, 99.98% system availability, zero payment finality violations, fraud losses 0.003% (industry-leading), Payments Canada governance rating: Strong operational compliance. Customer experience: Instant payments within 3 seconds, better than Interac e-Transfer (30+ minute typical), adoption growing 15% monthly."
+    },
+    {
+      "title": "TD: RTR Liquidity Management and Risk Controls",
+      "description": "Implement payments-canada-oversight for payment system liquidity management",
+      "scenario": "TD manages liquidity for RTR (Real-Time Rail) participation ensuring sufficient funds to settle instant payments while minimizing idle cash (opportunity cost). Payments Canada requirement: Maintain sufficient liquidity to cover expected RTR payment volumes + 20% buffer. TD's approach: Dynamic liquidity forecasting using ML model predicting hourly RTR volume based on historical patterns, day-of-week effects, seasonality (month-end spikes), automated funding from Bank of Canada account when liquidity drops below threshold ($100M target balance, refill trigger at $75M), real-time liquidity dashboard for treasury team. Policy enforces: RTR payment submission blocked if current liquidity + incoming payments - pending outgoing < minimum threshold, escalation to treasury if multiple liquidity warnings in single day (may indicate forecasting model drift), weekly liquidity adequacy report to CFO. Statistics: Average RTR daily volume $800M (outgoing) + $750M (incoming) = net outflow $50M, peak day $2.1B outgoing (payroll Friday), minimum liquidity maintained $65M (never breached $50M critical threshold), funding events: 2-3 times/week from Bank of Canada, liquidity cost optimized (minimal idle cash). Payments Canada oversight: Strong liquidity management, no settlement failures, commended for sophisticated forecasting."
+    },
+    {
+      "title": "Scotiabank: High-Value Payment Fraud Controls for RTR",
+      "description": "Use payments-canada-oversight for real-time fraud prevention",
+      "scenario": "Scotiabank implements fraud controls for RTR payments balancing instant payments with fraud prevention within 3-second processing limit. Fraud challenge: Traditional fraud review (5-10 minutes) incompatible with instant payments, must decide ALLOW/DENY in <2 seconds. Policy approach: Risk-based automated fraud decisioning - Low risk (<$1,000, known recipient, typical pattern): Auto-approve (95% of volume), Medium risk ($1,000-$10,000, new recipient, moderate velocity): ML fraud score <0.7 = approve (4% of volume), High risk (>$10,000, suspicious pattern, high fraud score): Block and request customer verification (1% of volume). Fraud detection features: Account age, recipient relationship (previous successful payments), sending pattern (velocity checks), device fingerprinting, behavioral biometrics. Results: Fraud rate 0.008% for RTR (3x better than Interac e-Transfer 0.024%), customer friction minimal (99% auto-approved), false positives 0.1% (200 legit payments blocked daily from 200,000 volume, resolved via customer SMS verification within 2 minutes average). 2024 prevented fraud: $8.7M stopped (14,000 fraudulent payment attempts), recovery rate 92% for fraud losses. Payments Canada commendation: Excellent balance of fraud prevention and customer experience in real-time environment."
+    },
+    {
+      "title": "National Bank: ACSS Bulk Clearing File Validation",
+      "description": "Deploy payments-canada-oversight for Automated Clearing Settlement System compliance",
+      "scenario": "National Bank submits 50,000 ACSS transactions daily (direct deposits, pre-authorized debits, bill payments) via bulk clearing files. Payments Canada file validation requirements: File format compliance, transaction limits, duplicate detection, institution number validation, balanced file (total debits = credits). Policy enforces: Clearing file upload blocked if validation fails (format errors, unbalanced file, transaction exceeds limits), automated file format validation (pre-submission check), duplicate transaction detection across submissions, institution/transit number validation against Payments Canada directory, file size limits (max 1M transactions/file), submission deadline enforcement (12:00 PM PT daily cutoff). Validation error handling: Real-time feedback to payment operations team, automated retry for transient errors (network timeout), manual intervention for data errors (invalid transit number, unbalanced file). Statistics: 50,000 transactions/day in 5 bulk files, 99.7% first-submission success rate, 0.3% require correction and resubmission, zero missed deadlines in 2024, average submission time 11:30 AM (30-minute buffer before cutoff). Payments Canada: Zero file rejections in 2024, strong file quality and operational discipline."
+    },
+    {
+      "title": "Tangerine: Digital-Only Bank RTR Consumer Experience",
+      "description": "Apply payments-canada-oversight for consumer-friendly instant payments",
+      "scenario": "Tangerine (digital bank, no branches) implements RTR for customer-to-customer instant payments competing with Interac e-Transfer. Customer expectations: Instant payment (<10 seconds end-to-end), mobile-first experience, no complex forms. Policy balance: RTR 3-second limit + fraud controls + regulatory compliance. Implementation: Simplified payment flow (recipient email/phone, amount, 1-tap to send), fraud screening in parallel with payment processing (not sequential - saves time), risk-based authentication (trusted recipient = no MFA, new recipient = biometric confirmation), payment finality notification in-app (payment is final, cannot be reversed unless fraud). Customer experience metrics: 92% of payments complete in <5 seconds, 8% require additional verification (adds 30 seconds), customer satisfaction 94% (vs. 88% for Interac e-Transfer), adoption: 60% of Tangerine customers use RTR at least monthly (higher than industry average 40%). Fraud performance: 0.006% fraud rate (lower than industry 0.012%), achieved through ML fraud models + behavioral biometrics. Payments Canada + OSFI: Exemplary RTR implementation for digital bank, strong fraud controls without compromising customer experience, model for other digital-first financial institutions."
+    },
+    {
+      "title": "Meridian Credit Union: RTR Implementation for Credit Union Sector",
+      "description": "Implement payments-canada-oversight for credit union Central 1 indirect access",
+      "scenario": "Meridian (Ontario's largest credit union, 370K members) accesses RTR via Central 1 (credit union central providing shared infrastructure). Payments Canada model: Direct participants (Big banks) vs. Indirect participants (credit unions via centrals). Complexity: RTR payment from Meridian member → Meridian system → Central 1 → RTR system → receiving bank, settlement via Central 1 account. Policy considerations: Meridian must track liquidity contribution to Central 1 collective settlement account, fraud controls at Meridian level (can't rely solely on Central 1), payment finality notification to members, error handling when Central 1 or RTR unavailable. Implementation: Daily liquidity report from Central 1 showing Meridian's share of settlement obligations, local fraud controls (Meridian's ML model, not just Central 1's), graceful degradation (if Central 1 RTR unavailable, fallback to Interac e-Transfer with customer notification), member education (RTR is 'Instant Payment' feature in app). Results: 95% member satisfaction with instant payments, lower cost than building direct RTR access (Central 1 shared infrastructure), fraud rate 0.009%, zero settlement failures. Payments Canada: Successful indirect access model, demonstrates credit union sector can effectively participate in RTR with appropriate risk controls."
+    },
+    {
+      "title": "Desjardins: RTR Fraud Case Study - Business Email Compromise",
+      "description": "Use payments-canada-oversight for fraud prevention in instant payments",
+      "scenario": "Desjardins detects Business Email Compromise (BEC) fraud attempt via RTR: Fraudster compromises CFO email at Quebec manufacturing company, sends urgent payment request to accounting clerk for $250,000 RTR payment to 'supplier' (mule account). Fraud prevention challenge: RTR payment is instant and final (can't be reversed), must detect fraud before payment settles. Detection: (1) RTR payment to new recipient for large amount (never paid before), (2) Payment initiated from new IP address (fraudster's location, not company office), (3) Unusual time (sent at 11 PM, company typically transacts 9 AM-5 PM), (4) Velocity check: $250K is 10x larger than company's typical payments. Policy response: Automated DENY, payment blocked, call-back verification required (phone call to CFO at registered number, not email), fraudulent payment prevented. Company CFO notified: Email compromise confirmed, password reset, investigation revealed fraudster had email access for 3 days. Prevention value: $250,000 fraud loss prevented, customer relationship maintained (grateful for fraud prevention), learnings shared with other Desjardins business clients. FINTRAC/Payments Canada: Excellent real-time fraud prevention, demonstrates risk-based controls can be effective in instant payment environment."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Payment system action",
+      "required": true,
+      "example_values": [
+        "join_real_time_rail",
+        "send_rtr_payment",
+        "submit_clearing_file"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Payment resource type",
+      "required": true,
+      "example_values": [
+        "payment_system_membership",
+        "real_time_payment",
+        "clearing_batch"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.available_liquidity_cad",
+      "type": "number",
+      "description": "Available settlement liquidity",
+      "required": true,
+      "example_values": [
+        1000000,
+        5000000,
+        100000000
+      ],
+      "example_value": "1"
+    },
+    {
+      "name": "context.payment_amount_cad",
+      "type": "number",
+      "description": "Payment amount",
+      "required": true,
+      "example_values": [
+        100,
+        5000,
+        250000
+      ],
+      "example_value": "1"
+    },
+    {
+      "name": "context.fraud_score",
+      "type": "number",
+      "description": "Fraud risk score 0-1",
+      "required": true,
+      "example_values": [
+        0.1,
+        0.5,
+        0.9
+      ],
+      "example_value": "5"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Real-Time Rail Connection",
+      "Liquidity Management System",
+      "Fraud Detection Platform",
+      "Payment Processing Core"
+    ],
+    "complexity_score": "Critical - Real-time payment processing with sub-second fraud decisioning"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Apply for Payments Canada RTR participation",
+      "Configure liquidity management",
+      "Implement real-time fraud controls",
+      "Test payment finality enforcement"
+    ],
+    "sandbox_testing": [
+      "Test RTR payment with sufficient liquidity → ALLOW",
+      "Test RTR payment exceeding liquidity → DENY",
+      "Test high fraud score payment → DENY"
+    ],
+    "production_deployment": [
+      "Phased launch: employees first, then select customers, then all customers",
+      "Monitor fraud rates and liquidity",
+      "Customer education on payment finality"
+    ],
+    "monitoring_setup": [
+      "Real-time liquidity monitoring",
+      "Fraud detection performance metrics",
+      "Payment success rates",
+      "Customer satisfaction tracking"
+    ]
+  },
+  "compliance_frameworks": [
+    "Payments Canada By-Law No. 3",
+    "Payments Canada RTR Rules",
+    "OSFI E-21",
+    "FINTRAC"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "payments-canada",
+    "real-time-rail",
+    "rtr",
+    "instant-payments",
+    "fraud-prevention",
+    "liquidity"
+  ],
+  "related_templates": [
+    "osfi-e21-operational-risk",
+    "fintrac-aml-monitoring",
+    "api-rate-limiting-throttling"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 7,
+    "user_attributes": 0,
+    "resource_attributes": 2,
+    "context_attributes": 5
+  },
+  "integration_guide": {
+    "overview": "Integrate with Payments Canada RTR system, liquidity management, and fraud detection platforms",
+    "steps_by_system": []
+  }
+}

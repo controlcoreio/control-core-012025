@@ -1,0 +1,245 @@
+
+/* Import Inter from Google Fonts for enterprise crispness */
+@import url('https://fonts.googleapis.com/css2?family=72:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* SAP Fiori Enterprise Color Palette */
+    --background: 0 0% 98%; /* SAP Shell Background - Softer white */
+    --foreground: 210 22% 22%; /* SAP Text Color - Darker for better contrast */
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 22% 22%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 22% 22%;
+
+    /* SAP Corporate Blue as Primary */
+    --primary: 210 100% 46%; /* SAP Corporate Blue #0054b4 */
+    --primary-foreground: 0 0% 100%;
+
+    /* SAP Teal as Secondary for enterprise feel */
+    --secondary: 174 100% 29%; /* SAP Teal #009688 */
+    --secondary-foreground: 0 0% 100%;
+
+    /* SAP Neutral Gray */
+    --muted: 210 17% 96%; /* SAP Light Background */
+    --muted-foreground: 210 17% 40%;
+
+    /* SAP Teal for Accent */
+    --accent: 174 100% 29%;
+    --accent-foreground: 0 0% 100%;
+
+    /* SAP Error Red */
+    --destructive: 0 84% 55%; /* SAP Error Red #d32f2f */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 17% 88%; /* SAP Border Color */
+    --input: 210 17% 94%;
+    --ring: 210 100% 46%; /* SAP Corporate Blue */
+
+    /* Light mode sidebar colors */
+    --sidebar-background: 0 0% 100%; /* White background for light mode */
+    --sidebar-foreground: 210 22% 22%; /* Dark text for light mode */
+    --sidebar-primary: 210 100% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 17% 94%; /* Light gray accent for light mode */
+    --sidebar-accent-foreground: 210 22% 22%; /* Dark text on light accent */
+    --sidebar-border: 210 17% 88%; /* Light border */
+    --sidebar-ring: 210 100% 46%;
+
+    --radius: 0.25rem; /* SAP uses smaller radius */
+  }
+
+  .dark {
+    /* SAP Quartz Dark Theme - Enterprise focused */
+    --background: 210 24% 8%; /* SAP Dark Background - Darker for enterprise */
+    --foreground: 0 0% 92%; /* Slightly less bright for better readability */
+
+    --card: 210 24% 10%;
+    --card-foreground: 0 0% 92%;
+
+    --popover: 210 24% 10%;
+    --popover-foreground: 0 0% 92%;
+
+    --primary: 210 100% 58%; /* Lighter SAP Blue for dark mode */
+    --primary-foreground: 210 24% 8%;
+
+    --secondary: 174 100% 35%; /* Lighter SAP Teal for dark mode */
+    --secondary-foreground: 210 24% 8%;
+
+    --muted: 210 24% 14%;
+    --muted-foreground: 210 17% 65%; /* Increased brightness for better readability */
+
+    --accent: 174 100% 35%;
+    --accent-foreground: 210 24% 8%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 210 24% 8%;
+
+    --border: 210 24% 18%;
+    --input: 210 24% 14%;
+    --ring: 210 100% 58%;
+
+    /* Dark sidebar */
+    --sidebar-background: 210 24% 6%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 210 100% 58%;
+    --sidebar-primary-foreground: 210 24% 6%;
+    --sidebar-accent: 210 24% 14%;
+    --sidebar-accent-foreground: 0 0% 92%;
+    --sidebar-border: 210 24% 14%;
+    --sidebar-ring: 210 100% 58%;
+  }
+
+  html {
+    font-family: '72', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-size: 14px; /* SAP uses 14px base font size */
+    font-weight: 400;
+    letter-spacing: 0.0125em; /* SAP letter spacing */
+    line-height: 1.5; /* SAP line height */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: inherit;
+    font-size: 0.9rem; /* Slightly larger base font */
+  }
+
+  .dark body {
+    font-size: 0.95rem; /* Even larger for dark mode */
+    font-weight: 450; /* Slightly heavier font weight for dark mode */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: '72', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.0125em;
+    margin-bottom: 0.5rem;
+  }
+
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    font-weight: 650; /* Slightly heavier headings in dark mode */
+  }
+
+  h1 { font-size: 2rem; line-height: 1.25; } /* SAP Title 1 */
+  h2 { font-size: 1.5rem; line-height: 1.33; } /* SAP Title 2 */
+  h3 { font-size: 1.25rem; line-height: 1.4; } /* SAP Title 3 */
+  h4 { font-size: 1.125rem; line-height: 1.44; } /* SAP Title 4 */
+  h5 { font-size: 1rem; line-height: 1.5; } /* SAP Title 5 */
+  h6 { font-size: 0.875rem; line-height: 1.57; } /* SAP Title 6 */
+
+  .dark h1 { font-size: 2.125rem; } /* Slightly larger in dark mode */
+  .dark h2 { font-size: 1.625rem; }
+  .dark h3 { font-size: 1.375rem; }
+  .dark h4 { font-size: 1.25rem; }
+  .dark h5 { font-size: 1.125rem; }
+  .dark h6 { font-size: 1rem; }
+}
+
+/* SAP Fiori Enterprise utilities */
+@layer components {
+  .sap-card {
+    @apply bg-card border border-border rounded-sm shadow-sm;
+    box-shadow: 0 0 0.125rem rgba(0, 0, 0, 0.12), 0 0.125rem 0.25rem rgba(0, 0, 0, 0.12);
+  }
+
+  .sap-button-emphasized {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 font-medium;
+    border-radius: 0.25rem;
+    padding: 0.5rem 1rem;
+    min-height: 2.75rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.15);
+  }
+
+  .sap-button-standard {
+    @apply bg-background border border-border text-foreground hover:bg-muted font-medium;
+    border-radius: 0.25rem;
+    padding: 0.5rem 1rem;
+    min-height: 2.75rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.08);
+  }
+
+  .sap-input {
+    @apply bg-background border border-border text-foreground placeholder:text-muted-foreground;
+    border-radius: 0.25rem;
+    padding: 0.75rem 1rem;
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+  }
+
+  .dark .sap-input {
+    font-size: 0.9rem; /* Slightly larger input text in dark mode */
+  }
+
+  .sap-table {
+    @apply bg-card border border-border;
+    border-radius: 0.25rem;
+  }
+
+  .sap-table-header {
+    @apply bg-muted border-b border-border font-medium text-sm;
+    padding: 0.75rem 1rem;
+  }
+
+  .sap-table-cell {
+    @apply border-b border-border text-sm;
+    padding: 0.75rem 1rem;
+  }
+
+  .dark .sap-table-header {
+    font-size: 0.875rem;
+  }
+
+  .dark .sap-table-cell {
+    font-size: 0.875rem;
+  }
+
+  .sap-badge {
+    @apply inline-flex items-center justify-center rounded-full text-xs font-medium;
+    padding: 0.25rem 0.5rem;
+    min-height: 1.5rem;
+  }
+
+  .dark .sap-badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .sap-badge-success {
+    @apply bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800;
+  }
+
+  .sap-badge-warning {
+    @apply bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800;
+  }
+
+  .sap-badge-error {
+    @apply bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800;
+  }
+
+  .sap-badge-info {
+    @apply bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800;
+  }
+
+  .sap-badge-neutral {
+    @apply bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800;
+  }
+}
+
+::selection {
+  @apply bg-primary/20 text-primary;
+}

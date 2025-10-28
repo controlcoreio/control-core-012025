@@ -1,0 +1,603 @@
+{
+  "version": "1.0.0",
+  "summary": "AI Bias Detection Policy NIST Framework-based bias detection and mitigation Default allow with bias monitoring",
+  "detailed_description": "This policy template implements Ai Bias Detection controls for Ai Risk Management. It provides comprehensive authorization and governance capabilities with real-time policy evaluation. \n\nThe policy evaluates 10 different conditions including user attributes, resource properties, and contextual information. Policy decisions are made dynamically based on the current state of the system, user context, and resource characteristics. \n\nKey capabilities:\n- Real-time authorization decisions with sub-millisecond evaluation\n- Comprehensive audit logging for all policy evaluations\n- Dynamic context enrichment from multiple data sources\n- Fine-grained attribute-based access control (ABAC)\n- Support for both allow and deny rules with conflict resolution\n\n\nThis template is designed to be deployed in Control Core's policy engine and can be customized to meet your specific requirements. It follows best practices for policy authoring and includes comprehensive error handling.",
+  "use_cases": [
+    {
+      "title": "Financial Services: AI-Powered Fraud Detection System",
+      "description": "Deploy ai-bias-detection.meta for a production fraud detection AI model",
+      "scenario": "Global Bank deploys an AI fraud detection model processing 10M daily transactions. Auditor requirement: demonstrate model approval process, training data governance, and bias testing before production deployment. Policy enforces: (1) Risk assessment by Chief AI Officer, (2) Validation by independent team showing <2% false positive rate, (3) Monthly bias audits on protected classes, (4) Automated rollback if accuracy drops below 95%. Compliance: Federal Reserve SR 11-7 (Model Risk Management)."
+    },
+    {
+      "title": "Healthcare: Clinical Decision Support AI with HIPAA Requirements",
+      "description": "Apply ai-bias-detection.meta to protect patient data in AI diagnostic systems",
+      "scenario": "Hospital network implements AI radiology assistant analyzing 5,000 X-rays daily. Auditor verification needed: (1) All 47 radiologists have signed AI use agreements, (2) System logs every AI recommendation with radiologist override capability, (3) PHI access restricted to treating physicians only, (4) AI outputs reviewed by second physician for high-stakes diagnoses. Policy blocks: AI access outside treating relationship, automated AI decisions without physician review. HIPAA audit trail maintained for 6 years."
+    },
+    {
+      "title": "Retail: Customer Service AI with PII Protection",
+      "description": "Implement ai-bias-detection.meta for AI chatbot handling customer data",
+      "scenario": "E-commerce platform's AI chatbot handles 50,000 daily customer interactions across EU and California. Compliance requirement: Demonstrate GDPR Article 22 (right to object to automated decisions) and CCPA compliance. Policy enforces: (1) Customer PII (SSN, payment details) masked in AI training data, (2) Chatbot unable to make purchase decisions >$500 without human, (3) EU customers can request human agent immediately, (4) All AI interactions logged with 'automated decision' flag. Reduced compliance violations from 12/month to zero."
+    },
+    {
+      "title": "Insurance: Automated Underwriting with Fairness Requirements",
+      "description": "Use ai-bias-detection.meta to ensure fair AI-driven insurance decisions",
+      "scenario": "Insurance carrier uses AI to evaluate 15,000 policy applications monthly. State regulator audit focuses on: (1) Proving AI doesn't discriminate on race, gender (protected classes), (2) Demonstrating explainability for all denials, (3) Human review for borderline cases. Policy requires: Bias testing quarterly across 50+ demographic segments, explainability scores >0.7, senior underwriter review when AI confidence <85%. Result: Zero discrimination findings in regulatory exam, 23% faster application processing."
+    },
+    {
+      "title": "Manufacturing: Predictive Maintenance AI with Safety Controls",
+      "description": "Deploy ai-bias-detection.meta for safety-critical industrial AI systems",
+      "scenario": "Auto manufacturer uses AI to predict equipment failures affecting 1,200 assembly robots. Safety audit requirements: (1) Prove AI trained only on verified sensor data, (2) Human override always available, (3) False negatives (missed failures) tracked and investigated, (4) AI recommendations reviewed by maintenance engineers before critical shutdowns. Policy enforces: 2-person approval for shutdowns affecting >50 workers, AI confidence thresholds before automated actions, incident tracking for all prediction failures."
+    },
+    {
+      "title": "Government: AI in Public Services with Transparency Requirements",
+      "description": "Apply ai-bias-detection.meta for government AI systems requiring public accountability",
+      "scenario": "City government deploys AI for permit application processing (5,000/month). Public accountability requirements: (1) AI decision criteria published publicly, (2) Citizens can request human review within 5 business days, (3) Bias audits by independent third party annually, (4) Algorithmic Impact Assessment published. Policy ensures: All denials include explanation in plain language, applicant notification of AI use, appeals tracked with resolution times, bias metrics published quarterly."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "decision.affects_protected_class",
+      "type": "string",
+      "description": "The 'decision.affects_protected_class' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'decision.affects_protected_class' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'decision.affects_protected_class' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'decision.affects_protected_class':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'decision.affects_protected_class' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "decision.risk_level",
+      "type": "integer",
+      "description": "The 'decision.risk_level' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'decision.risk_level' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'decision.risk_level' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'decision.risk_level':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'decision.risk_level' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "5"
+    },
+    {
+      "name": "model.bias_metrics.demographic_parity",
+      "type": "string",
+      "description": "The 'model.bias_metrics.demographic_parity' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.bias_metrics.demographic_parity' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.bias_metrics.demographic_parity' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.bias_metrics.demographic_parity':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.bias_metrics.demographic_parity' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "model.bias_metrics.disparate_impact",
+      "type": "string",
+      "description": "The 'model.bias_metrics.disparate_impact' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.bias_metrics.disparate_impact' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.bias_metrics.disparate_impact' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.bias_metrics.disparate_impact':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.bias_metrics.disparate_impact' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "model.bias_metrics.statistical_parity",
+      "type": "string",
+      "description": "The 'model.bias_metrics.statistical_parity' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.bias_metrics.statistical_parity' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.bias_metrics.statistical_parity' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.bias_metrics.statistical_parity':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.bias_metrics.statistical_parity' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "model.bias_mitigation_applied",
+      "type": "string",
+      "description": "The 'model.bias_mitigation_applied' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.bias_mitigation_applied' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.bias_mitigation_applied' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.bias_mitigation_applied':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.bias_mitigation_applied' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "model.bias_monitoring_enabled",
+      "type": "boolean",
+      "description": "The 'model.bias_monitoring_enabled' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.bias_monitoring_enabled' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.bias_monitoring_enabled' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.bias_monitoring_enabled':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.bias_monitoring_enabled' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "model.bias_testing_complete",
+      "type": "string",
+      "description": "The 'model.bias_testing_complete' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.bias_testing_complete' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.bias_testing_complete' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.bias_testing_complete':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.bias_testing_complete' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "model.deployment_status",
+      "type": "string",
+      "description": "The 'model.deployment_status' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.deployment_status' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.deployment_status' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.deployment_status':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.deployment_status' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "active"
+    },
+    {
+      "name": "model.risk_level",
+      "type": "integer",
+      "description": "The 'model.risk_level' attribute is evaluated at runtime to make policy decisions. This condition is checked against incoming request data to determine authorization.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'model.risk_level' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'model.risk_level' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'model.risk_level':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'model.risk_level' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "5"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "data_sources": [
+        {
+          "condition": "input.decision.affects_protected_class",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "decision.affects_protected_class",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.decision.risk_level",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "decision.risk_level",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.bias_metrics.demographic_parity",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.bias_metrics.demographic_parity",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.bias_metrics.disparate_impact",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.bias_metrics.disparate_impact",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.bias_metrics.statistical_parity",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.bias_metrics.statistical_parity",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.bias_mitigation_applied",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.bias_mitigation_applied",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.bias_monitoring_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.bias_monitoring_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.bias_testing_complete",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.bias_testing_complete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.deployment_status",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.deployment_status",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.model.risk_level",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "model.risk_level",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ]
+    },
+    "systems_needed": [
+      "Custom data source"
+    ],
+    "complexity_score": "Medium - Moderate complexity requiring multiple integrations"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Review policy requirements and ensure all prerequisites are met",
+      "2. Configure data sources and integrations in Control Core",
+      "3. Map required attributes (10 conditions identified) to your data sources",
+      "4. Deploy policy to Sandbox environment using Control Core Admin UI",
+      "5. Configure test users, resources, and scenarios in Sandbox",
+      "6. Run comprehensive tests with various authorization scenarios",
+      "7. Monitor policy evaluation logs and adjust conditions as needed",
+      "8. Validate audit logging and compliance reporting",
+      "9. Conduct user acceptance testing with stakeholders",
+      "10. Promote to Production with gradual rollout (shadow mode, then enforcement)",
+      "11. Set up monitoring alerts for policy violations and errors",
+      "12. Document policy configuration and operational procedures"
+    ],
+    "sandbox_testing": [
+      "🧪 Deploy to Sandbox environment first:",
+      "   1. Create test users with various attribute combinations",
+      "   2. Set up test resources with different classifications",
+      "   3. Run test scenarios:",
+      "   4. Verify audit logs capture all evaluations",
+      "   5. Check performance (policy evaluation < 100ms)",
+      "   6. Test error handling (missing attributes, null values)"
+    ],
+    "configuration_tips": [
+      "Start with permissive policies and gradually tighten restrictions",
+      "Use policy versioning to track changes and enable rollbacks",
+      "Implement comprehensive logging before enforcement",
+      "Test in shadow mode to observe behavior without blocking access",
+      "Document all customizations and environment-specific settings",
+      "Set up monitoring dashboards for policy metrics",
+      "Create runbooks for common policy-related incidents",
+      "Establish a policy review and update schedule"
+    ],
+    "production_deployment": [
+      "🚀 Production deployment checklist:",
+      "   1. ✅ All sandbox tests passing",
+      "   2. ✅ Stakeholder approval documented",
+      "   3. ✅ Rollback plan prepared",
+      "   4. ✅ Deploy in shadow mode (log only, don't enforce) for 24-48 hours",
+      "   5. ✅ Review shadow mode logs for unexpected denials",
+      "   6. ✅ Adjust policy based on real traffic patterns",
+      "   7. ✅ Enable enforcement mode with gradual rollout (10% → 50% → 100%)",
+      "   8. ✅ Monitor error rates and user feedback",
+      "   9. ✅ Document deployment for compliance audit trail"
+    ],
+    "troubleshooting": [
+      "Check Control Core logs if policy evaluation fails",
+      "Verify all required attributes are available in request context",
+      "Ensure data source integrations are healthy and responsive",
+      "Review audit logs to understand policy decisions",
+      "Use Control Core's policy testing tools to debug conditions",
+      "Check for network connectivity issues between PEP and PDP",
+      "Verify policy syntax and structure using validator",
+      "Contact Control Core support for persistent issues"
+    ],
+    "prerequisites": [
+      "✅ Inventory all systems needed for 10 conditions in this policy",
+      "✅ Verify API access and credentials for each system",
+      "✅ Test API endpoints return expected data format",
+      "✅ Document field mappings between your systems and policy conditions",
+      "✅ Ensure network connectivity from Control Core to all data sources"
+    ],
+    "data_source_configuration": [
+      "\n📦 Data Sources:",
+      "   • Configure Custom data source integration for 'input.decision.affects_protected_class'",
+      "     - API: REST API endpoint",
+      "     - Field: decision.affects_protected_class",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.decision.risk_level'",
+      "     - API: REST API endpoint",
+      "     - Field: decision.risk_level",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.model.bias_metrics.demographic_parity'",
+      "     - API: REST API endpoint",
+      "     - Field: model.bias_metrics.demographic_parity",
+      "     - Method: REST API"
+    ],
+    "policy_customization": [
+      "🔧 Review and customize the following conditions for your environment:",
+      "",
+      "📝 Modification guidelines:",
+      "   • Update attribute names to match your system's field names",
+      "   • Adjust threshold values (e.g., risk scores, time windows)",
+      "   • Add/remove conditions based on your requirements",
+      "   • Test each condition individually before combining",
+      "",
+      "💾 Save modified policy with version tag for tracking"
+    ],
+    "monitoring_setup": [
+      "📊 Set up monitoring and alerts:",
+      "   • Policy evaluation count (baseline: track for 1 week)",
+      "   • Denial rate (alert if > 5% of requests)",
+      "   • Evaluation latency (alert if > 200ms p95)",
+      "   • Missing attribute errors (alert on any occurrence)",
+      "   • Condition-specific metrics:",
+      "     1. Monitor 'input.decision.affects_protected_class' - track null/missing values",
+      "     2. Monitor 'input.decision.risk_level' - track null/missing values",
+      "     3. Monitor 'input.model.bias_metrics.demographic_parity' - track null/missing values",
+      "     4. Monitor 'input.model.bias_metrics.disparate_impact' - track null/missing values",
+      "     5. Monitor 'input.model.bias_metrics.statistical_parity' - track null/missing values"
+    ]
+  },
+  "compliance_frameworks": [
+    "ISO 27001",
+    "SOC 2 Type II"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "ai-risk-management",
+    "bias",
+    "detection",
+    "audit-logging",
+    "monitoring"
+  ],
+  "related_templates": [
+    "ai-model-monitoring-drift-detection",
+    "prompt-injection-prevention",
+    "ai-agent-authorization",
+    "ai-bias-detection-mitigation"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 10,
+    "user_attributes": 0,
+    "resource_attributes": 0,
+    "context_attributes": 0
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technical stack to fetch the required attributes.",
+    "steps_by_system": [
+      {
+        "system": "Custom data source",
+        "attributes_needed": [
+          "input.decision.affects_protected_class",
+          "input.decision.risk_level",
+          "input.model.bias_metrics.demographic_parity",
+          "input.model.bias_metrics.disparate_impact",
+          "input.model.bias_metrics.statistical_parity",
+          "input.model.bias_mitigation_applied",
+          "input.model.bias_monitoring_enabled",
+          "input.model.bias_testing_complete",
+          "input.model.deployment_status",
+          "input.model.risk_level"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Custom data source",
+          "2. Test API access: REST API endpoint",
+          "3. In Control Core: Settings → Integrations → Add Custom data source",
+          "4. Configure field mappings for 10 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: decision.affects_protected_class, decision.risk_level, model.bias_metrics.demographic_parity"
+      }
+    ]
+  }
+}

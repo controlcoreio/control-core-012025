@@ -1,0 +1,159 @@
+{
+  "version": "1.0.0",
+  "summary": "Canadian Open Banking consumer consent framework for financial data sharing with fintechs and third parties",
+  "detailed_description": "This policy template implements consumer consent requirements for Canada's emerging Open Banking framework (Consumer-Driven Finance). Following UK and EU models, Canadian Open Banking enables consumers to share banking data with accredited third parties (fintechs) via secure APIs. The policy enforces explicit consent requirements, consent scope limitations, consent expiry and renewal, third-party accreditation verification, and consumer right to revoke consent. Aligns with Finance Canada's Open Banking implementation plan, FCAC (Financial Consumer Agency of Canada) consumer protection guidance, and PIPEDA consent principles for financial data sharing.",
+  "use_cases": [
+    {
+      "title": "RBC: Open Banking API Launch with Fintech Partners",
+      "description": "Deploy open-banking-consumer-consent for Canada's first Open Banking implementations",
+      "scenario": "RBC launches Open Banking APIs enabling customers to share data with accredited fintechs (Wealthsimple, Borrowell, Plaid). Finance Canada requirements: (1) Explicit consumer consent with clear purpose, (2) Data minimization (only share what's needed), (3) Consent expiry (max 12 months), (4) Easy revocation, (5) Third-party accreditation. Policy enforces: Customer must actively consent (no pre-checked boxes), consent screen explains what data shared and why (plain language required), scope selection (customer chooses: account balances only, transactions 90 days, or full history), consent expires after 12 months (auto-revocation with customer notification 30 days prior), revocation available in RBC app (1-tap), fintech accreditation verified via Open Banking registry before API access granted. Implementation stats: 150K RBC customers consented to Open Banking (2% of digital users), most popular use case: Borrowell free credit score (75K users), average consent scope: balances + 90-day transactions (customers understand data minimization), revocation rate: 15% after 90 days (customers achieved purpose - Borrowell score obtained, consent no longer needed). Customer protection: Zero unauthorized data sharing, customer education on Open Banking (FAQ, videos), trust building (customer control emphasized). Regulatory review (FCAC + OSFI): Strong consent practices protecting consumer interests, model Open Banking implementation."
+    },
+    {
+      "title": "TD: Open Banking Consent Scope Management",
+      "description": "Implement open-banking-consumer-consent for granular data sharing controls",
+      "scenario": "TD implements consent scope limitations enabling customers to precisely control what fintechs can access. Scope levels: (1) Read-only account balances (useful for budgeting apps like Mint), (2) Transaction history 90 days (credit score services like Borrowell), (3) Transaction history 12 months (lending decisioning like Flinks), (4) Full account details including payee list (account switching services). Policy enforces: Fintech API requests must specify required scope in OAuth consent screen, customer approves specific scope (cannot be broader than fintech requested), API endpoints return only consented data (attempting to access out-of-scope data returns 403 Forbidden), scope cannot be expanded without new consent (fintech wanting more data must re-request consent with explanation). Customer experience: Consent screen shows 'Budgeting App wants to see: Account balances only' (clear, specific), comparison to app permissions on phone (familiar mental model), warnings for sensitive scopes ('This app will see all your transactions including who you pay'). Statistics: 85% of consents are narrow scope (balances or 90-day history), 15% grant full access (account switching use case justifies), zero scope violations detected (fintechs comply with approved scope - API enforcement effective). Customer trust: Granular control increases willingness to use Open Banking (survey: 68% more likely to consent with scope options vs. all-or-nothing), revocation rate lower for narrow scopes (customers comfortable with limited sharing). FCAC: Excellent consent scope implementation protecting consumer privacy while enabling innovation."
+    },
+    {
+      "title": "Scotiabank: Third-Party Fintech Accreditation Verification",
+      "description": "Use open-banking-consumer-consent for Open Banking registry integration",
+      "scenario": "Scotiabank verifies fintech accreditation before granting Open Banking API access using Open Banking Canada registry (operated by accreditation body). Accreditation requirements for fintechs: (1) Security standards certification (penetration testing, secure development), (2) Privacy compliance (Privacy Officer, PIPEDA compliance program), (3) Financial viability (capitalization requirements), (4) Consumer complaint handling, (5) Insurance/liability coverage. Policy enforces: API access request from fintech triggers registry lookup, accreditation status must be 'Active' (not Suspended/Revoked/Expired), accreditation expiry date checked (must be >30 days remaining), re-verification monthly (detect if fintech loses accreditation after initial grant), automatic API key suspension if accreditation revoked, customer notification if fintech accreditation issues detected ('You may want to revoke consent'). 2024 statistics: 250 fintechs in Open Banking registry, 85 have requested Scotiabank API access, 78 approved (active accreditation), 7 denied (suspended accreditation, expired certification, failed security review), 2 fintechs had accreditation revoked during year (API access immediately suspended, 15K affected customers notified, consent auto-revoked). Customer protection value: Automated accreditation verification ensures only trustworthy fintechs access customer data, rapid response when fintech becomes unaccredited, zero incidents of unaccredited fintech accessing Scotiabank APIs. Regulatory: Finance Canada commended for robust accreditation enforcement, zero consumer harm from fintech data breaches."
+    },
+    {
+      "title": "BMO: Open Banking Consent Revocation and Data Deletion",
+      "description": "Deploy open-banking-consumer-consent for consumer right to revoke and delete",
+      "scenario": "BMO implements consent revocation with data deletion enforcement per PIPEDA principles. Customer rights: (1) Revoke consent anytime (immediate effect), (2) Request deletion of shared data from fintech, (3) Transparency on what data fintech still has. Policy enforces: Consent revocation in BMO app revokes API access immediately (fintech API key invalidated within 60 seconds), BMO notifies fintech of revocation via webhook (standard Open Banking API), fintech has 30 days to delete customer data (Open Banking rule, not PIPEDA general 'reasonable time' - stricter for financial data), BMO requests deletion confirmation from fintech, customer can verify deletion (BMO dashboard shows 'Data deletion confirmed' after fintech confirms). Implementation: Consent management dashboard in BMO app showing all active consents (fintech name, data shared, grant date), 1-tap revocation with confirmation, deletion tracking (status: Revoked, Deletion Requested, Deletion Confirmed), webhook-based notification to fintechs (standard Open Banking Infrastructure). Revocation statistics: 15% of customers revoke consent after achieving purpose (e.g., obtained credit score, no longer need sharing), average time-to-deletion-confirmation: 8 days (fintechs generally respond quickly), 2 fintechs didn't confirm deletion within 30 days (BMO escalated to Open Banking Canada governance body, resolved). Customer satisfaction: 92% satisfied with revocation process (easy to find, instant effect), transparency valued (can see exactly what was shared and when deleted). FCAC: Strong implementation of consumer data rights, exceeds minimum requirements."
+    },
+    {
+      "title": "Questrade: Open Banking for Investment Account Aggregation",
+      "description": "Implement open-banking-consumer-consent for multi-account investment views",
+      "scenario": "Questrade develops account aggregation feature enabling customers to view external investment accounts (RBC, TD, Scotiabank) alongside Questrade holdings for complete portfolio picture. Open Banking API usage: Read-only access to account balances + holdings + performance (no trading capability through aggregation). Consent implementation: Customer selects which external accounts to link (can link 1, 2, or all), separate consent for each bank (customer may trust Questrade with RBC data but not TD - allows granular choice), consent renewal annually with email reminder, data refresh frequency disclosed (daily for balances, weekly for performance - managing customer expectations). Customer experience: Streamlined linking flow (OAuth redirect to bank, approve consent, redirect back to Questrade - <60 seconds), aggregated view shows total portfolio value across all institutions (valuable for high-net-worth clients with multiple accounts), performance tracking across accounts (identifies underperforming investments). Statistics: 45K customers use account aggregation (15% of base), average 2.3 external accounts linked per user, renewal rate 82% after first year (high value feature, customers renew consent), zero security incidents (data never stored by Questrade, always fetched real-time from banks via API). Competitive impact: Account aggregation differentiates Questrade vs. bank-owned brokerages (RBC Direct Investing can't show TD accounts), supports Questrade's 'comprehensive wealth view' value proposition. Regulatory (IIROC + OSC): Appropriate use of Open Banking for customer benefit, strong consent and security practices."
+    },
+    {
+      "title": "Borrowell: Fintech Open Banking Data Access Compliance",
+      "description": "Use open-banking-consumer-consent from fintech perspective requesting data access",
+      "scenario": "Borrowell (credit score and lending fintech, 3M Canadian users) requests Open Banking access to customer bank accounts at RBC, TD, Scotiabank. Use case: Free credit score requires verification of bank account ownership for identity confirmation + credit builder loan eligibility (analyzes income deposits, expense patterns). Consent flow: Customer in Borrowell app clicks 'Link Bank Account', redirected to bank's Open Banking consent screen (Borrowell requests: account balances + transaction history 90 days), customer approves at bank, redirected to Borrowell with access token. Data minimization: Borrowell only requests data needed for credit score (doesn't request full history unless customer applies for credit builder loan), consent purpose clearly explained ('Verify your bank account for identity and analyze cash flow'). Data handling: Transactions analyzed to identify income deposits (employment, government benefits), expense categorization (rent, utilities - payment behavior proxy), data retained 90 days then deleted (unless customer has active loan), customer can view what Borrowell sees (transaction list in app settings - transparency). Compliance: 2.8M customers consented (93% of Borrowell users), consent renewal rate 85% (annual re-consent required), data deletion: 100% compliance with 90-day retention, zero data breaches. Customer complaints: 150 complaints about data sharing (all related to customer not understanding consent - resolved with education), zero complaints about unauthorized data use. FCAC monitoring: Borrowell's consent practices reviewed in sample of fintechs, rated as strong consumer protection with good transparency, recommended as fintech best practice example."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Data sharing action",
+      "required": true,
+      "example_values": [
+        "share_financial_data",
+        "access_customer_data",
+        "grant_api_access"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Data resource type",
+      "required": true,
+      "example_values": [
+        "customer_banking_data",
+        "banking_data",
+        "banking_api"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.customer_consent_obtained",
+      "type": "boolean",
+      "description": "Customer consent status",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.consent_expired",
+      "type": "boolean",
+      "description": "Whether consent has expired",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.accreditation_verified",
+      "type": "boolean",
+      "description": "Fintech accreditation verified",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Open Banking API Platform",
+      "Consent Management System",
+      "Accreditation Registry",
+      "Customer Authentication (OAuth 2.0)"
+    ],
+    "complexity_score": "High - Open Banking infrastructure with consent orchestration"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Implement Open Banking APIs (FDX or UK standard)",
+      "Build consent management UI",
+      "Integrate accreditation registry",
+      "Configure OAuth 2.0 flows"
+    ],
+    "sandbox_testing": [
+      "Test consent grant → API access enabled",
+      "Test consent revoke → API access disabled immediately",
+      "Test unaccredited fintech request → DENY"
+    ],
+    "production_deployment": [
+      "Phased launch: internal testing, beta customers, general availability",
+      "Monitor consent grant/revoke patterns",
+      "Track API usage by fintech"
+    ],
+    "monitoring_setup": [
+      "Consent grant/revoke rates",
+      "API access violations (scope exceeded)",
+      "Accreditation status checks",
+      "Customer complaints tracking"
+    ]
+  },
+  "compliance_frameworks": [
+    "Finance Canada Open Banking",
+    "FCAC Consumer Protection",
+    "PIPEDA",
+    "OSFI B-13"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "open-banking",
+    "consumer-consent",
+    "fintech",
+    "api-security",
+    "data-sharing",
+    "pipeda"
+  ],
+  "related_templates": [
+    "pipeda-consent-principles",
+    "api-authentication-oauth2",
+    "canadian-data-residency"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 7,
+    "user_attributes": 0,
+    "resource_attributes": 2,
+    "context_attributes": 5
+  },
+  "integration_guide": {
+    "overview": "Implement Open Banking APIs with consent management and accreditation verification",
+    "steps_by_system": []
+  }
+}

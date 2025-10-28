@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Control Core Pro Tenant is Ready!</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #10b981;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #10b981;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #10b981;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 10px 0;
+        }
+        .credentials-box {
+            background-color: #f0fdf4;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #10b981;
+        }
+        .credential-item {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🛡️ Control Core Pro</div>
+        <h1>Your Tenant is Ready!</h1>
+    </div>
+
+    <div class="content">
+        <p>Hi {{ name }},</p>
+        
+        <p>Great news! Your Control Core Pro tenant for <strong>{{ company_name }}</strong> has been successfully provisioned and is ready to use.</p>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ tenant_url }}" class="button">🚀 Launch Control Plane</a>
+        </div>
+
+        <div class="credentials-box">
+            <h3>🔑 Your Access Credentials</h3>
+            <p><strong>Control Plane URL:</strong></p>
+            <div class="credential-item">{{ tenant_url }}</div>
+            
+            <p><strong>Admin Email:</strong></p>
+            <div class="credential-item">{{ admin_email }}</div>
+            
+            <p><strong>Admin Password:</strong></p>
+            <div class="credential-item">{{ admin_password }}</div>
+            
+            <p style="font-size: 14px; color: #6b7280; margin-top: 15px;">
+                ⚠️ <strong>Important:</strong> Please change your password after your first login for security.
+            </p>
+        </div>
+
+        <h3>🎯 Next Steps:</h3>
+        <ol>
+            <li><strong>Login to your Control Plane</strong> - Use the credentials above</li>
+            <li><strong>Complete the Getting Started Wizard</strong> - We'll guide you through setup</li>
+            <li><strong>Configure your first policies</strong> - Start protecting your APIs</li>
+            <li><strong>Deploy Policy Enforcement Points</strong> - Connect your applications</li>
+        </ol>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{ getting_started_url }}" class="button">📋 Start Getting Started Wizard</a>
+        </div>
+
+        <h3>📚 Resources:</h3>
+        <ul>
+            <li><a href="{{ docs_url }}">📖 Pro Tier Documentation</a> - Complete guide to advanced features</li>
+            <li><a href="https://docs.controlcore.io/policies">📋 Policy Examples</a> - Sample policies for common scenarios</li>
+            <li><a href="https://docs.controlcore.io/api">🔌 API Documentation</a> - Integrate with your applications</li>
+            <li><a href="https://community.controlcore.io">💬 Community Forum</a> - Connect with other Pro users</li>
+        </ul>
+
+        <div style="background-color: #dbeafe; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #1e40af;">🎉 Congratulations!</h4>
+            <p style="margin-bottom: 0; color: #1e40af;">You now have a fully managed Control Core Pro instance. Your Control Plane is hosted, secured, and ready to scale with your business needs.</p>
+        </div>
+
+        <p>If you have any questions or need help getting started, don't hesitate to reach out to our support team at <a href="mailto:{{ support_email }}">{{ support_email }}</a>. Pro customers get priority support!</p>
+
+        <p>Welcome to the future of API security!</p>
+        
+        <p>Best regards,<br>
+        The Control Core Team</p>
+    </div>
+
+    <div class="footer">
+        <p>This email was sent to {{ email }} because your Control Core Pro tenant is ready.</p>
+        <p>
+            <a href="https://controlcore.io/privacy-policy">Privacy Policy</a> | 
+            <a href="https://controlcore.io/terms-of-use">Terms of Service</a> | 
+            <a href="mailto:{{ support_email }}">Support</a>
+        </p>
+        <p>© 2024 Control Core. All rights reserved.</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "input": {
+    "user": {
+      "role": "admin",
+      "department": "IT",
+      "clearance": "top-secret"
+    },
+    "action": "read",
+    "resource": {
+      "type": "document",
+      "department": "IT",
+      "classification": "confidential",
+      "owner": "admin"
+    },
+    "context": {
+      "time": "14:30",
+      "location": "office",
+      "environment": "production"
+    }
+  }
+}

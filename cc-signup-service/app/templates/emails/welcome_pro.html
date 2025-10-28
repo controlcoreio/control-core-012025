@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Control Core Pro</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #10b981;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #10b981;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #10b981;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 10px 0;
+        }
+        .feature-list {
+            background-color: #f0fdf4;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .provisioning-status {
+            background-color: #dbeafe;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 0;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🛡️ Control Core Pro</div>
+        <h1>Welcome to Control Core Pro!</h1>
+    </div>
+
+    <div class="content">
+        <p>Hi {{ name }},</p>
+        
+        <p>Welcome to Control Core Pro! Your hosted Control Plane is being provisioned and will be ready shortly. You've chosen the professional tier with advanced features and dedicated support.</p>
+
+        <div class="provisioning-status">
+            <h3>🚀 Your Pro Tenant is Being Provisioned</h3>
+            <p><strong>Estimated completion time:</strong> {{ provisioning_time }}</p>
+            <p>We're setting up your dedicated Control Plane instance with:</p>
+            <ul style="text-align: left; display: inline-block;">
+                <li>Hosted Control Plane at your subdomain</li>
+                <li>SSL certificates and security</li>
+                <li>Database and Redis instances</li>
+                <li>OPAL policy synchronization</li>
+                <li>Monitoring and logging</li>
+            </ul>
+        </div>
+
+        <div class="feature-list">
+            <h3>✨ What's Included in Your Pro Plan:</h3>
+            <ul>
+                <li><strong>Hosted Control Plane</strong> - No infrastructure management needed</li>
+                <li><strong>Advanced policy management</strong> - Visual policy builder and code editor</li>
+                <li><strong>10M API calls/month</strong> - Scale with your needs</li>
+                <li><strong>Priority support</strong> - Faster response times</li>
+                <li><strong>Multi-tenant support</strong> - Manage multiple environments</li>
+                <li><strong>99.9% uptime SLA</strong> - Enterprise-grade reliability</li>
+                <li><strong>SSL certificates included</strong> - Secure by default</li>
+                <li><strong>Usage-based billing</strong> - Pay only for what you use</li>
+            </ul>
+        </div>
+
+        <h3>📧 What Happens Next:</h3>
+        <ol>
+            <li><strong>Provisioning completes</strong> - We'll send you another email with access details</li>
+            <li><strong>Access your Control Plane</strong> - Login with the provided credentials</li>
+            <li><strong>Complete the Getting Started Wizard</strong> - We'll guide you through setup</li>
+            <li><strong>Deploy your first policies</strong> - Start protecting your APIs immediately</li>
+        </ol>
+
+        <h3>📚 Resources to Get You Started:</h3>
+        <ul>
+            <li><a href="{{ docs_url }}">📖 Pro Tier Guide</a> - Advanced features and best practices</li>
+            <li><a href="https://docs.controlcore.io/policies">📋 Policy Examples</a> - Sample policies for common scenarios</li>
+            <li><a href="https://docs.controlcore.io/api">🔌 API Documentation</a> - Integrate with your applications</li>
+            <li><a href="https://community.controlcore.io">💬 Community Forum</a> - Connect with other Pro users</li>
+        </ul>
+
+        <div style="background-color: #dbeafe; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <h4 style="margin-top: 0; color: #1e40af;">🎯 Pro Tip</h4>
+            <p style="margin-bottom: 0; color: #1e40af;">With Pro tier, you get access to our visual policy builder. Start with templates and customize them using our drag-and-drop interface.</p>
+        </div>
+
+        <p>If you have any questions or need help getting started, don't hesitate to reach out to our support team at <a href="mailto:{{ support_email }}">{{ support_email }}</a>. Pro customers get priority support!</p>
+
+        <p>Welcome to the future of API security!</p>
+        
+        <p>Best regards,<br>
+        The Control Core Team</p>
+    </div>
+
+    <div class="footer">
+        <p>This email was sent to {{ email }} because you signed up for Control Core Pro.</p>
+        <p>
+            <a href="https://controlcore.io/privacy-policy">Privacy Policy</a> | 
+            <a href="https://controlcore.io/terms-of-use">Terms of Service</a> | 
+            <a href="mailto:{{ support_email }}">Support</a>
+        </p>
+        <p>© 2024 Control Core. All rights reserved.</p>
+    </div>
+</body>
+</html>

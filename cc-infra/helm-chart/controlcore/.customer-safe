@@ -1,0 +1,9 @@
+# Customer-Safe Helm Chart
+# This file marks this helm chart as customer-safe
+# Internal artifacts are automatically excluded during customer package creation
+
+# Customer-safe components only
+# Version-locked dependencies
+# No internal development artifacts
+# No BOM or internal changelogs
+# Offline deployment ready

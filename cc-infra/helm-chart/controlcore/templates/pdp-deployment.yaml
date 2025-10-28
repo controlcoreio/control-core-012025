@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.pdp.name }}
+  labels:
+    app: {{ .Values.pdp.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.pdp.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.pdp.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.pdp.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+    spec:
+      containers:
+        - name: {{ .Values.pdp.name }}
+          image: "{{ .Values.pdp.image.repository }}:{{ .Values.pdp.image.tag }}"
+          imagePullPolicy: {{ .Values.pdp.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.pdp.service.port }}
+          env:
+            {{- range .Values.pdp.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.pdp.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.pdp.probes.startup.path }}
+              port: {{ .Values.pdp.probes.startup.port }}
+            initialDelaySeconds: {{ .Values.pdp.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.pdp.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.pdp.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.pdp.probes.startup.failureThreshold }}
+            successThreshold: {{ .Values.pdp.probes.startup.successThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.pdp.probes.readiness.path }}
+              port: {{ .Values.pdp.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.pdp.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.pdp.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.pdp.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.pdp.probes.readiness.failureThreshold }}
+            successThreshold: {{ .Values.pdp.probes.readiness.successThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.pdp.probes.liveness.path }}
+              port: {{ .Values.pdp.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.pdp.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.pdp.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.pdp.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.pdp.probes.liveness.failureThreshold }}
+            successThreshold: {{ .Values.pdp.probes.liveness.successThreshold }}

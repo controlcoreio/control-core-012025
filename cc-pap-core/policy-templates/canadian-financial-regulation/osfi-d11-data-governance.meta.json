@@ -1,0 +1,148 @@
+{
+  "version": "1.0.0",
+  "summary": "OSFI Guideline D-11 Data Governance and Quality Management for regulatory reporting excellence",
+  "detailed_description": "This policy template implements OSFI Guideline D-11 Data Governance and Management controls ensuring data quality, integrity, and governance across Canadian financial institutions. OSFI mandates robust data governance for accurate regulatory reporting, risk management, and business decision-making. The policy enforces data quality standards (95%+ accuracy for regulatory reports), data lineage documentation for critical data elements, data steward assignment for all data domains, retention compliance, access controls for sensitive information, cloud data sovereignty, and data integration quality validation. Designed to support OSFI regulatory reporting accuracy and enterprise data management maturity.",
+  "use_cases": [
+    {
+      "title": "Big 6 Bank: OSFI Regulatory Reporting Data Quality",
+      "description": "Use osfi-d11-data-governance to achieve 99%+ accuracy in regulatory submissions",
+      "scenario": "Major Canadian bank submits monthly regulatory reports to OSFI (balance sheet, capital adequacy, liquidity coverage ratio) aggregating data from 50+ source systems. OSFI data quality expectations: 95%+ accuracy, full data lineage, reconciliation to source systems, timely submission. Policy enforces: Data quality score must be ≥95% before report submission (automated validation), reconciliation to general ledger required, data steward sign-off on each critical data element, audit trail of all data transformations. Implementation: 127 critical data elements identified, data quality rules configured (format validation, range checks, cross-field consistency), automated reconciliation between regulatory reporting system and GL (daily), data steward dashboard showing quality metrics. Results: Regulatory reporting accuracy improved from 94.2% to 99.1%, zero OSFI data quality findings in examination, submission timeliness improved from 85% on-time to 98%."
+    },
+    {
+      "title": "Credit Union: Data Retention Compliance",
+      "description": "Deploy osfi-d11-data-governance for automated retention management",
+      "scenario": "Meridian Credit Union manages retention for 500K member records across 15 systems with varying retention requirements (7 years for transaction records per FINTRAC, 10 years for mortgage documents per provincial law, indefinite for legal holds). Policy enforces: Deletion blocked if retention period incomplete (automated calculation based on record type and creation date), legal hold check before any deletion, privacy officer approval required for bulk deletions, audit log of all retention decisions. System implementation: Data catalog with 2,300 record types classified with retention periods, automated deletion workflows with 90-day warning, legal hold flags from litigation management system, quarterly retention compliance dashboard. Compliance: 99.7% retention compliance (15 violations investigated - all human error in manual overrides), zero premature deletions, complete audit trail for regulatory inspection."
+    },
+    {
+      "title": "Wealthsimple: Data Sovereignty for Cloud-Native Operations",
+      "description": "Apply osfi-d11-data-governance for Canadian data residency requirements",
+      "scenario": "Wealthsimple (federally regulated dealer, IIROC member) operates on AWS infrastructure serving 3M Canadian clients with $20B AUM. OSFI data governance review: (1) All Canadian customer data must reside in Canada unless waiver approved, (2) Data sovereignty controls technically enforced, (3) Cloud provider compliance validation. Policy enforces: All customer data must be in ca-central-1 (Montreal) region, automatic blocking if workload attempts deployment to us-east-1 or other non-Canadian regions, encrypted backups must also be in Canadian region, cross-border data transfer requires Data Governance Committee waiver with documented business justification, quarterly AWS compliance validation (data location audits). Technical controls: AWS Service Control Policies (SCPs) prevent resource creation outside Canada regions, automated scanning for data residency violations, encryption with keys managed in Canadian HSM. Compliance: 100% Canadian data residency, zero violations detected, OSFI rated data sovereignty controls as 'strong'."
+    },
+    {
+      "title": "Manulife: Data Lineage for Insurance Pricing Models",
+      "description": "Implement osfi-d11-data-governance for actuarial data lineage requirements",
+      "scenario": "Manulife uses complex actuarial models for life insurance pricing affecting $500M annual premium revenue. OSFI model risk management review requires: (1) Data lineage for all model inputs (25 data sources), (2) Data quality validation before model execution, (3) Change management for data definitions, (4) Audit trail for pricing decisions. Policy enforces: Data lineage must be documented from source system → data warehouse → model input, data quality checks at each transformation stage (completeness, accuracy, timeliness), version control for data dictionaries and transformation logic, model cannot execute if critical data element quality <98%. Implementation: Automated data lineage tool (Collibra) integrated with Control Core, 250+ data lineage flows mapped, quality rules configured for each critical element, model execution blocked 23 times in Q1 2024 due to data quality issues (prevented pricing errors). Compliance: Zero pricing errors due to data quality, complete audit trail for OSFI model validation, Appointed Actuary sign-off on data governance controls."
+    },
+    {
+      "title": "Tangerine Bank: Data Stewardship for Digital Banking",
+      "description": "Deploy osfi-d11-data-governance for enterprise data governance program",
+      "scenario": "Tangerine (direct bank, subsidiary of Scotiabank) establishes data governance program for 2M customers and 500 employees. OSFI examination: (1) Data stewards assigned for all critical data domains, (2) Data ownership and accountability documented, (3) Data quality metrics tracked and improving, (4) Data governance committee oversight. Policy enforces: Each data domain requires assigned data steward (senior manager or director), data steward responsibilities include quality monitoring, access approval, definition changes, quarterly metrics to Data Governance Committee, new data domains cannot be created without steward assignment, data steward succession planning for key domains. Structure: 12 data domains (customer master data, account data, transaction data, etc.), data stewards from business units (not IT), Data Governance Council (CDO, CIO, CRO, CFO) quarterly meetings, data quality scorecards published monthly. Maturity: Improved from DCAM Level 2 to Level 4 in 18 months, OSFI rated data governance as 'strong' program."
+    },
+    {
+      "title": "EQ Bank: Data Integration Quality Controls",
+      "description": "Use osfi-d11-data-governance for third-party data feed validation",
+      "scenario": "EQ Bank (digital bank) integrates 15 external data sources for deposit account operations (credit bureau, bank account verification, fraud detection, AML screening). OSFI data governance requirement: External data quality must be validated before use in business decisions. Policy enforces: Data quality validation must be configured for each external data source (completeness checks, format validation, data freshness verification), automated blocking if data quality drops below threshold (credit bureau data >24 hours old, fraud score unavailable, AML screening returns error), reconciliation between external data and internal systems, third-party data SLAs monitored (99.9% availability target). Data quality incidents Q3 2024: Credit bureau API timeout (15 minutes, automatic failover to backup bureau), fraud detection vendor upgrade caused 2-hour outage (new accounts blocked during outage), AML screening data quality issue (500 records failed validation, manual review required). All incidents detected within 5 minutes by Control Core policy evaluation failures, business impact minimized. OSFI review: Proactive data quality monitoring with effective controls."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Data governance action",
+      "required": true,
+      "example_values": [
+        "submit_regulatory_report",
+        "access_data",
+        "delete_customer_data"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Data resource type",
+      "required": true,
+      "example_values": [
+        "osfi_report",
+        "sensitive_data",
+        "customer_record"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.data_quality_score",
+      "type": "number",
+      "description": "Data quality score (0-1 scale)",
+      "required": true,
+      "example_values": [
+        0.95,
+        0.98,
+        0.87
+      ],
+      "example_value": "5"
+    },
+    {
+      "name": "user.role",
+      "type": "string",
+      "description": "User role",
+      "required": true,
+      "example_values": [
+        "chief_data_officer",
+        "regulatory_reporting_manager",
+        "data_steward"
+      ],
+      "example_value": "user"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Data Quality Tool",
+      "GRC Platform",
+      "Data Catalog",
+      "Privacy Management"
+    ],
+    "complexity_score": "High - Enterprise data governance with quality monitoring"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Review OSFI D-11",
+      "Implement data quality framework",
+      "Assign data stewards",
+      "Configure quality monitoring"
+    ],
+    "sandbox_testing": [
+      "Test regulatory report with low quality score → DENY",
+      "Test data access with proper controls → ALLOW"
+    ],
+    "production_deployment": [
+      "Obtain CDO approval",
+      "Shadow mode for data quality baseline",
+      "Enable enforcement for regulatory reporting first"
+    ],
+    "monitoring_setup": [
+      "Track data quality scores by domain",
+      "Monitor retention compliance",
+      "Alert on sensitive data access"
+    ]
+  },
+  "compliance_frameworks": [
+    "OSFI D-11",
+    "OSFI E-21",
+    "BCBS 239",
+    "GDPR",
+    "PIPEDA"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "osfi",
+    "data-governance",
+    "data-quality",
+    "regulatory-reporting",
+    "d-11"
+  ],
+  "related_templates": [
+    "osfi-e21-operational-risk",
+    "gdpr-data-protection",
+    "pipeda-accountability"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 10,
+    "user_attributes": 1,
+    "resource_attributes": 2,
+    "context_attributes": 7
+  },
+  "integration_guide": {
+    "overview": "Integrate with data quality, cataloging, and governance platforms",
+    "steps_by_system": []
+  }
+}

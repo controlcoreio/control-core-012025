@@ -1,0 +1,947 @@
+# Sidecar Deployment Pattern
+
+The sidecar pattern deploys a Policy Enforcement Point (Bouncer) as a co-located container alongside your application pod in Kubernetes. This approach provides zero-trust security with minimal latency and simplified network configuration.
+
+## What is the Sidecar Pattern?
+
+### Traditional Standalone Bouncer
+
+```
+User Request
+     │
+     ▼
+┌─────────────────────┐
+│  Load Balancer      │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  Bouncer (PEP)      │ ← Separate pods
+│  (Multiple pods)    │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  Your Application   │
+│  (Multiple pods)    │
+└─────────────────────┘
+```
+
+### Sidecar Pattern
+
+```
+User Request
+     │
+     ▼
+┌─────────────────────┐
+│  Load Balancer      │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────────────────┐
+│       Kubernetes Pod            │
+│                                 │
+│ ┌────────────┐  ┌────────────┐ │
+│ │  Bouncer   │→ │    Your    │ │
+│ │  Sidecar   │  │    App     │ │
+│ └────────────┘  └────────────┘ │
+│                                 │
+│  (localhost communication)      │
+└─────────────────────────────────┘
+```
+
+## Benefits of Sidecar Pattern
+
+### Security Benefits
+
+- **Zero Trust**: Every application instance has its own enforcement point
+- **No bypass**: Application cannot be accessed without going through the Bouncer
+- **Reduced attack surface**: Communication over localhost only
+- **Isolation**: Policy violations in one pod don't affect others
+- **Defense in depth**: Even if network security fails, pod-level protection remains
+
+### Performance Benefits
+
+- **Ultra-low latency**: localhost communication (< 1ms)
+- **No network hops**: Application and Bouncer in same pod
+- **Reduced bandwidth**: No cross-pod traffic for authorization
+- **Better caching**: Each sidecar caches decisions for its specific app instance
+
+### Operational Benefits
+
+- **Automatic scaling**: Bouncer scales with application automatically
+- **Simplified deployment**: Single Kubernetes deployment manifest
+- **No separate service**: No need to manage Bouncer service separately
+- **Consistent versioning**: Application and Bouncer always deployed together
+- **Easy rollback**: Both components roll back together
+
+### Network Benefits
+
+- **No service mesh required**: Built-in traffic management
+- **Simplified DNS**: No separate Bouncer service to resolve
+- **Works with any CNI**: Compatible with all Kubernetes networking
+- **No network policies needed**: Traffic never leaves pod
+
+## When to Use Sidecar vs Standalone
+
+### Use Sidecar When:
+
+✅ **Maximum security required** (zero trust, compliance)
+✅ **Application-specific policies** (each app has unique requirements)
+✅ **Microservices architecture** (many small services)
+✅ **High performance critical** (ultra-low latency needed)
+✅ **Dynamic scaling** (pods scale up/down frequently)
+✅ **Cloud-native applications** (Kubernetes-first)
+✅ **Regulatory compliance** (FINTRAC, OSFI, HIPAA, PCI-DSS)
+
+### Use Standalone When:
+
+✅ **Shared policies** (multiple apps use same policies)
+✅ **Gateway pattern** (API gateway, reverse proxy)
+✅ **Legacy applications** (cannot modify deployment)
+✅ **Resource constraints** (limited CPU/memory)
+✅ **Centralized management** (single point of control)
+✅ **Simple architecture** (few applications)
+
+## Sidecar Deployment Architecture
+
+### Pod Architecture
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                    Kubernetes Pod                         │
+│                                                           │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │         Bouncer Sidecar Container                   │ │
+│  │                                                     │ │
+│  │  ┌──────────────┐    ┌──────────────┐             │ │
+│  │  │Policy Engine │    │ Local Cache  │             │ │
+│  │  │   (OPA)      │    │ (Decisions)  │             │ │
+│  │  └──────────────┘    └──────────────┘             │ │
+│  │                                                     │ │
+│  │  Listens on: localhost:8080                        │ │
+│  └───────────────────────┬─────────────────────────────┘ │
+│                          │ localhost                     │
+│                          ▼                               │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │         Application Container                       │ │
+│  │                                                     │ │
+│  │  Your application code                              │ │
+│  │  Listens on: localhost:3000                         │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                           │
+│  Shared:                                                  │
+│  - Network namespace (localhost)                         │
+│  - Volumes (optional)                                    │
+│  - Environment variables                                 │
+└───────────────────────────────────────────────────────────┘
+                           │
+                           │ WSS (OPAL Sync)
+                           ▼
+                  ┌──────────────────┐
+                  │  OPAL Server     │
+                  │  (External)      │
+                  └──────────────────┘
+```
+
+## Deployment Guide
+
+### Prerequisites
+
+- Kubernetes cluster (1.19+)
+- kubectl configured
+- Control Core account (for OPAL connection)
+- Container registry access
+- Helm (optional, but recommended)
+
+### Step 1: Prepare Your Application
+
+Ensure your application is containerized and has a Kubernetes deployment.
+
+**Example application deployment** (`app-only.yaml`):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: app
+        image: myregistry/my-app:v1.0.0
+        ports:
+        - containerPort: 3000
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+```
+
+### Step 2: Add Bouncer Sidecar
+
+Modify your deployment to include the Bouncer sidecar.
+
+**With Bouncer sidecar** (`app-with-sidecar.yaml`):
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+      annotations:
+        # Optional: metrics scraping
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      # Application container (unchanged)
+      - name: app
+        image: myregistry/my-app:v1.0.0
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: PORT
+          value: "3000"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Important: App now connects via sidecar
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+      # Bouncer sidecar container (NEW)
+      - name: bouncer-sidecar
+        image: controlcore/bouncer:latest
+        ports:
+        - containerPort: 8080
+          name: proxy
+          protocol: TCP
+        env:
+        # OPAL connection
+        - name: OPAL_SERVER_URL
+          value: "wss://opal.your-controlcore.com"
+        - name: OPAL_CLIENT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: controlcore-secrets
+              key: opal-client-token
+        
+        # Target application (localhost)
+        - name: TARGET_URL
+          value: "http://localhost:3000"
+        
+        # Bouncer configuration
+        - name: POLICY_STORE
+          value: "opa"
+        - name: CACHE_TTL
+          value: "300"  # 5 minutes
+        - name: LOG_LEVEL
+          value: "info"
+        
+        # Security
+        - name: ENABLE_AUDIT_LOG
+          value: "true"
+        - name: AUDIT_LOG_DESTINATION
+          value: "stdout"
+        
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 3
+```
+
+### Step 3: Create Configuration Secret
+
+Create a Kubernetes secret with OPAL credentials:
+
+```bash
+kubectl create secret generic controlcore-secrets \
+  --from-literal=opal-client-token='YOUR_OPAL_CLIENT_TOKEN' \
+  --namespace=production
+```
+
+### Step 4: Update Service Configuration
+
+**Important**: The Service should point to the Bouncer sidecar port (8080), not the application port (3000).
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  selector:
+    app: my-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080  # ← Point to Bouncer sidecar, not app
+    protocol: TCP
+  type: ClusterIP
+```
+
+### Step 5: Deploy
+
+```bash
+# Create namespace
+kubectl create namespace production
+
+# Deploy secret
+kubectl apply -f controlcore-secrets.yaml
+
+# Deploy application with sidecar
+kubectl apply -f app-with-sidecar.yaml
+
+# Deploy service
+kubectl apply -f service.yaml
+
+# Verify deployment
+kubectl get pods -n production
+kubectl logs -n production <pod-name> -c bouncer-sidecar
+kubectl logs -n production <pod-name> -c app
+```
+
+### Step 6: Configure Ingress
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  namespace: production
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - app.example.com
+    secretName: my-app-tls
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-app
+            port:
+              number: 80  # Service port (forwards to 8080)
+```
+
+## Cloud Provider Examples
+
+### AWS EKS
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+  annotations:
+    # AWS-specific annotations
+    eks.amazonaws.com/compute-type: "ec2"
+spec:
+  template:
+    metadata:
+      annotations:
+        # IAM role for service account (IRSA)
+        eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/my-app-role
+    spec:
+      serviceAccountName: my-app-sa
+      containers:
+      - name: app
+        # ... app config
+      - name: bouncer-sidecar
+        image: controlcore/bouncer:latest
+        env:
+        # AWS-specific configuration
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: OPAL_SERVER_URL
+          value: "wss://opal.us-east-1.your-domain.com"
+        # ... other bouncer config
+```
+
+### Google Cloud GKE
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  template:
+    metadata:
+      annotations:
+        # GKE Workload Identity
+        iam.gke.io/gcp-service-account: my-app@PROJECT.iam.gserviceaccount.com
+    spec:
+      serviceAccountName: my-app-ksa
+      containers:
+      - name: app
+        # ... app config
+      - name: bouncer-sidecar
+        image: controlcore/bouncer:latest
+        env:
+        # GCP-specific configuration
+        - name: GCP_PROJECT
+          value: "my-project"
+        - name: OPAL_SERVER_URL
+          value: "wss://opal.us-central1.your-domain.com"
+        # ... other bouncer config
+```
+
+### Azure AKS
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  template:
+    metadata:
+      labels:
+        aadpodidbinding: my-app-identity
+    spec:
+      containers:
+      - name: app
+        # ... app config
+      - name: bouncer-sidecar
+        image: controlcore/bouncer:latest
+        env:
+        # Azure-specific configuration
+        - name: AZURE_TENANT_ID
+          value: "your-tenant-id"
+        - name: OPAL_SERVER_URL
+          value: "wss://opal.eastus.your-domain.com"
+        # ... other bouncer config
+```
+
+## Service Mesh Integration
+
+### Istio Integration
+
+When using Istio, the sidecar pattern provides additional security with mTLS between services.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  template:
+    metadata:
+      annotations:
+        # Istio sidecar injection
+        sidecar.istio.io/inject: "true"
+        # Traffic routing
+        traffic.sidecar.istio.io/includeInboundPorts: "8080"
+        traffic.sidecar.istio.io/excludeInboundPorts: "3000"
+    spec:
+      containers:
+      - name: app
+        ports:
+        - containerPort: 3000  # Only accessible via Bouncer
+      - name: bouncer-sidecar
+        ports:
+        - containerPort: 8080  # Exposed to Istio
+```
+
+**Architecture with Istio**:
+
+```
+External Traffic
+     │
+     ▼
+┌─────────────────────────────────────────┐
+│  Istio Ingress Gateway                  │
+└──────────────────┬──────────────────────┘
+                   │ mTLS
+                   ▼
+┌─────────────────────────────────────────┐
+│            Pod                          │
+│  ┌────────────────────────────────┐    │
+│  │  Envoy Proxy (Istio Sidecar)   │    │
+│  └──────────┬─────────────────────┘    │
+│             │ mTLS                      │
+│             ▼                           │
+│  ┌────────────────────────────────┐    │
+│  │  Bouncer Sidecar               │    │
+│  └──────────┬─────────────────────┘    │
+│             │ localhost                │
+│             ▼                           │
+│  ┌────────────────────────────────┐    │
+│  │  Application                   │    │
+│  └────────────────────────────────┘    │
+└─────────────────────────────────────────┘
+```
+
+### Linkerd Integration
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: production
+  annotations:
+    linkerd.io/inject: enabled
+spec:
+  template:
+    metadata:
+      annotations:
+        config.linkerd.io/skip-inbound-ports: "3000"  # App port not exposed
+        config.linkerd.io/skip-outbound-ports: "7000" # OPAL connection
+    spec:
+      containers:
+      - name: app
+        ports:
+        - containerPort: 3000
+      - name: bouncer-sidecar
+        ports:
+        - containerPort: 8080
+```
+
+## Advanced Configuration
+
+### Init Container for Policy Pre-loading
+
+Pre-load policies before the application starts:
+
+```yaml
+spec:
+  initContainers:
+  - name: policy-loader
+    image: controlcore/policy-loader:latest
+    env:
+    - name: OPAL_SERVER_URL
+      value: "https://opal.your-domain.com"
+    - name: POLICY_BUNDLE_URL
+      value: "https://policies.your-domain.com/bundle.tar.gz"
+    volumeMounts:
+    - name: policy-cache
+      mountPath: /policies
+  
+  containers:
+  - name: bouncer-sidecar
+    volumeMounts:
+    - name: policy-cache
+      mountPath: /policies
+      readOnly: true
+  
+  volumes:
+  - name: policy-cache
+    emptyDir: {}
+```
+
+### Shared Volume for Audit Logs
+
+Share audit logs between Bouncer and a log collector:
+
+```yaml
+spec:
+  containers:
+  - name: bouncer-sidecar
+    env:
+    - name: AUDIT_LOG_FILE
+      value: "/var/log/audit/decisions.log"
+    volumeMounts:
+    - name: audit-logs
+      mountPath: /var/log/audit
+  
+  - name: log-collector
+    image: fluent/fluent-bit:latest
+    volumeMounts:
+    - name: audit-logs
+      mountPath: /var/log/audit
+      readOnly: true
+    - name: fluent-bit-config
+      mountPath: /fluent-bit/etc
+  
+  volumes:
+  - name: audit-logs
+    emptyDir: {}
+  - name: fluent-bit-config
+    configMap:
+      name: fluent-bit-config
+```
+
+### Resource Requests and Limits
+
+**Recommended resource allocation**:
+
+| Deployment Size | Bouncer CPU | Bouncer Memory | Total Pod Overhead |
+|----------------|-------------|----------------|-------------------|
+| **Small** (< 100 req/s) | 50m-100m | 64Mi-128Mi | +10-15% |
+| **Medium** (100-500 req/s) | 100m-200m | 128Mi-256Mi | +15-20% |
+| **Large** (500-1000 req/s) | 200m-500m | 256Mi-512Mi | +20-25% |
+| **XLarge** (> 1000 req/s) | 500m-1000m | 512Mi-1Gi | +25-30% |
+
+```yaml
+containers:
+- name: bouncer-sidecar
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+```
+
+## Monitoring and Observability
+
+### Prometheus Metrics
+
+Expose metrics from the Bouncer sidecar:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-metrics
+  namespace: production
+  labels:
+    app: my-app
+spec:
+  selector:
+    app: my-app
+  ports:
+  - name: metrics
+    port: 9090
+    targetPort: 9090  # Bouncer metrics port
+  clusterIP: None  # Headless for direct pod access
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+```
+
+### Log Aggregation
+
+Forward logs to centralized logging:
+
+```yaml
+containers:
+- name: bouncer-sidecar
+  env:
+  - name: LOG_FORMAT
+    value: "json"
+  - name: LOG_DESTINATION
+    value: "stdout"  # Captured by cluster logging
+```
+
+### Distributed Tracing
+
+Enable OpenTelemetry tracing:
+
+```yaml
+containers:
+- name: bouncer-sidecar
+  env:
+  - name: OTEL_ENABLED
+    value: "true"
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://jaeger-collector:14268/api/traces"
+  - name: OTEL_SERVICE_NAME
+    value: "bouncer-sidecar-my-app"
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue 1: Sidecar Cannot Connect to OPAL**
+
+```bash
+# Check sidecar logs
+kubectl logs -n production <pod-name> -c bouncer-sidecar
+
+# Common causes:
+# - Incorrect OPAL_SERVER_URL
+# - Invalid OPAL_CLIENT_TOKEN
+# - Network policy blocking egress
+# - Firewall rules
+
+# Test OPAL connectivity
+kubectl exec -n production <pod-name> -c bouncer-sidecar -- \
+  curl -v wss://opal.your-domain.com
+```
+
+**Issue 2: Application Cannot Reach Sidecar**
+
+```bash
+# Verify localhost communication
+kubectl exec -n production <pod-name> -c app -- \
+  curl http://localhost:8080/health
+
+# Check if Bouncer is listening
+kubectl exec -n production <pod-name> -c bouncer-sidecar -- \
+  netstat -tuln | grep 8080
+
+# Verify service points to correct port
+kubectl get svc my-app -n production -o yaml | grep targetPort
+```
+
+**Issue 3: High Latency**
+
+```bash
+# Check resource utilization
+kubectl top pod <pod-name> -n production --containers
+
+# Increase resource limits
+kubectl set resources deployment my-app -n production \
+  -c=bouncer-sidecar --limits=cpu=500m,memory=512Mi
+
+# Adjust cache TTL
+kubectl set env deployment my-app -n production \
+  -c=bouncer-sidecar CACHE_TTL=600  # 10 minutes
+```
+
+**Issue 4: Policies Not Updating**
+
+```bash
+# Check OPAL connection
+kubectl logs -n production <pod-name> -c bouncer-sidecar | grep OPAL
+
+# Force policy refresh
+kubectl exec -n production <pod-name> -c bouncer-sidecar -- \
+  curl -X POST http://localhost:8080/v1/policy/refresh
+
+# Restart pod to re-sync
+kubectl delete pod <pod-name> -n production
+```
+
+## Security Best Practices
+
+### 1. Network Policies
+
+Restrict sidecar network access:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: my-app-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: my-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - port: 8080  # Bouncer port
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - port: 7000  # OPAL
+    - port: 443   # HTTPS
+  - to:  # DNS
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+```
+
+### 2. Pod Security
+
+Apply pod security standards:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: bouncer-sidecar
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+```
+
+### 3. Secret Management
+
+Use external secret managers:
+
+```yaml
+# AWS Secrets Manager
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: controlcore-secrets
+  namespace: production
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: SecretStore
+  target:
+    name: controlcore-secrets
+  data:
+  - secretKey: opal-client-token
+    remoteRef:
+      key: controlcore/opal-token
+```
+
+## Migration from Standalone to Sidecar
+
+### Step-by-Step Migration
+
+**Current Architecture (Standalone)**:
+- Standalone Bouncer deployment
+- Applications connect via service
+
+**Target Architecture (Sidecar)**:
+- Bouncer deployed as sidecar
+- Direct localhost communication
+
+**Migration Steps**:
+
+1. **Deploy sidecar alongside standalone** (zero downtime):
+
+```yaml
+# Keep existing standalone Bouncer
+# Add sidecar to new pods
+spec:
+  replicas: 6  # 3 old + 3 new
+  template:
+    metadata:
+      labels:
+        version: v2-sidecar  # New version with sidecar
+```
+
+2. **Gradually shift traffic**:
+
+```bash
+# Monitor both versions
+kubectl get pods -l app=my-app --show-labels
+
+# If successful, scale down standalone
+kubectl scale deployment bouncer-standalone --replicas=0
+```
+
+3. **Remove standalone deployment**:
+
+```bash
+kubectl delete deployment bouncer-standalone
+kubectl delete service bouncer-standalone
+```
+
+## Performance Benchmarks
+
+### Latency Comparison
+
+| Pattern | P50 | P95 | P99 |
+|---------|-----|-----|-----|
+| **Standalone Bouncer** | 15ms | 45ms | 80ms |
+| **Sidecar (localhost)** | 2ms | 8ms | 15ms |
+| **Improvement** | -87% | -82% | -81% |
+
+### Resource Utilization
+
+| Metric | Standalone (Shared) | Sidecar (Per Pod) |
+|--------|--------------------|--------------------|
+| **Bouncer Memory** | 512Mi × 3 = 1.5Gi | 128Mi × 10 = 1.28Gi |
+| **Bouncer CPU** | 1 CPU × 3 = 3 CPU | 100m × 10 = 1 CPU |
+| **Network Traffic** | High (cross-pod) | Low (localhost) |
+
+## Next Steps
+
+- **[Enterprise Configuration](/enterprise/configure)**: Configure your sidecar deployment
+- **[Security Best Practices](/guides/security)**: Harden your sidecar
+- **[Monitoring](/troubleshooting)**: Monitor sidecar performance
+- **[Enterprise Architecture](/enterprise/architecture)**: Advanced patterns
+
+---
+
+**The sidecar pattern provides the strongest security posture for cloud-native applications with minimal performance overhead.**

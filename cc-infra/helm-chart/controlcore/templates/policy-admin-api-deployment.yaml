@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.policyAdminApi.name }}
+  labels:
+    app: {{ .Values.policyAdminApi.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.policyAdminApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.policyAdminApi.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.policyAdminApi.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+      annotations:
+        # Force pod restart when config changes
+        kubectl.kubernetes.io/restartedAt: "{{ now | date "2006-01-02T15:04:05Z07:00" }}"
+    spec:
+      containers:
+        - name: {{ .Values.policyAdminApi.name }}
+          image: "{{ .Values.policyAdminApi.image.repository }}:{{ .Values.policyAdminApi.image.tag }}"
+          imagePullPolicy: {{ .Values.policyAdminApi.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.policyAdminApi.service.port }}
+          env:
+            {{- range .Values.policyAdminApi.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cc-pap-github-token
+                  key: token
+          resources:
+            {{- toYaml .Values.policyAdminApi.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.policyAdminApi.probes.startup.path }}
+              port: {{ .Values.policyAdminApi.probes.startup.port }}
+            initialDelaySeconds: {{ .Values.policyAdminApi.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminApi.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.policyAdminApi.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.policyAdminApi.probes.startup.failureThreshold }}
+            successThreshold: {{ .Values.policyAdminApi.probes.startup.successThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.policyAdminApi.probes.readiness.path }}
+              port: {{ .Values.policyAdminApi.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.policyAdminApi.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminApi.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.policyAdminApi.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.policyAdminApi.probes.readiness.failureThreshold }}
+            successThreshold: {{ .Values.policyAdminApi.probes.readiness.successThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.policyAdminApi.probes.liveness.path }}
+              port: {{ .Values.policyAdminApi.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.policyAdminApi.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminApi.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.policyAdminApi.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.policyAdminApi.probes.liveness.failureThreshold }}
+            successThreshold: {{ .Values.policyAdminApi.probes.liveness.successThreshold }}

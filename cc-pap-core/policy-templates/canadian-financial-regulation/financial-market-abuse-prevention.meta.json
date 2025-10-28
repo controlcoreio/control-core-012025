@@ -1,0 +1,173 @@
+{
+  "version": "1.0.0",
+  "summary": "Market abuse and insider trading prevention controls for Canadian securities firms and investment dealers",
+  "detailed_description": "This policy template enforces market abuse prevention and insider trading controls for IIROC (Investment Industry Regulatory Organization of Canada) member firms and CSA (Canadian Securities Administrators) registrants. The policy addresses insider trading prevention during blackout periods, material non-public information (MNPI) access controls, Chinese wall enforcement between divisions, market manipulation detection, and employee personal trading pre-clearance requirements. Ensures compliance with securities laws prohibiting insider trading, market manipulation, front-running, and other abusive practices that undermine market integrity and investor confidence in Canadian capital markets.",
+  "use_cases": [
+    {
+      "title": "RBC Capital Markets: Chinese Wall Between Investment Banking and Trading",
+      "description": "Deploy financial-market-abuse-prevention for information barrier enforcement",
+      "scenario": "RBC Capital Markets maintains Chinese wall between investment banking (advising on M&A, IPOs) and trading desk (executing client trades, proprietary trading) to prevent insider trading. Scenario: Investment banking advising Company X on $5B acquisition (material non-public information), trading desk handles Company X stock for clients. Policy enforces: Physical separation (different floors), IT separation (investment banking on separate network, trading cannot access IB files), communication blocking (email between divisions flagged for compliance review), restricted list (Company X added when M&A mandate signed - trading desk can only execute unsolicited client orders, no recommendations), surveillance (all trading desk activity in Company X monitored for suspicious patterns). Breach detection: Trader makes personal purchase of Company X stock during blackout (trading account linked to employee profile, automated detection), policy blocks trade + immediate compliance investigation, determined: Trader unaware of M&A (legitimate oversight, no MNPI access), corrective action: Enhanced restricted list notifications to all trading personnel. Results: Zero insider trading violations in 2024, 45 restricted list securities at any time (average), effective information barriers validated in IIROC examination. Regulatory: IIROC rated Chinese wall controls as 'strong', no deficiencies noted."
+    },
+    {
+      "title": "TD Securities: Employee Personal Trading Pre-Clearance",
+      "description": "Implement financial-market-abuse-prevention for employee trading oversight",
+      "scenario": "TD Securities requires pre-clearance for all employee personal securities trades (2,500 employees subject to policy: traders, analysts, investment bankers, research). Pre-clearance purpose: Prevent front-running (employee trading ahead of client orders), insider trading (employee has MNPI), conflicts of interest. Policy enforces: Employee must submit trade request 24 hours before execution (exemption: mutual funds, government bonds), compliance system checks: (1) Is security on restricted list (insider lists, material corporate actions), (2) Does employee have MNPI access (based on role + recent deal involvement), (3) Conflicts with client orders (employee buying while clients selling), automated approval if all checks pass (<5 minutes), manual review if any flags (4-hour SLA), trade blocked if not pre-cleared (broker integration prevents unauthorized trades). Statistics: 12,000 pre-clearance requests/month, 94% auto-approved (routine trades, no conflicts), 6% flagged for review (720 requests), manual review findings: 680 approved (legitimate, no conflicts), 40 denied (restricted list, MNPI concern, conflict with client). Compliance: Zero unauthorized employee trades, zero insider trading cases, 100% pre-clearance compliance. IIROC examination: Strong employee trading controls, effective use of automation for conflict detection."
+    },
+    {
+      "title": "Scotiabank Trading Desk: Market Manipulation Detection",
+      "description": "Use financial-market-abuse-prevention for abusive trading pattern detection",
+      "scenario": "Scotiabank trading desk implements surveillance for market manipulation patterns: (1) Layering (placing/canceling orders to create false liquidity), (2) Spoofing (fake orders to move prices), (3) Wash trading (self-trades to create false volume), (4) Marking the close (trades near market close to manipulate closing price). Technology: Market surveillance system (NICE Actimize) analyzing 500,000 orders/day for Canadian equities/options. Policy enforces: Automated detection of manipulation patterns (order-to-trade ratio >100:1 indicates spoofing, self-match detection for wash trading, high-cancel rate flagging), suspicious orders flagged for review before execution (trader receives warning: 'This order pattern may appear manipulative - confirm legitimacy'), post-trade surveillance for trade cancellation patterns. 2024 detections: 150 alerts for suspicious patterns investigated, 140 legitimate (algo trading, market making activity - explained and documented), 10 potentially manipulative (investigated by compliance, 2 resulted in trader suspensions pending investigation - determined to be algo errors not intentional manipulation, 8 were borderline cases with coaching provided). Results: Zero IIROC market manipulation violations, proactive detection prevented potential regulatory action, trader education improved (understanding of how patterns appear to surveillance). IIROC: Strong market surveillance program, effective real-time detection, appropriate investigation and escalation procedures."
+    },
+    {
+      "title": "Questrade: Insider Trading Prevention for Retail Brokerage",
+      "description": "Deploy financial-market-abuse-prevention for retail investor protection",
+      "scenario": "Questrade (retail brokerage, 300K clients) prevents insider trading by clients and employees. Retail client scenario: Client works for publicly-traded tech company (TSX: TECH), receives stock options as compensation, subject to insider trading rules. Questrade challenges: (1) How to know client is insider, (2) Blackout period enforcement, (3) Client education. Policy approach: Client self-declaration during account opening (employment with public company, officer/director status, >10% shareholder), insider status flagged in CRM, automated blackout period enforcement (client cannot trade employer stock during blackout - typically quarterly earnings +/- 2 weeks), 10b5-1 trading plan support (automated execution during blackouts if pre-arranged plan approved). Client experience: Trading attempt during blackout blocked with message 'You cannot trade [TECH] during blackout period. Blackout ends: [date]', client can establish 10b5-1 plan (allows systematic selling regardless of blackout - no timing discretion). Compliance: 15,000 clients flagged as insiders (5% of base), 500 blackout trading attempts blocked per quarter (clients educated on restrictions), 200 clients use 10b5-1 plans (sophisticated users), zero insider trading violations by Questrade clients. Regulatory (IIROC + OSC): Appropriate retail insider trading controls, good client education, 10b5-1 plan support demonstrates sophistication."
+    },
+    {
+      "title": "Fiera Capital: Front-Running Prevention in Asset Management",
+      "description": "Apply financial-market-abuse-prevention for portfolio manager trade sequencing",
+      "scenario": "Fiera Capital (investment manager, $170B AUM) prevents front-running (portfolio manager trading personal account before client accounts). Scenario: Portfolio manager decides to buy 1M shares of Bank of Montreal for all client portfolios (aggregate purchase will move market price up), temptation to buy personal account first (benefit from price increase caused by large client order). Policy enforces: Personal trading blackout 7 days before and 3 days after client trades in same security, automated detection (portfolio manager's personal account linked in compliance system), order management system cross-references personal holdings with pending client orders, violations flagged immediately (trade blocked + compliance investigation). Detection example: Portfolio manager submits personal trade for 500 shares BAM.TO, system checks: Pending client order for 1M shares BAM.TO same day, policy blocks personal trade with explanation 'Conflict with client trading activity', portfolio manager can trade after client orders complete + 3 day cooling off. Results: Zero front-running violations, 25 blocked personal trades in 2024 (all legitimate conflicts detected and prevented), portfolio manager satisfaction: Understand necessity (builds client trust), personal trading still allowed (just sequenced appropriately). IIROC: Excellent front-running controls, client interests clearly prioritized, automated detection effective."
+    },
+    {
+      "title": "CIBC Capital Markets: Insider List Management and Surveillance",
+      "description": "Implement financial-market-abuse-prevention for corporate finance insider lists",
+      "scenario": "CIBC Capital Markets manages insider lists for M&A deals, equity offerings, debt financings (100+ active mandates at any time). Insider list purpose: Track who has MNPI, prevent insider trading, demonstrate proper information barriers if trading occurs. Policy enforces: All employees on deals added to insider list (investment bankers, lawyers, compliance, IT support), restricted trading in affected securities (personal trading blocked, proprietary trading blocked, client facilitation only), periodic reminders to insiders (weekly email: 'You are on insider list for Company X - trading prohibited'), insider list maintained for 5 years post-deal (regulatory requirement), automated surveillance for any trading in insider list securities (by insiders or family members). Surveillance results: 2,500 employees on insider lists at any time (50 deals × 50 employees average), 15 potential violations detected in 2024 (employee family member traded insider list security), investigations found: 12 legitimate (family member not informed of insider status - employee educated on disclosure obligation), 3 concerning (required deeper investigation, 2 cleared - coincidental timing, 1 resulted in employee termination + OSC referral). Regulatory: Strong insider list management, appropriate surveillance, effective investigation procedures. OSC enforcement: 1 case referred resulted in $50K penalty for individual (not CIBC - demonstrated adequate controls), CIBC's detection and reporting praised."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Market activity action",
+      "required": true,
+      "example_values": [
+        "execute_trade",
+        "access_mnpi",
+        "share_client_information",
+        "place_market_order",
+        "employee_personal_trade"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Market resource type",
+      "required": true,
+      "example_values": [
+        "securities_order",
+        "confidential_information",
+        "trading_order",
+        "employee_securities_order"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "user.insider_status",
+      "type": "boolean",
+      "description": "Whether user is company insider",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "user.authorized_for_mnpi",
+      "type": "boolean",
+      "description": "Authorization for MNPI access",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.blackout_period_active",
+      "type": "boolean",
+      "description": "Whether trading blackout is active",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.preclearance_approved",
+      "type": "boolean",
+      "description": "Pre-clearance approval status",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Trading System",
+      "Compliance Monitoring Platform (Actimize)",
+      "Restricted List Management",
+      "Employee Trading System"
+    ],
+    "complexity_score": "Critical - Real-time market surveillance with insider trading detection"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Configure restricted list management",
+      "Implement employee trading pre-clearance",
+      "Setup market surveillance for manipulation",
+      "Integrate insider list tracking"
+    ],
+    "sandbox_testing": [
+      "Test insider trade during blackout → DENY",
+      "Test employee trade without pre-clearance → DENY",
+      "Test suspicious order pattern → FLAG for review"
+    ],
+    "production_deployment": [
+      "Deploy pre-clearance system for employees first",
+      "Add market surveillance for client trading",
+      "Enable Chinese wall enforcement"
+    ],
+    "monitoring_setup": [
+      "Track pre-clearance denial rates",
+      "Monitor restricted list additions",
+      "Surveillance alerts for suspicious patterns",
+      "Insider trading violation investigations"
+    ]
+  },
+  "compliance_frameworks": [
+    "IIROC",
+    "CSA National Instrument 23-103",
+    "OSC Securities Act",
+    "Criminal Code of Canada (Insider Trading)"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "iiroc",
+    "insider-trading",
+    "market-abuse",
+    "securities",
+    "front-running",
+    "chinese-wall"
+  ],
+  "related_templates": [
+    "osfi-d11-data-governance",
+    "soc2-access-control",
+    "iso27001-access-control"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 8,
+    "user_attributes": 2,
+    "resource_attributes": 2,
+    "context_attributes": 4
+  },
+  "integration_guide": {
+    "overview": "Integrate with trading systems, compliance surveillance, and employee trading platforms",
+    "steps_by_system": []
+  }
+}

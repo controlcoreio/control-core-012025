@@ -1,0 +1,168 @@
+{{/*
+Storage Persistent Volume Claims
+This template creates PVCs for all Control Core components based on configuration
+*/}}
+
+{{- if .Values.persistence.enabled }}
+{{- range $name, $config := .Values.persistence.paths }}
+{{- if $config.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "controlcore.fullname" $ }}-{{ $name }}-pvc
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" $ | nindent 4 }}
+    component: {{ $name }}
+    storage-type: persistent
+  {{- with $config.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- if $.Values.persistence.accessModes }}
+      {{- toYaml $.Values.persistence.accessModes | nindent 4 }}
+    {{- else }}
+      {{- toYaml $config.accessModes | nindent 4 }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ $config.size }}
+  {{- if or $.Values.persistence.storageClass $config.storageClass }}
+  storageClassName: {{ $config.storageClass | default $.Values.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Component-specific PVCs
+*/}}
+
+{{- if .Values.components.database.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "controlcore.fullname" . }}-database-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: database
+    storage-type: persistent
+  {{- with .Values.components.database.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.components.database.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.components.database.persistence.size }}
+  {{- if .Values.components.database.persistence.storageClass }}
+  storageClassName: {{ .Values.components.database.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.components.redis.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "controlcore.fullname" . }}-redis-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: redis
+    storage-type: persistent
+  {{- with .Values.components.redis.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.components.redis.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.components.redis.persistence.size }}
+  {{- if .Values.components.redis.persistence.storageClass }}
+  storageClassName: {{ .Values.components.redis.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.components.opal.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "controlcore.fullname" . }}-opal-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: opal
+    storage-type: persistent
+  {{- with .Values.components.opal.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.components.opal.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.components.opal.persistence.size }}
+  {{- if .Values.components.opal.persistence.storageClass }}
+  storageClassName: {{ .Values.components.opal.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.components.frontend.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "controlcore.fullname" . }}-frontend-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: frontend
+    storage-type: persistent
+  {{- with .Values.components.frontend.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.components.frontend.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.components.frontend.persistence.size }}
+  {{- if .Values.components.frontend.persistence.storageClass }}
+  storageClassName: {{ .Values.components.frontend.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.backup.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "controlcore.fullname" . }}-backup-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "controlcore.labels" . | nindent 4 }}
+    component: backup
+    storage-type: persistent
+spec:
+  accessModes:
+    {{- toYaml .Values.backup.storage.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.storage.size }}
+  {{- if .Values.backup.storage.storageClass }}
+  storageClassName: {{ .Values.backup.storage.storageClass }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,123 @@
+# Example: Multiple Bouncers Protecting Different Resources
+# Copy this file and customize for your specific resources
+
+version: '3.8'
+
+services:
+  # Bouncer 1: Protect Customer API
+  customer-api-bouncer:
+    image: controlcore/cc-bouncer:latest
+    container_name: customer-api-bouncer
+    ports:
+      - "8080:8080"
+    environment:
+      # Basic Configuration
+      - BOUNCER_PORT=8080
+      - TARGET_HOST=customer-api:8000  # Your internal API host
+      - PAP_API_URL=http://cc-pap-api:8082
+      - OPAL_SERVER_URL=http://cc-opal:7000
+      - TENANT_ID=your-tenant-id
+      - API_KEY=your-api-key
+      
+      # Resource Auto-Discovery
+      - BOUNCER_ID=bouncer-customer-api
+      - BOUNCER_NAME=Customer API Bouncer
+      - BOUNCER_TYPE=reverse-proxy
+      - RESOURCE_NAME=Customer API
+      - RESOURCE_TYPE=api
+      - ORIGINAL_HOST_URL=https://api.mycompany.com
+      - BOUNCER_PUBLIC_URL=https://api-protected.mycompany.com
+      - SECURITY_POSTURE=deny-all
+      - DEPLOYMENT_PLATFORM=docker
+      - ENVIRONMENT=production
+      
+      # Operational
+      - LOG_ENABLED=true
+      - CACHE_ENABLED=true
+      - METRICS_ENABLED=true
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Bouncer 2: Protect Admin Portal
+  admin-portal-bouncer:
+    image: controlcore/cc-bouncer:latest
+    container_name: admin-portal-bouncer
+    ports:
+      - "8081:8081"
+    environment:
+      # Basic Configuration
+      - BOUNCER_PORT=8081
+      - TARGET_HOST=admin-portal:3000  # Your internal web app
+      - PAP_API_URL=http://cc-pap-api:8082
+      - OPAL_SERVER_URL=http://cc-opal:7000
+      - TENANT_ID=your-tenant-id
+      - API_KEY=your-api-key
+      
+      # Resource Auto-Discovery
+      - BOUNCER_ID=bouncer-admin-portal
+      - BOUNCER_NAME=Admin Portal Bouncer
+      - BOUNCER_TYPE=reverse-proxy
+      - RESOURCE_NAME=Admin Portal
+      - RESOURCE_TYPE=webapp
+      - ORIGINAL_HOST_URL=https://admin.mycompany.com
+      - BOUNCER_PUBLIC_URL=https://admin-protected.mycompany.com
+      - SECURITY_POSTURE=deny-all
+      - DEPLOYMENT_PLATFORM=docker
+      - ENVIRONMENT=production
+      
+      # Operational
+      - LOG_ENABLED=true
+      - CACHE_ENABLED=true
+      - METRICS_ENABLED=true
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Bouncer 3: Protect AI Agent
+  ai-agent-bouncer:
+    image: controlcore/cc-bouncer:latest
+    container_name: ai-agent-bouncer
+    ports:
+      - "8082:8082"
+    environment:
+      # Basic Configuration
+      - BOUNCER_PORT=8082
+      - TARGET_HOST=ai-agent-service:8000  # Your AI agent service
+      - PAP_API_URL=http://cc-pap-api:8082
+      - OPAL_SERVER_URL=http://cc-opal:7000
+      - TENANT_ID=your-tenant-id
+      - API_KEY=your-api-key
+      
+      # Resource Auto-Discovery
+      - BOUNCER_ID=bouncer-ai-agent
+      - BOUNCER_NAME=AI Agent Bouncer
+      - BOUNCER_TYPE=reverse-proxy
+      - RESOURCE_NAME=AI Customer Service Agent
+      - RESOURCE_TYPE=ai-agent
+      - ORIGINAL_HOST_URL=https://ai.mycompany.com
+      - BOUNCER_PUBLIC_URL=https://ai-protected.mycompany.com
+      - SECURITY_POSTURE=deny-all
+      - DEPLOYMENT_PLATFORM=docker
+      - ENVIRONMENT=production
+      
+      # Operational
+      - LOG_ENABLED=true
+      - CACHE_ENABLED=true
+      - METRICS_ENABLED=true
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+networks:
+  controlcore-network:
+    external: true
+
+# Usage:
+# 1. Copy this file and customize for your resources
+# 2. Update the resource configurations (names, types, hosts)
+# 3. Deploy: docker-compose -f your-bouncer-compose.yml up -d
+# 4. Verify: docker logs <bouncer-name> | grep "Successfully registered"
+# 5. View resources at http://localhost:3000/settings/resources
+# 6. Each bouncer will auto-register its resource with the Control Plane
+

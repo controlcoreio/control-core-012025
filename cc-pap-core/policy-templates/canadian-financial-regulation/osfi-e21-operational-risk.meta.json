@@ -1,0 +1,248 @@
+{
+  "version": "1.0.0",
+  "summary": "OSFI Guideline E-21 Operational Risk Management framework for Canadian financial institutions",
+  "detailed_description": "This policy template implements OSFI Guideline E-21 Operational Risk Management controls for federally regulated financial institutions. It enforces operational risk identification, assessment, monitoring, and mitigation across people, processes, systems, and external events - the four pillars of operational risk under OSFI's framework.\n\nThe policy ensures comprehensive operational risk management including new product risk assessments, critical process controls, key person dependency management, system failure impact analysis, external event monitoring, operational loss event reporting, risk appetite threshold monitoring, and business continuity plan activation protocols.\n\nKey capabilities:\n- Pre-launch operational risk assessment for new financial products\n- Validation of process controls for high-volume critical workflows\n- Detection and mitigation of key person dependencies\n- System change impact analysis for customer-facing systems\n- External threat monitoring with heightened controls activation\n- Automated operational loss event reporting (>$10K CAD threshold)\n- Risk appetite threshold enforcement with CRO escalation\n- Business continuity plan activation authorization controls\n\nThis template aligns with OSFI's three lines of defense model and supports ICAAP (Internal Capital Adequacy Assessment Process) for operational risk capital requirements. Designed for banks, trust companies, insurance companies, and cooperative credit associations under federal oversight.",
+  "use_cases": [
+    {
+      "title": "TD Bank: New Product Launch Operational Risk Assessment",
+      "description": "Deploy osfi-e21-operational-risk for new digital banking product rollout",
+      "scenario": "TD launches new AI-powered investment robo-advisor targeting 500K customers in first year. OSFI new product review focuses on: (1) Operational risk assessment before launch, (2) Process controls for algorithm-driven trades, (3) Technology failure scenarios and customer impact, (4) Third-party risk (cloud provider, data vendors). Policy enforces: Operational risk assessment required covering people (5 specialized roles), processes (automated rebalancing), systems (AWS infrastructure), external events (market volatility). Product launch blocked until assessment approved by Product Risk Committee with sign-off from CRO. Testing included: 50K simulated customer portfolios, stress testing for market crash scenario, vendor failure simulation. Result: Successful launch with zero operational incidents in first 6 months, OSFI examination rated operational risk management as 'strong'."
+    },
+    {
+      "title": "BMO: Critical Process Controls for Wire Transfer Operations",
+      "description": "Implement osfi-e21-operational-risk for high-volume payment processing",
+      "scenario": "BMO processes 250,000 wire transfers daily totaling $15B CAD. OSFI operational risk review examines: (1) Dual control for transfers >$100K, (2) Automated fraud detection, (3) Process controls to prevent errors, (4) Business continuity if payment system fails. Policy enforces: Dual authorization required (maker-checker) for transfers >$100K, automated blocking if fraud score >0.7, process control validation every 90 days including reconciliation checks, real-time monitoring of payment system health with automatic BCP activation if system availability <99.95%. Operational metrics: 99.98% accuracy rate (50 errors in 250K transfers/day), zero unauthorized transfers, fraud losses <0.001%. OSFI rating: Satisfactory operational risk controls."
+    },
+    {
+      "title": "National Bank: Key Person Dependency in Cybersecurity",
+      "description": "Use osfi-e21-operational-risk to address concentration risk in critical roles",
+      "scenario": "National Bank identifies key person risk: CISO holds unique knowledge of security architecture for 2,500 applications. OSFI operational risk assessment flags: (1) Single point of failure if CISO departs, (2) Insufficient documentation of security decisions, (3) Lack of succession planning. Policy enforces: New critical function assignments require documented succession plan with identified backup (deputy CISO + 2 senior architects), knowledge transfer plan with quarterly updates, cross-training schedule with verification, automated escalation if key person unavailable >5 business days without coverage. Mitigation implemented: Deputy CISO hired, security architecture documented in wiki (500+ pages), 3 senior architects cross-trained, quarterly BCP tests of CISO absence scenario. Result: Key person dependency reduced from critical to low risk."
+    },
+    {
+      "title": "CIBC: System Failure Impact Analysis for Mobile Banking",
+      "description": "Deploy osfi-e21-operational-risk for customer-facing digital channels",
+      "scenario": "CIBC mobile banking app serves 6M active users with 15M logins/day. OSFI technology risk review: (1) Impact if mobile app fails for >4 hours, (2) Customer notification procedures, (3) Alternative access channels, (4) Revenue impact and reputational risk. Policy requires: Failure impact analysis before any mobile app changes affecting >100K users, RTO of 1 hour for critical path (login, view balances, e-transfer), automated customer communication if outage >30 minutes, executive escalation if impact >$1M in lost revenue. Recent deployment blocked: Backend API change lacking failure analysis - discovered potential 2-hour outage affecting all 6M users. Analysis completed, change rescheduled with phased rollout (10% → 50% → 100% over 1 week). Avoided major outage, OSFI commended proactive risk management."
+    },
+    {
+      "title": "Scotiabank: External Event Risk - 2023 Rogers Outage",
+      "description": "Apply osfi-e21-operational-risk for third-party infrastructure dependencies",
+      "scenario": "Scotiabank experienced disruption during July 2022 Rogers network outage affecting payment terminals nationwide. OSFI post-mortem: (1) External event risk identification, (2) Dependency on single telecom provider, (3) Business continuity response, (4) Customer impact mitigation. Policy now enforces: Heightened monitoring mode activated automatically if major external threat detected (telecom outage, power grid issue, pandemic), dual-provider telecommunications for critical branches (Rogers + Bell), automated failover to backup network if primary unavailable >15 minutes, executive crisis committee activation for widespread service disruptions. During Oct 2023 Rogers outage (6 hours): Automatic failover to Bell network within 12 minutes, 98% of payment terminals operational throughout outage, zero customer complaints, business continuity plan validated. OSFI review: Excellent external event risk management and operational resilience."
+    },
+    {
+      "title": "Vancity Credit Union: Operational Loss Event Reporting",
+      "description": "Implement osfi-e21-operational-risk for operational loss data collection",
+      "scenario": "Vancity tracks operational losses per OSFI E-21 requirements: losses >$10K CAD must be reported to Risk Committee, >$100K to Board, trends analyzed for control improvements. Types: (1) Internal fraud - employee embezzlement, (2) External fraud - debit card fraud, (3) Technology failures - ATM outages, (4) Process errors - incorrect interest calculations. Policy enforces: Automatic loss event creation in GRC system if threshold exceeded, risk classification (people/process/systems/external), root cause analysis required within 30 days for losses >$50K, trend analysis quarterly identifying control gaps. 2024 operational losses: 47 events totaling $2.3M (down from $4.1M in 2023), top cause: external card fraud (automated controls reduced losses 44%), zero internal fraud events (enhanced monitoring). OSFI examination: Strong operational risk data collection and loss prevention framework."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Action being performed",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Application Code",
+          "integration_method": "Direct injection",
+          "example_api": "POST /authorize {action: 'launch_new_product'}"
+        }
+      ],
+      "configuration_notes": "Map business actions to policy evaluation triggers",
+      "plain_english": "What operational activity is being performed",
+      "how_to_fetch": "Configure action mapping in Control Core PEP",
+      "example_values": [
+        "launch_new_product",
+        "execute_process",
+        "approve_risk_exception",
+        "activate_bcp"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Type of resource (product, process, system, etc.)",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Resource Registry",
+          "integration_method": "Database lookup",
+          "example_api": "SELECT type FROM resources WHERE id = ?"
+        }
+      ],
+      "configuration_notes": "Classify resources by operational risk category",
+      "plain_english": "What type of business resource is involved",
+      "how_to_fetch": "Maintain resource registry with operational risk classifications",
+      "example_values": [
+        "financial_product",
+        "critical_business_process",
+        "core_system",
+        "continuity_plan"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.operational_risk_assessment_completed",
+      "type": "boolean",
+      "description": "Whether operational risk assessment has been completed and approved",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "GRC Platform",
+          "integration_method": "REST API",
+          "example_api": "GET /api/risk-assessments/{id}/status"
+        }
+      ],
+      "configuration_notes": "Track assessments in GRC system with approval workflow",
+      "plain_english": "Has the operational risk been formally assessed and documented",
+      "how_to_fetch": "Query GRC platform for assessment completion status",
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "user.role",
+      "type": "string",
+      "description": "User's role (CRO for Chief Risk Officer)",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Identity Provider",
+          "integration_method": "SAML/SCIM",
+          "example_api": "GET /api/users/{id}/groups"
+        }
+      ],
+      "configuration_notes": "Map IdP groups to policy roles, ensure CRO role is correctly identified",
+      "plain_english": "What is the user's organizational role",
+      "how_to_fetch": "Configure IdP integration with role mapping",
+      "example_values": [
+        "cro",
+        "coo",
+        "business_owner",
+        "risk_manager",
+        "auditor"
+      ],
+      "example_value": "user"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "Application Code",
+          "api_endpoint": "Request payload",
+          "field_mapping": "action",
+          "integration_method": "Direct",
+          "setup_notes": "Include action in authorization requests"
+        },
+        {
+          "condition": "input.resource.type",
+          "system": "Resource Registry",
+          "api_endpoint": "Database query",
+          "field_mapping": "resource_type",
+          "integration_method": "SQL",
+          "setup_notes": "Maintain resource classifications"
+        },
+        {
+          "condition": "input.context.operational_risk_assessment_completed",
+          "system": "GRC Platform",
+          "api_endpoint": "GET /api/assessments",
+          "field_mapping": "status",
+          "integration_method": "REST API",
+          "setup_notes": "Track assessment lifecycle"
+        }
+      ]
+    },
+    "systems_needed": [
+      "GRC Platform (Archer, MetricStream)",
+      "Resource Registry",
+      "Identity Provider",
+      "Risk Management System"
+    ],
+    "complexity_score": "High - Requires integration with enterprise risk management systems and operational workflows"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Review OSFI E-21 requirements and align with institutional risk appetite statement",
+      "2. Integrate Control Core with GRC platform for operational risk assessments",
+      "3. Configure resource classification for products, processes, and systems",
+      "4. Map user roles (CRO, COO, risk managers) from IdP to policy roles",
+      "5. Deploy to Sandbox and test with sample operational risk scenarios",
+      "6. Validate operational loss event reporting workflow",
+      "7. Configure monitoring for risk appetite threshold breaches",
+      "8. Train risk management team on policy administration",
+      "9. Deploy to Production with board Risk Committee approval",
+      "10. Schedule quarterly operational risk metrics reporting"
+    ],
+    "sandbox_testing": [
+      "Test new product launch without risk assessment → DENY",
+      "Test critical process execution with validated controls → ALLOW",
+      "Test risk exception approval by non-CRO → DENY",
+      "Test operational loss >$10K without Risk Committee reporting → FLAG",
+      "Validate BCP activation by authorized personnel → ALLOW"
+    ],
+    "production_deployment": [
+      "Obtain CRO and Board Risk Committee approval",
+      "Deploy in shadow mode for 2 weeks",
+      "Review operational risk events captured during shadow period",
+      "Enable enforcement with phased rollout (new products → processes → exceptions)",
+      "Monitor deny rate (target <2% for operational workflows)",
+      "Quarterly reporting to Board on operational risk policy effectiveness"
+    ],
+    "monitoring_setup": [
+      "Track new product launches blocked pending risk assessment",
+      "Monitor operational loss events >$10K CAD for reporting compliance",
+      "Alert on risk appetite breaches requiring CRO escalation",
+      "Dashboard for business continuity activations and resolution times",
+      "Quarterly operational risk metrics for OSFI self-assessment"
+    ]
+  },
+  "compliance_frameworks": [
+    "OSFI Guideline E-21",
+    "OSFI Guideline E-18",
+    "Basel II/III Operational Risk",
+    "SOC 2"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "osfi",
+    "operational-risk",
+    "e-21",
+    "canadian-banking",
+    "risk-management",
+    "business-continuity"
+  ],
+  "related_templates": [
+    "osfi-b13-technology-cyber-risk",
+    "osfi-b10-third-party-risk",
+    "soc2-change-management"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 12,
+    "user_attributes": 1,
+    "resource_attributes": 4,
+    "context_attributes": 7
+  },
+  "integration_guide": {
+    "overview": "Integrate Control Core with your GRC platform, resource registry, and risk management systems to automate OSFI E-21 operational risk controls.",
+    "steps_by_system": [
+      {
+        "system": "GRC Platform (Archer/MetricStream)",
+        "attributes_needed": [
+          "context.operational_risk_assessment_completed",
+          "context.product_committee_approved"
+        ],
+        "integration_steps": [
+          "1. Configure GRC API access for operational risk module",
+          "2. Map assessment workflow statuses to policy boolean flags",
+          "3. Test with sample product risk assessment",
+          "4. Enable 1-hour caching for assessment status"
+        ],
+        "example_response": "{\"assessment\": {\"status\": \"Approved\", \"approved_by\": \"Product Risk Committee\", \"date\": \"2024-10-15\"}}"
+      }
+    ]
+  }
+}

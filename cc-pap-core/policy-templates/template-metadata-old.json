@@ -1,0 +1,186 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-26",
+  "categories": {
+    "ai-governance": {
+      "name": "AI Governance",
+      "description": "Policies for AI system governance, accountability, and oversight",
+      "icon": "brain",
+      "color": "#3B82F6",
+      "templates": [
+        "ai-model-approval",
+        "ai-decision-transparency",
+        "ai-accountability-framework",
+        "ai-ethics-compliance"
+      ]
+    },
+    "ai-risk-management": {
+      "name": "AI Risk Management",
+      "description": "NIST Framework-based AI risk management policies",
+      "icon": "shield-check",
+      "color": "#10B981",
+      "templates": [
+        "ai-risk-assessment",
+        "ai-bias-detection",
+        "ai-adversarial-protection",
+        "ai-model-drift-monitoring"
+      ]
+    },
+    "ai-prompt-security": {
+      "name": "AI Prompt Security",
+      "description": "Security policies for AI prompt injection and manipulation",
+      "icon": "lock",
+      "color": "#EF4444",
+      "templates": [
+        "prompt-injection-prevention",
+        "ai-input-validation",
+        "ai-output-sanitization",
+        "ai-context-isolation"
+      ]
+    },
+    "ai-context-management": {
+      "name": "AI Dynamic Context Management",
+      "description": "Dynamic context-aware policies for AI systems",
+      "icon": "cpu",
+      "color": "#8B5CF6",
+      "templates": [
+        "ai-context-awareness",
+        "ai-dynamic-permissions",
+        "ai-session-management",
+        "ai-context-audit"
+      ]
+    },
+    "compliance": {
+      "name": "Compliance Frameworks",
+      "description": "Regulatory compliance policies (GDPR, HIPAA, CCPA, PIPEDA, PHIPA)",
+      "icon": "scale",
+      "color": "#F59E0B",
+      "templates": [
+        "gdpr-data-protection",
+        "hipaa-healthcare-privacy",
+        "ccpa-consumer-privacy",
+        "pipeda-canadian-privacy",
+        "phipa-ontario-health"
+      ]
+    },
+    "security": {
+      "name": "Security Frameworks",
+      "description": "Security and access control policies",
+      "icon": "shield",
+      "color": "#DC2626",
+      "templates": [
+        "zero-trust-architecture",
+        "multi-factor-authentication",
+        "role-based-access-control",
+        "privileged-access-management"
+      ]
+    },
+    "industry-frameworks": {
+      "name": "Industry Frameworks",
+      "description": "Industry-specific compliance and governance",
+      "icon": "building",
+      "color": "#6366F1",
+      "templates": [
+        "soc2-compliance",
+        "iso27001-security",
+        "iso9001-quality",
+        "pci-dss-payment"
+      ]
+    },
+    "ai-assistants": {
+      "name": "AI Assistants & Agents",
+      "description": "Policies for AI assistants, chatbots, and autonomous agents",
+      "icon": "robot",
+      "color": "#06B6D4",
+      "templates": [
+        "ai-assistant-boundaries",
+        "ai-agent-autonomy",
+        "ai-human-collaboration",
+        "ai-decision-delegation"
+      ]
+    }
+  },
+  "smartSuggestions": {
+    "resourceTypes": {
+      "healthcare-data": {
+        "suggestedCategories": ["compliance", "security"],
+        "priorityTemplates": [
+          "hipaa-healthcare-privacy",
+          "phipa-ontario-health",
+          "zero-trust-architecture"
+        ],
+        "complianceRequirements": ["HIPAA", "PHIPA", "SOC2"]
+      },
+      "financial-data": {
+        "suggestedCategories": ["compliance", "security", "industry-frameworks"],
+        "priorityTemplates": [
+          "pci-dss-payment",
+          "soc2-compliance",
+          "zero-trust-architecture"
+        ],
+        "complianceRequirements": ["PCI-DSS", "SOC2", "ISO27001"]
+      },
+      "ai-model": {
+        "suggestedCategories": ["ai-governance", "ai-risk-management", "ai-prompt-security"],
+        "priorityTemplates": [
+          "ai-model-approval",
+          "ai-bias-detection",
+          "prompt-injection-prevention"
+        ],
+        "complianceRequirements": ["AI Governance", "NIST AI Framework"]
+      },
+      "personal-data": {
+        "suggestedCategories": ["compliance", "security"],
+        "priorityTemplates": [
+          "gdpr-data-protection",
+          "ccpa-consumer-privacy",
+          "pipeda-canadian-privacy"
+        ],
+        "complianceRequirements": ["GDPR", "CCPA", "PIPEDA"]
+      },
+      "ai-assistant": {
+        "suggestedCategories": ["ai-assistants", "ai-context-management", "ai-prompt-security"],
+        "priorityTemplates": [
+          "ai-assistant-boundaries",
+          "ai-context-awareness",
+          "prompt-injection-prevention"
+        ],
+        "complianceRequirements": ["AI Governance", "Data Protection"]
+      }
+    },
+    "industryContext": {
+      "healthcare": {
+        "requiredCompliance": ["HIPAA", "PHIPA"],
+        "suggestedTemplates": [
+          "hipaa-healthcare-privacy",
+          "phipa-ontario-health",
+          "ai-model-approval"
+        ]
+      },
+      "financial": {
+        "requiredCompliance": ["PCI-DSS", "SOC2"],
+        "suggestedTemplates": [
+          "pci-dss-payment",
+          "soc2-compliance",
+          "ai-risk-assessment"
+        ]
+      },
+      "government": {
+        "requiredCompliance": ["GDPR", "PIPEDA"],
+        "suggestedTemplates": [
+          "gdpr-data-protection",
+          "pipeda-canadian-privacy",
+          "ai-ethics-compliance"
+        ]
+      },
+      "technology": {
+        "requiredCompliance": ["SOC2", "ISO27001"],
+        "suggestedTemplates": [
+          "soc2-compliance",
+          "iso27001-security",
+          "ai-governance"
+        ]
+      }
+    }
+  }
+}

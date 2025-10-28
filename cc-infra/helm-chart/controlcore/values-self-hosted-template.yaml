@@ -1,0 +1,331 @@
+# Helm values template for self-hosted deployments (Kickstart/Custom tiers)
+# This template is used by cc-signup-service to generate self-hosted deployment packages
+
+global:
+  user:
+    id: "{{ .Values.user.id }}"
+    email: "{{ .Values.user.email }}"
+    company_name: "{{ .Values.user.company_name }}"
+    tier: "{{ .Values.user.tier }}"
+    stripe_customer_id: "{{ .Values.user.stripe_customer_id }}"
+  
+  telemetry:
+    enabled: true
+    endpoint: "{{ .Values.telemetry.endpoint }}"
+    api_key: "{{ .Values.telemetry.api_key }}"
+    customer_id: "{{ .Values.user.stripe_customer_id }}"
+
+# Control Plane (cc-pap)
+cc-pap:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: controlcore/cc-pap
+    tag: "{{ .Values.image.tag | default "latest" }}"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: "{{ .Values.ingress.host | default "controlcore.local" }}"
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: "cc-pap-tls"
+        hosts:
+          - "{{ .Values.ingress.host | default "controlcore.local" }}"
+  
+  env:
+    USER_ID: "{{ .Values.user.id }}"
+    TIER: "{{ .Values.user.tier }}"
+    STRIPE_CUSTOMER_ID: "{{ .Values.user.stripe_customer_id }}"
+    DATABASE_URL: "postgresql://{{ .Values.database.username }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+    REDIS_URL: "redis://:{{ .Values.redis.password }}@{{ .Values.redis.host }}:{{ .Values.redis.port }}"
+    OPA_URL: "http://{{ .Values.opa.host }}:{{ .Values.opa.port }}"
+    OPAL_URL: "http://{{ .Values.opal.host }}:{{ .Values.opal.port }}"
+    TELEMETRY_ENDPOINT: "{{ .Values.telemetry.endpoint }}"
+    TELEMETRY_API_KEY: "{{ .Values.telemetry.api_key }}"
+    TELEMETRY_CUSTOMER_ID: "{{ .Values.user.stripe_customer_id }}"
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Policy Admin API (cc-pap-api)
+cc-pap-api:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: controlcore/cc-pap-api
+    tag: "{{ .Values.image.tag | default "latest" }}"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  env:
+    USER_ID: "{{ .Values.user.id }}"
+    TIER: "{{ .Values.user.tier }}"
+    DATABASE_URL: "postgresql://{{ .Values.database.username }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+    REDIS_URL: "redis://:{{ .Values.redis.password }}@{{ .Values.redis.host }}:{{ .Values.redis.port }}"
+    OPA_URL: "http://{{ .Values.opa.host }}:{{ .Values.opa.port }}"
+    OPAL_URL: "http://{{ .Values.opal.host }}:{{ .Values.opal.port }}"
+    TELEMETRY_ENDPOINT: "{{ .Values.telemetry.endpoint }}"
+    TELEMETRY_API_KEY: "{{ .Values.telemetry.api_key }}"
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
+
+# Database (PostgreSQL)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "{{ .Values.database.postgres_password }}"
+    username: "{{ .Values.database.username }}"
+    password: "{{ .Values.database.password }}"
+    database: "{{ .Values.database.name }}"
+  
+  primary:
+    persistence:
+      enabled: true
+      size: "{{ .Values.tierLimits[.Values.user.tier].storageGB | default 10 }}Gi"
+      storageClass: "standard"
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+    
+    initdb:
+      scripts:
+        init-user.sql: |
+          -- Initialize user-specific database schema
+          CREATE SCHEMA IF NOT EXISTS user_{{ .Values.user.id | replace "-" "_" }};
+          GRANT ALL PRIVILEGES ON SCHEMA user_{{ .Values.user.id | replace "-" "_" }} TO {{ .Values.database.username }};
+          
+          -- Create user-specific tables
+          CREATE TABLE IF NOT EXISTS user_{{ .Values.user.id | replace "-" "_" }}.policies (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            rego_code TEXT NOT NULL,
+            tier VARCHAR(50) NOT NULL DEFAULT '{{ .Values.user.tier }}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS user_{{ .Values.user.id | replace "-" "_" }}.resources (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(100) NOT NULL,
+            config JSONB,
+            tier VARCHAR(50) NOT NULL DEFAULT '{{ .Values.user.tier }}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS user_{{ .Values.user.id | replace "-" "_" }}.bouncers (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(100) NOT NULL,
+            config JSONB,
+            status VARCHAR(50) DEFAULT 'active',
+            tier VARCHAR(50) NOT NULL DEFAULT '{{ .Values.user.tier }}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          -- Insert user record
+          INSERT INTO user_{{ .Values.user.id | replace "-" "_" }}.users (id, email, company_name, tier, created_at) 
+          VALUES ('{{ .Values.user.id }}', '{{ .Values.user.email }}', '{{ .Values.user.company_name }}', '{{ .Values.user.tier }}', CURRENT_TIMESTAMP)
+          ON CONFLICT (id) DO NOTHING;
+
+# Redis
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "{{ .Values.redis.password }}"
+  
+  master:
+    persistence:
+      enabled: true
+      size: "2Gi"
+      storageClass: "standard"
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+
+# OPA (Open Policy Agent)
+opa:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: openpolicyagent/opa
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8181
+    targetPort: 8181
+  
+  env:
+    USER_ID: "{{ .Values.user.id }}"
+    TIER: "{{ .Values.user.tier }}"
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "100m"
+
+# OPAL (Open Policy Administration Layer)
+opal:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: authorizon/opal-server
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 7002
+    targetPort: 7002
+  
+  env:
+    USER_ID: "{{ .Values.user.id }}"
+    TIER: "{{ .Values.user.tier }}"
+    OPA_SERVER_URL: "http://{{ .Values.opa.host }}:{{ .Values.opa.port }}"
+    DATABASE_URL: "postgresql://{{ .Values.database.username }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "100m"
+
+# Monitoring (basic for self-hosted)
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 60s
+      scrapeTimeout: 10s
+  
+  grafana:
+    enabled: false  # Disabled for self-hosted to reduce resource usage
+
+# Backup (basic for self-hosted)
+backup:
+  enabled: true
+  
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  retention: "{{ .Values.tierLimits[.Values.user.tier].backupRetentionDays | default 7 }}d"
+  
+  local:
+    enabled: true
+    path: "/backups"
+  
+  s3:
+    enabled: false  # Disabled for self-hosted by default
+
+# Security
+security:
+  networkPolicy:
+    enabled: true
+    ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8000
+  
+  podSecurityPolicy:
+    enabled: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  serviceAccount:
+    create: true
+    name: "cc-pap-sa"
+    annotations: {}
+
+# Resource limits based on tier
+tierLimits:
+  kickstart:
+    maxPolicies: 100
+    maxResources: 50
+    maxBouncers: 5
+    maxUsers: 10
+    apiCallsPerHour: 10000
+    policyEvaluationsPerHour: 50000
+    storageGB: 10
+    backupRetentionDays: 7
+  custom:
+    maxPolicies: 1000
+    maxResources: 500
+    maxBouncers: 50
+    maxUsers: 100
+    apiCallsPerHour: 100000
+    policyEvaluationsPerHour: 500000
+    storageGB: 50
+    backupRetentionDays: 30
+
+# Feature flags based on tier
+features:
+  kickstart:
+    aiIntegration: false
+    advancedAnalytics: false
+    customIntegrations: false
+    prioritySupport: false
+  custom:
+    aiIntegration: true
+    advancedAnalytics: true
+    customIntegrations: true
+    prioritySupport: true

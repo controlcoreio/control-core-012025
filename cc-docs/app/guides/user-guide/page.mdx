@@ -1,0 +1,1279 @@
+# Policy Manager User Guide
+
+Welcome to the Control Core Policy Manager Guide! This comprehensive guide will help you create, test, deploy, and manage authorization policies effectively.
+
+## Introduction
+
+As a Policy Manager, you're responsible for defining and maintaining the authorization rules that protect your organization's resources. Control Core provides powerful tools to make policy management intuitive, safe, and efficient.
+
+### What You'll Learn
+
+- Creating policies using visual builder and code editor
+- Testing policies with comprehensive test cases
+- Deploying policies to sandbox and production
+- Managing policy versions and rollbacks
+- Using policy templates for common scenarios
+- Monitoring policy performance and decisions
+- Collaborating with team members
+
+## Getting Started
+
+### Accessing the Policy Administration Console
+
+1. **Navigate to your Control Core instance**:
+   - **90-day Pilot**: `https://your-tenant.controlcore.io`
+   - **Pro**: `https://your-tenant.controlplane.controlcore.io`
+   - **Enterprise**: `https://console.yourcompany.com`
+
+2. **Log in** with your credentials
+
+3. **Dashboard Overview**:
+   - **Policies**: View and manage all policies
+   - **Resources**: Define protected resources
+   - **Monitoring**: View policy decisions and metrics
+   - **Settings**: Configure system settings
+
+### Understanding Environments
+
+Control Core provides two environments for safe policy development:
+
+**Sandbox Environment**:
+- Safe testing environment
+- No impact on production
+- Test policies before deployment
+- Experiment freely
+
+**Production Environment**:
+- Live policy enforcement
+- Protects real resources
+- Requires approval (in some configurations)
+- Can rollback if needed
+
+## Creating Your First Policy
+
+### Method 1: Using the Visual Policy Builder
+
+The visual policy builder provides a no-code interface for creating policies.
+
+**Step 1: Create New Policy**
+
+1. Click **Policies** → **Create Policy**
+2. Choose **Visual Builder**
+3. Enter policy details:
+   - **Name**: `api-read-access`
+   - **Description**: Allow users to read API data
+   - **Environment**: Sandbox
+   - **Category**: Access Control
+
+**Step 2: Define Conditions**
+
+Use the visual interface to build your policy:
+
+```
+IF User has role "developer"
+AND Resource type is "api"
+AND Action is "read"
+THEN Allow
+```
+
+Visual elements:
+- **Drag** condition blocks
+- **Connect** with AND/OR operators
+- **Configure** each condition
+- **Preview** the generated Rego code
+
+**Step 3: Save and Test**
+
+1. Click **Generate Rego** to see the code
+2. Click **Save**
+3. Proceed to testing
+
+### Method 2: Using the Monaco Code Editor
+
+For advanced policies, use the Monaco code editor with IntelliSense.
+
+**Step 1: Create New Policy**
+
+1. Click **Policies** → **Create Policy**
+2. Choose **Code Editor**
+3. Enter policy details (same as above)
+
+**Step 2: Write Policy Code**
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Default deny - fail secure
+default allow := false
+
+# Allow developers to read API data
+allow if {
+    # Check user role
+    input.user.roles[_] == "developer"
+    
+    # Check resource type
+    input.resource.type == "api"
+    
+    # Check action
+    input.action.name == "read"
+}
+
+# Allow admins all access
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+**Step 3: Use IntelliSense**
+
+- **Type `input.`** to see available fields
+- **Hover** over functions for documentation
+- **Ctrl+Space** for auto-completion
+- **F12** to go to definition
+
+### Method 3: Using Policy Templates
+
+Start with pre-built templates for common scenarios.
+
+**Step 1: Browse Templates**
+
+1. Click **Policies** → **Create from Template**
+2. Browse available templates:
+   - API Authentication
+   - Role-Based Access Control (RBAC)
+   - Attribute-Based Access Control (ABAC)
+   - Time-Based Access
+   - Data Row-Level Security
+   - AI Agent Control
+
+**Step 2: Select Template**
+
+1. Click **API Basic Authentication** template
+2. Preview the template code
+3. Click **Use This Template**
+
+**Step 3: Customize Template**
+
+The template provides variables you can customize:
+
+```rego
+# Template provides structure
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Customize these values
+allowed_roles := ["developer", "admin", "manager"]  # Edit this
+allowed_actions := ["read", "write"]                # Edit this
+
+allow if {
+    input.user.roles[_] in allowed_roles
+    input.action.name in allowed_actions
+}
+```
+
+1. **Modify** the allowed roles and actions
+2. **Add** additional conditions as needed
+3. **Save** your customized policy
+
+## Understanding Policy Structure
+
+### Input Schema
+
+All policies receive an `input` object with this structure:
+
+```json
+{
+  "user": {
+    "id": "user-123",
+    "email": "john@company.com",
+    "roles": ["developer", "team-lead"],
+    "department": "Engineering",
+    "attributes": {
+      "clearance_level": 3,
+      "manager": "user-456",
+      "hire_date": "2020-01-15"
+    }
+  },
+  "resource": {
+    "id": "api-users",
+    "type": "api",
+    "path": "/api/v1/users",
+    "attributes": {
+      "owner": "user-789",
+      "sensitivity": "confidential",
+      "environment": "production"
+    }
+  },
+  "action": {
+    "name": "read",
+    "method": "GET"
+  },
+  "context": {
+    "ip_address": "192.168.1.100",
+    "time": "2025-01-25T10:30:00Z",
+    "request_id": "req-123-456"
+  }
+}
+```
+
+### Policy Output
+
+Policies must return an `allow` decision:
+
+```rego
+# Boolean result
+allow := true   # Allow the request
+allow := false  # Deny the request (default)
+
+# Or conditional
+allow if {
+    # conditions here
+}
+```
+
+### Common Policy Patterns
+
+**Pattern 1: Role-Based Access**
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Admin users have full access
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+# Developers can read
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name == "read"
+}
+```
+
+**Pattern 2: Resource Ownership**
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Users can access their own resources
+allow if {
+    input.resource.attributes.owner == input.user.id
+}
+
+# Or resources in their department
+allow if {
+    input.resource.attributes.department == input.user.department
+}
+```
+
+**Pattern 3: Time-Based Access**
+
+```rego
+package controlcore.policy
+
+import rego.v1
+import future.keywords.contains
+
+default allow := false
+
+# Allow during business hours only
+allow if {
+    input.user.roles[_] == "employee"
+    is_business_hours
+}
+
+# Check if current time is business hours (9 AM - 5 PM)
+is_business_hours if {
+    hour := time.clock([time.now_ns()])[0]
+    hour >= 9
+    hour < 17
+}
+```
+
+**Pattern 4: Multi-Factor Authentication Required**
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Sensitive resources require MFA
+allow if {
+    input.resource.attributes.sensitivity == "confidential"
+    input.user.attributes.mfa_verified == true
+    input.user.roles[_] in ["admin", "manager"]
+}
+
+# Public resources don't require MFA
+allow if {
+    input.resource.attributes.sensitivity == "public"
+    input.user.roles[_] == "employee"
+}
+```
+
+## Testing Policies
+
+### Creating Test Cases
+
+Comprehensive testing ensures your policies work correctly.
+
+**Step 1: Navigate to Test Tab**
+
+1. Open your policy
+2. Click **Test** tab
+3. Click **Add Test Case**
+
+**Step 2: Define Test Case**
+
+```json
+{
+  "name": "Developer can read API",
+  "description": "Verify developers have read access to APIs",
+  "input": {
+    "user": {
+      "id": "user-123",
+      "roles": ["developer"]
+    },
+    "resource": {
+      "type": "api",
+      "path": "/api/v1/data"
+    },
+    "action": {
+      "name": "read"
+    }
+  },
+  "expected": true,
+  "tags": ["rbac", "api", "read"]
+}
+```
+
+**Step 3: Add Multiple Test Cases**
+
+Create comprehensive test coverage:
+
+```json
+[
+  {
+    "name": "Admin has full access",
+    "input": {
+      "user": {"id": "user-1", "roles": ["admin"]},
+      "resource": {"type": "api"},
+      "action": {"name": "write"}
+    },
+    "expected": true
+  },
+  {
+    "name": "Developer can read",
+    "input": {
+      "user": {"id": "user-2", "roles": ["developer"]},
+      "resource": {"type": "api"},
+      "action": {"name": "read"}
+    },
+    "expected": true
+  },
+  {
+    "name": "Developer cannot write",
+    "input": {
+      "user": {"id": "user-2", "roles": ["developer"]},
+      "resource": {"type": "api"},
+      "action": {"name": "write"}
+    },
+    "expected": false
+  },
+  {
+    "name": "Viewer cannot write",
+    "input": {
+      "user": {"id": "user-3", "roles": ["viewer"]},
+      "resource": {"type": "api"},
+      "action": {"name": "write"}
+    },
+    "expected": false
+  }
+]
+```
+
+**Step 4: Run Tests**
+
+1. Click **Run All Tests**
+2. View results:
+   - ✅ **Pass**: Policy returned expected result
+   - ❌ **Fail**: Policy returned unexpected result
+3. Review failures and fix policy
+
+### Test-Driven Policy Development
+
+**Best Practice**: Write tests first, then implement policy.
+
+1. **Define requirements** as test cases
+2. **Run tests** (they will fail initially)
+3. **Implement policy** to make tests pass
+4. **Refactor** while keeping tests green
+
+### Coverage Analysis
+
+Ensure your tests cover all scenarios:
+
+- **Positive cases**: Requests that should be allowed
+- **Negative cases**: Requests that should be denied
+- **Edge cases**: Boundary conditions
+- **Error cases**: Invalid or missing data
+
+**Example Coverage**:
+
+| Scenario | Role | Action | Resource | Expected |
+|----------|------|--------|----------|----------|
+| Admin full access | admin | write | api | Allow |
+| Developer read | developer | read | api | Allow |
+| Developer write | developer | write | api | Deny |
+| Viewer read | viewer | read | api | Allow |
+| Viewer write | viewer | write | api | Deny |
+| No role | - | read | api | Deny |
+| Invalid resource | developer | read | invalid | Deny |
+
+## Deploying Policies
+
+### Sandbox Deployment
+
+Test your policy in a safe environment first.
+
+**Step 1: Deploy to Sandbox**
+
+1. Open your policy
+2. Click **Deploy** dropdown
+3. Select **Deploy to Sandbox**
+4. Add deployment notes (optional)
+5. Click **Confirm**
+
+**Step 2: Verify Deployment**
+
+1. Status changes to "Active in Sandbox"
+2. Policy is now enforced in sandbox environment
+3. Test with real requests
+
+**Step 3: Test in Sandbox**
+
+```bash
+# Test API call through sandbox bouncer
+curl -X GET https://sandbox-bouncer.yourcompany.com/api/v1/data \
+  -H "Authorization: Bearer developer-token"
+
+# Should succeed for developers
+
+curl -X POST https://sandbox-bouncer.yourcompany.com/api/v1/data \
+  -H "Authorization: Bearer developer-token" \
+  -d '{"test": "data"}'
+
+# Should be denied for developers
+```
+
+### Production Deployment
+
+Once tested, promote to production.
+
+**Step 1: Review Policy**
+
+1. Verify all tests pass
+2. Review policy code
+3. Check sandbox performance metrics
+4. Get approval (if required)
+
+**Step 2: Promote to Production**
+
+1. Click **Deploy** dropdown
+2. Select **Promote to Production**
+3. Add deployment notes
+4. Review changes
+5. Click **Confirm**
+
+**Step 3: Monitor Deployment**
+
+1. Watch decision logs in real-time
+2. Monitor for errors or unexpected denials
+3. Check performance metrics
+4. Be ready to rollback if needed
+
+### Rollback Procedures
+
+If issues arise, quickly rollback.
+
+**Quick Rollback**:
+
+1. Navigate to **Policies** → **History**
+2. Find previous working version
+3. Click **Rollback to This Version**
+4. Confirm rollback
+
+**Automatic Rollback** (if configured):
+
+- Triggers on high error rate
+- Triggers on performance degradation
+- Triggers on validation failures
+- Notifies administrators
+
+## Policy Versioning
+
+### Understanding Versions
+
+Every policy save creates a new version:
+
+```
+Version 1 (Initial)    → Created policy
+Version 2              → Added admin rule
+Version 3              → Fixed bug in developer rule
+Version 4 (Current)    → Added time-based restrictions
+```
+
+### Version Management
+
+**View Version History**:
+
+1. Open policy
+2. Click **History** tab
+3. See all versions with:
+   - Version number
+   - Author
+   - Timestamp
+   - Deployment status
+   - Changes summary
+
+**Compare Versions**:
+
+1. Select two versions
+2. Click **Compare**
+3. View side-by-side diff
+4. Understand what changed
+
+**Restore Previous Version**:
+
+1. Select version to restore
+2. Click **Restore**
+3. Creates new version with old content
+4. Deploy as normal
+
+## Managing Resources
+
+### Defining Protected Resources
+
+Tell Control Core what you're protecting.
+
+**Step 1: Add Resource**
+
+1. Navigate to **Resources**
+2. Click **Add Resource**
+3. Enter details:
+
+```yaml
+Name: User Management API
+Type: API
+Path: /api/v1/users/*
+Methods: GET, POST, PUT, DELETE
+Environment: Production
+
+Attributes:
+  sensitivity: confidential
+  owner: engineering-team
+  compliance: GDPR
+  data_classification: PII
+```
+
+**Step 2: Configure Protection**
+
+1. **Authentication Required**: Yes
+2. **Policy Enforcement**: Enabled
+3. **Audit Logging**: All requests
+4. **Rate Limiting**: 1000 req/min
+
+**Step 3: Link Policies**
+
+1. Select applicable policies
+2. Set policy priority
+3. Configure policy chain (AND/OR)
+
+### Resource Attributes
+
+Use attributes in policies:
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Only users with high clearance can access confidential resources
+allow if {
+    input.resource.attributes.sensitivity == "confidential"
+    input.user.attributes.clearance_level >= 3
+}
+
+# GDPR-protected resources require consent
+allow if {
+    input.resource.attributes.compliance == "GDPR"
+    input.user.attributes.gdpr_consent == true
+}
+```
+
+## Monitoring Policies
+
+### Decision Logs
+
+View all authorization decisions in real-time.
+
+**Access Decision Logs**:
+
+1. Navigate to **Monitoring** → **Decisions**
+2. Filter by:
+   - Time range
+   - User
+   - Resource
+   - Decision (Allow/Deny)
+   - Policy
+
+**Example Log Entry**:
+
+```json
+{
+  "timestamp": "2025-01-25T10:30:45Z",
+  "decision_id": "dec-123-456",
+  "policy": "api-read-access",
+  "decision": "allow",
+  "user": {
+    "id": "user-123",
+    "email": "john@company.com"
+  },
+  "resource": {
+    "path": "/api/v1/users",
+    "type": "api"
+  },
+  "action": "read",
+  "evaluation_time_ms": 15,
+  "cache_hit": true
+}
+```
+
+### Performance Metrics
+
+Monitor policy performance:
+
+**Key Metrics**:
+- **Evaluation Time**: How long policy took to evaluate
+- **Cache Hit Rate**: Percentage of cached decisions
+- **Allow Rate**: Percentage of allowed requests
+- **Deny Rate**: Percentage of denied requests
+- **Error Rate**: Policy evaluation errors
+
+**Performance Dashboard**:
+
+1. Navigate to **Monitoring** → **Performance**
+2. View metrics:
+   - Average evaluation time: 12ms
+   - P95 evaluation time: 45ms
+   - P99 evaluation time: 89ms
+   - Cache hit rate: 87%
+   - Requests per second: 450
+
+**Optimization Tips**:
+
+- Keep policies simple and focused
+- Use caching effectively
+- Avoid complex computations
+- Index frequently queried data
+- Use early returns when possible
+
+### Alerts and Notifications
+
+Set up alerts for important events.
+
+**Configure Alerts**:
+
+1. Navigate to **Settings** → **Alerts**
+2. Click **Create Alert**
+3. Configure:
+
+```yaml
+Alert Name: High Deny Rate
+Condition: Deny rate > 50% for 5 minutes
+Notification: Email, Slack
+Recipients: security-team@company.com
+Severity: Warning
+```
+
+**Common Alert Types**:
+- High deny rate (possible attack)
+- Policy evaluation errors
+- Slow policy performance
+- Unexpected access patterns
+- Failed policy deployments
+
+## Collaboration and Workflow
+
+### Team Collaboration
+
+Work effectively with your team.
+
+**Roles and Permissions**:
+
+| Role | Create | Edit | Test | Deploy | Delete |
+|------|--------|------|------|--------|--------|
+| Admin | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Policy Manager | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Policy Developer | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Viewer | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+**Collaborative Features**:
+
+1. **Comments**: Add comments to policies
+2. **Reviews**: Request peer review before deployment
+3. **Approval Workflow**: Require approvals for production
+4. **Change Tracking**: See who changed what and when
+5. **Notifications**: Get notified of relevant changes
+
+### Policy Review Process
+
+**Best Practice Workflow**:
+
+1. **Create**: Developer creates policy
+2. **Test**: Developer adds comprehensive tests
+3. **Review**: Peer reviews code and tests
+4. **Approve**: Manager approves policy
+5. **Deploy Sandbox**: Deploy to sandbox
+6. **Validate**: Test in sandbox environment
+7. **Deploy Production**: Promote to production
+8. **Monitor**: Watch decision logs closely
+9. **Document**: Update documentation
+
+### Commenting and Documentation
+
+**Add Comments to Policies**:
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Policy: API Read Access Control
+# Owner: Engineering Team
+# Last Updated: 2025-01-25
+# Jira: ENG-1234
+
+default allow := false
+
+# Allow developers to read API data
+# This rule supports the data science team's read-only access needs
+# Reference: https://wiki.company.com/api-access-policy
+allow if {
+    input.user.roles[_] == "developer"
+    input.resource.type == "api"
+    input.action.name == "read"
+}
+```
+
+**Document Policies**:
+
+1. Navigate to policy
+2. Click **Documentation** tab
+3. Add:
+   - Purpose and scope
+   - Business requirements
+   - Dependencies
+   - Related policies
+   - Contact information
+
+## Best Practices
+
+### Policy Design
+
+**Keep Policies Simple**:
+```rego
+# Good: Clear and simple
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+# Bad: Complex and hard to understand
+allow if {
+    count([r | r := input.user.roles[_]; r == "admin" || r == "superuser" || r == "root"]) > 0
+}
+```
+
+**Use Helper Functions**:
+```rego
+# Good: Reusable helper function
+is_admin if {
+    input.user.roles[_] in ["admin", "superuser"]
+}
+
+allow if {
+    is_admin
+}
+
+# Another rule using the same helper
+audit_required if {
+    is_admin
+}
+```
+
+**Fail Secure**:
+```rego
+# Always start with default deny
+default allow := false
+
+# Then explicitly allow
+allow if {
+    # conditions
+}
+```
+
+### Testing Best Practices
+
+**Test Coverage**:
+- Aim for 100% coverage of policy rules
+- Test both positive and negative cases
+- Test edge cases and boundary conditions
+- Test with real-world data when possible
+
+**Test Organization**:
+```json
+{
+  "name": "Admin Access Tests",
+  "tests": [
+    {
+      "name": "admin-can-read",
+      "description": "Admin users can read all resources",
+      "input": {...},
+      "expected": true
+    },
+    {
+      "name": "admin-can-write",
+      "description": "Admin users can write all resources",
+      "input": {...},
+      "expected": true
+    }
+  ]
+}
+```
+
+**Continuous Testing**:
+- Run tests before every deployment
+- Automate testing in CI/CD pipeline
+- Test in sandbox before production
+- Monitor test results over time
+
+### Performance Optimization
+
+**Cache-Friendly Policies**:
+```rego
+# Good: Deterministic and cacheable
+allow if {
+    input.user.roles[_] == "admin"
+    input.action.name == "read"
+}
+
+# Bad: Non-deterministic (uses current time)
+allow if {
+    input.user.roles[_] == "admin"
+    hour := time.clock([time.now_ns()])[0]
+    hour >= 9
+}
+```
+
+**Avoid Expensive Operations**:
+```rego
+# Good: Simple comparison
+allow if {
+    input.user.department == "Engineering"
+}
+
+# Bad: Complex computation in every evaluation
+allow if {
+    count([u | u := data.users[_]; u.department == "Engineering"]) > 100
+}
+```
+
+### Security Best Practices
+
+**Principle of Least Privilege**:
+```rego
+# Only grant minimum necessary permissions
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name == "read"  # Only read, not write
+    input.resource.environment == "development"  # Only dev, not prod
+}
+```
+
+**Defense in Depth**:
+```rego
+# Multiple layers of checks
+allow if {
+    # Layer 1: Authentication
+    input.user.authenticated == true
+    
+    # Layer 2: Authorization
+    input.user.roles[_] == "admin"
+    
+    # Layer 3: MFA
+    input.user.mfa_verified == true
+    
+    # Layer 4: IP restriction
+    input.context.ip_address in allowed_ips
+}
+```
+
+**Audit Everything**:
+```rego
+# Log all access attempts, especially denials
+deny_reason := "User lacks required role" if {
+    not input.user.roles[_] in allowed_roles
+}
+
+deny_reason := "MFA not verified" if {
+    input.user.mfa_verified != true
+}
+```
+
+## Common Use Cases
+
+### Use Case 1: Financial Services Compliance (FINTRAC, OSFI, AML)
+
+**FINTRAC Large Cash Transaction Reporting**:
+```rego
+package fintrac.reporting
+
+import rego.v1
+
+default allow := false
+default report_required := false
+
+# FINTRAC: Report cash transactions over $10,000 CAD
+report_required if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    input.transaction.type in ["cash", "cash_equivalent"]
+}
+
+# Allow transaction but flag for reporting
+allow if {
+    input.user.roles[_] in ["teller", "financial-advisor", "branch-manager"]
+    input.user.attributes.fintrac_trained == true
+    
+    # Transaction details captured for reporting
+    input.transaction.customer_id != null
+    input.transaction.purpose != null
+}
+
+# Suspicious Transaction Reporting (STR)
+suspicious_indicators[indicator] if {
+    # Indicator 1: Structuring (multiple transactions under threshold)
+    recent := data.customer_transactions[input.transaction.customer_id]
+    count([t | t := recent[_]; t.amount >= 9000; t.amount < 10000; t.days_ago < 30]) >= 3
+    indicator := "possible_structuring"
+}
+
+suspicious_indicators[indicator] if {
+    # Indicator 2: Unusual transaction pattern
+    customer := data.customers[input.transaction.customer_id]
+    input.transaction.amount > (customer.average_transaction * 10)
+    indicator := "unusual_amount"
+}
+
+# Block if too many suspicious indicators
+allow if {
+    count(suspicious_indicators) == 0
+}
+
+allow if {
+    count(suspicious_indicators) > 0
+    count(suspicious_indicators) < 3
+    # Flag for compliance review but allow
+    input.user.roles[_] == "compliance-officer"
+}
+```
+
+**OSFI Segregation of Duties**:
+```rego
+package osfi.segregation
+
+import rego.v1
+
+default allow := false
+
+# OSFI Guideline B-10: Segregation of Duties
+conflicting_role_pairs := [
+    ["transaction-initiator", "transaction-approver"],
+    ["payment-creator", "payment-approver"],
+    ["account-opener", "account-approver"],
+    ["limit-requester", "limit-approver"]
+]
+
+has_conflicting_roles if {
+    some pair in conflicting_role_pairs
+    pair[0] in input.user.roles
+    pair[1] in input.user.roles
+}
+
+# Deny if user has conflicting roles
+allow if {
+    not has_conflicting_roles
+    input.user.roles[_] in allowed_roles_for_action[input.action.name]
+}
+
+allowed_roles_for_action := {
+    "initiate": ["transaction-initiator", "payment-creator"],
+    "approve": ["transaction-approver", "payment-approver"],
+    "review": ["compliance-officer", "auditor"]
+}
+
+# OSFI: Dual Authorization for High-Value Transactions
+allow if {
+    input.transaction.amount >= 100000
+    input.transaction.approvals_count >= 2
+    input.transaction.approvers[_] == input.user.id
+    input.user.roles[_] == "senior-manager"
+}
+```
+
+**AML Know Your Customer (KYC)**:
+```rego
+package aml.kyc
+
+import rego.v1
+
+default allow := false
+
+# AML: KYC Verification Required
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    
+    # Customer must be KYC verified
+    customer.kyc_status == "verified"
+    
+    # KYC must be current (less than 12 months old)
+    kyc_age_days := (time.now_ns() - time.parse_rfc3339_ns(customer.kyc_date)) / (24 * 60 * 60 * 1000000000)
+    kyc_age_days < 365
+    
+    # Risk-based approach
+    risk_level_satisfied(customer)
+}
+
+# Risk levels and requirements
+risk_level_satisfied(customer) if {
+    customer.risk_level == "low"
+    customer.basic_kyc_complete == true
+}
+
+risk_level_satisfied(customer) if {
+    customer.risk_level == "medium"
+    customer.basic_kyc_complete == true
+    customer.source_of_funds_verified == true
+}
+
+risk_level_satisfied(customer) if {
+    customer.risk_level == "high"
+    customer.enhanced_due_diligence == true
+    customer.beneficial_owner_identified == true
+    customer.source_of_wealth_verified == true
+    customer.ongoing_monitoring == true
+}
+
+# PEP (Politically Exposed Person) Handling
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    
+    # PEPs require enhanced due diligence
+    customer.pep_status == true
+    customer.enhanced_due_diligence == true
+    customer.senior_management_approval == true
+    
+    # Compliance officer must review
+    input.user.roles[_] == "compliance-officer"
+}
+
+# Sanctions Screening
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    
+    # Customer not on sanctions list
+    not customer.id in data.sanctions_lists.ofac
+    not customer.id in data.sanctions_lists.un
+    not customer.id in data.sanctions_lists.eu
+    
+    # Regular re-screening (last 30 days)
+    screening_age := (time.now_ns() - time.parse_rfc3339_ns(customer.last_screening_date)) / (24 * 60 * 60 * 1000000000)
+    screening_age < 30
+}
+```
+
+### Use Case 2: API Access Control
+
+```rego
+package api.access
+
+import rego.v1
+
+default allow := false
+
+# API Key authentication
+allow if {
+    api_key := input.request.headers["X-API-Key"]
+    api_key in data.valid_api_keys
+}
+
+# OAuth token authentication
+allow if {
+    token := input.request.headers["Authorization"]
+    startswith(token, "Bearer ")
+    token_valid(trim_prefix(token, "Bearer "))
+}
+
+# Admin bypass
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+### Use Case 2: Data Row-Level Security
+
+```rego
+package data.security
+
+import rego.v1
+
+default allow := false
+
+# Users can access their own data
+allow if {
+    input.resource.attributes.owner_id == input.user.id
+}
+
+# Managers can access their team's data
+allow if {
+    input.user.roles[_] == "manager"
+    input.resource.attributes.department == input.user.department
+}
+
+# Filter visible rows
+visible_rows[row] if {
+    some row in input.query.result
+    row.owner_id == input.user.id
+}
+
+visible_rows[row] if {
+    some row in input.query.result
+    input.user.roles[_] == "manager"
+    row.department == input.user.department
+}
+```
+
+### Use Case 3: AI Agent Control
+
+```rego
+package ai.agent
+
+import rego.v1
+
+default allow := false
+
+# Allow AI agent access with safety checks
+allow if {
+    # User is authorized
+    input.user.roles[_] in ["developer", "data-scientist"]
+    
+    # Prompt is safe
+    not contains_sensitive_keywords(input.context.prompt)
+    
+    # Within usage limits
+    user_within_limits(input.user.id)
+    
+    # Content policy compliance
+    content_policy_compliant(input.context.prompt)
+}
+
+# Check for sensitive keywords
+contains_sensitive_keywords(prompt) if {
+    sensitive_keywords := ["password", "secret", "api-key", "private-key"]
+    lower_prompt := lower(prompt)
+    some keyword in sensitive_keywords
+    contains(lower_prompt, keyword)
+}
+
+# Check usage limits
+user_within_limits(user_id) if {
+    usage := data.usage_stats[user_id]
+    usage.requests_today < 1000
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: Policy Not Enforcing**
+
+Checklist:
+- [ ] Policy deployed to correct environment?
+- [ ] Policy status is "Active"?
+- [ ] Resource correctly configured?
+- [ ] Bouncer connected to correct Control Plane?
+- [ ] Policy synchronized to Bouncer?
+
+**Issue: Unexpected Denials**
+
+Debug steps:
+1. Check decision logs for deny reason
+2. Review policy logic
+3. Verify input data matches expectations
+4. Test policy with actual request data
+5. Check for typos in role/resource names
+
+**Issue: Policy Too Slow**
+
+Optimization:
+1. Simplify policy logic
+2. Remove expensive operations
+3. Use early returns
+4. Enable caching
+5. Index frequently queried data
+
+### Getting Help
+
+**Resources**:
+- **[Rego Guidelines](/guides/rego-guidelines)**: Learn Rego language
+- **[Policy Templates](/guides/policy-templates)**: Pre-built examples
+- **[Troubleshooting Guide](/guides/troubleshooting)**: Common issues
+- **[API Reference](/guides/api-reference)**: API documentation
+
+**Support**:
+- **In-App Help**: Click **?** icon
+- **Community**: GitHub Discussions
+- **Support Email**: support@controlcore.io
+- **Documentation**: docs.controlcore.io
+
+## Next Steps
+
+Now that you understand policy management, explore:
+
+1. **[Rego Guidelines](/guides/rego-guidelines)**: Master the policy language
+2. **[Policy Templates](/guides/policy-templates)**: Use pre-built templates
+3. **[PBAC Best Practices](/guides/pbac-best-practices)**: Learn advanced patterns
+4. **[PIP Getting Started](/guides/pip-getting-started)**: Connect data sources for context-aware policies
+
+---
+
+**Happy policy building!** Remember: Start simple, test thoroughly, and deploy with confidence.
+

@@ -1,0 +1,31 @@
+{{- if .Values.policyAdminApi.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.policyAdminApi.name }}-hpa
+  labels:
+    app: {{ .Values.policyAdminApi.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.policyAdminApi.name }}
+  minReplicas: {{ .Values.policyAdminApi.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.policyAdminApi.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.policyAdminApi.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.policyAdminApi.autoscaling.targetMemoryUtilizationPercentage }}
+  behavior:
+    {{- toYaml .Values.policyAdminApi.autoscaling.behavior | nindent 4 }}
+{{- end }}

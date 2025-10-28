@@ -1,0 +1,376 @@
+basePath: /api/v1
+definitions:
+  models.ApprovalRequest:
+    properties:
+      action:
+        type: string
+      resource_id:
+        type: string
+      resource_type:
+        type: string
+      subject_id:
+        type: string
+    type: object
+  models.AuthorizationResponse:
+    properties:
+      allow:
+        type: boolean
+      reason:
+        type: string
+    type: object
+  models.DataUpdateRequest:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      data: {}
+      dst_path:
+        type: string
+      save_method:
+        type: string
+      topic:
+        type: string
+      url:
+        type: string
+    type: object
+  models.Policy:
+    properties:
+      content:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  models.PolicyInfo:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  models.PolicyListResponse:
+    properties:
+      policies:
+        items:
+          $ref: '#/definitions/models.PolicyInfo'
+        type: array
+    type: object
+  models.PolicyRequest:
+    properties:
+      content:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  models.RequestInfo:
+    properties:
+      method:
+        type: string
+      path:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      request:
+        $ref: '#/definitions/models.RequestInfo'
+      status:
+        type: string
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: API for managing OPA policies, approvals, and data updates
+  title: ControlCore Policy Admin API
+  version: 1.0.0
+paths:
+  /approvals:
+    post:
+      consumes:
+      - application/json
+      description: Create a new approval request and evaluate policy
+      parameters:
+      - description: Approval request data
+        in: body
+        name: approval
+        required: true
+        schema:
+          $ref: '#/definitions/models.ApprovalRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Create a new approval
+      tags:
+      - approvals
+  /approvals/status:
+    get:
+      consumes:
+      - application/json
+      description: Check the approval status of a resource for a subject
+      parameters:
+      - description: Resource type
+        in: query
+        name: resource_type
+        required: true
+        type: string
+      - description: Resource ID
+        in: query
+        name: resource_id
+        required: true
+        type: string
+      - description: Subject ID
+        in: query
+        name: subject_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthorizationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Check approval status
+      tags:
+      - approvals
+  /data-updates:
+    post:
+      consumes:
+      - application/json
+      description: Trigger a data update via OPAL server
+      parameters:
+      - description: Data update request
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/models.DataUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Publish data update
+      tags:
+      - data
+  /policies:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all policies from OPA
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.PolicyListResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: List all policies
+      tags:
+      - policies
+    post:
+      consumes:
+      - application/json
+      description: Create a new policy in OPA
+      parameters:
+      - description: Policy data
+        in: body
+        name: policy
+        required: true
+        schema:
+          $ref: '#/definitions/models.PolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Policy'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Create a new policy
+      tags:
+      - policies
+  /policies/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a policy by its ID from OPA
+      parameters:
+      - description: Policy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Delete a policy
+      tags:
+      - policies
+    get:
+      consumes:
+      - application/json
+      description: Get a policy by its ID from OPA
+      parameters:
+      - description: Policy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Policy'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Get a specific policy
+      tags:
+      - policies
+    put:
+      consumes:
+      - application/json
+      description: Update a policy by its ID in OPA
+      parameters:
+      - description: Policy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Policy data
+        in: body
+        name: policy
+        required: true
+        schema:
+          $ref: '#/definitions/models.PolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Policy'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Update an existing policy
+      tags:
+      - policies
+schemes:
+- http
+swagger: "2.0"

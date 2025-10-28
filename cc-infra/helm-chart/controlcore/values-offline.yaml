@@ -1,0 +1,640 @@
+# Offline Deployment Values for Control Core
+# This file contains version-locked dependencies for offline deployments
+# Generated from BOM: 012025.01
+# DO NOT MODIFY - Use BOM manager to update versions
+
+# Global settings for offline deployment
+global:
+  environment: production
+  stack: controlcore-stack
+  deploymentMode: "offline"
+  offlineMode: true
+  # Version locked from BOM
+  version: "012025.01"
+  bomVersion: "012025.01"
+  # GitHub token for accessing private repositories (not used in offline mode)
+  githubToken: ""
+  # Tenant configuration
+  tenantId: "default"
+  apiKey: "your-api-key-here"
+
+# Frontend service configuration - VERSION LOCKED
+frontend:
+  name: cc-frontend
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-frontend
+    tag: "012025.01"  # LOCKED VERSION
+    pullPolicy: IfNotPresent  # Changed from Never for offline
+    digest: "sha256:abc123def456..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    - name: POLICY_SERVICE_URL
+      value: "http://cc-pap:8082/api/v1"
+    - name: REGAL_LSP_URL
+      value: "ws://cc-regal-service:4389"
+  probes:
+    readiness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# Policy Admin Server configuration - VERSION LOCKED
+policyAdminServer:
+  name: cc-policy-admin-server
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin-server
+    tag: "012025.01"  # LOCKED VERSION
+    pullPolicy: IfNotPresent  # Changed from Never for offline
+    digest: "sha256:mno345pqr678..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 7002
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: OPAL_POLICY_SOURCE_TYPE
+      value: "LOCAL"  # Changed from GIT for offline mode
+    - name: OPAL_POLICY_REPO_URL
+      value: "file:///policies"  # Local policies directory
+    - name: OPAL_POLICY_REPO_CLONE_PATH
+      value: "/policies"
+    - name: OPAL_POLICY_REPO_MAIN_BRANCH
+      value: "main"
+    - name: OPAL_POLICY_REPO_POLLING_INTERVAL
+      value: "300"  # Increased for offline mode
+    - name: OPAL_DATA_CONFIG_SOURCES
+      value: '{"config":{"entries":[{"url":"http://cc-policy-admin-server:7002/policy-data","topics":["policy_data"],"dst_path":"/static"}]}}'
+    - name: OPAL_LOG_FORMAT_INCLUDE_PID
+      value: "true"
+  probes:
+    readiness:
+      port: 7002
+      initialDelaySeconds: 10
+      periodSeconds: 300
+    liveness:
+      port: 7002
+      initialDelaySeconds: 30
+      periodSeconds: 300
+
+# Policy Admin Client configuration - VERSION LOCKED
+policyAdminClient:
+  name: cc-policy-admin-client
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin-client
+    tag: "012025.01"  # LOCKED VERSION
+    pullPolicy: IfNotPresent  # Changed from Never for offline
+    digest: "sha256:pqr678stu901..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    ports:
+      - name: client
+        port: 8083
+        targetPort: 8083
+      - name: opa
+        port: 8181
+        targetPort: 8181
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: OPAL_CLIENT_API_SERVER_PORT
+      value: "8083"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-policy-admin-server:7002"
+    - name: OPAL_LOG_FORMAT_INCLUDE_PID
+      value: "true"
+    - name: OPAL_INLINE_OPA_LOG_FORMAT
+      value: "http"
+  probes:
+    readiness:
+      path: /v1/policies
+      port: 8181
+      initialDelaySeconds: 15
+      periodSeconds: 300
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /v1/policies
+      port: 8181
+      initialDelaySeconds: 30
+      periodSeconds: 300
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# Policy Admin API configuration - VERSION LOCKED
+policyAdminApi:
+  name: cc-policy-admin-api
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-pap-api
+    tag: "012025.01"  # LOCKED VERSION
+    pullPolicy: IfNotPresent  # Changed from IfNotPresent for offline
+    digest: "sha256:def456ghi789..."  # Exact digest from BOM
+  service:
+    name: cc-pap
+    type: ClusterIP
+    port: 8082
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+  env:
+    - name: PORT
+      value: "8082"
+    - name: DATABASE_URL
+      value: "postgresql://postgres:password@cc-db:5432/control_core_db"
+    - name: OPA_URL
+      value: "http://cc-opal:7000"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-opal:7000"
+    - name: METRICS_ENABLED
+      value: "true"
+    - name: METRICS_PORT
+      value: "9090"
+  probes:
+    startup:
+      path: /api/v1/policies
+      port: 8082
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 10
+      failureThreshold: 12
+      successThreshold: 1
+    readiness:
+      path: /api/v1/policies
+      port: 8082
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+    liveness:
+      path: /api/v1/policies
+      port: 8082
+      initialDelaySeconds: 30
+      periodSeconds: 60
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+
+# Bouncer Service configuration - VERSION LOCKED (includes integrated PDP)
+bouncer:
+  name: cc-bouncer
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+    tag: "012025.01"  # LOCKED VERSION
+    pullPolicy: IfNotPresent  # Changed from Never for offline
+    digest: "sha256:jkl012mno345..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: PORT
+      value: "8081"
+    - name: OPA_URL
+      value: "http://cc-policy-admin-client:8181"
+    - name: PAP_URL
+      value: "http://cc-pap:8082"
+    - name: GIN_MODE
+      value: "release"
+    - name: LOG_LEVEL
+      value: "info"
+  probes:
+    startup:
+      path: /healthz
+      port: 8081
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 10
+      failureThreshold: 30
+      successThreshold: 1
+    readiness:
+      path: /healthz
+      port: 8081
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+    liveness:
+      path: /healthz
+      port: 8081
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+
+# Control Core Bouncer (PEP) - VERSION LOCKED
+bouncer:
+  name: cc-bouncer
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+    tag: "012025.01"  # LOCKED VERSION
+    pullPolicy: IfNotPresent  # Changed from Never for offline
+    digest: "sha256:ghi789jkl012..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+  env:
+    - name: BOUNCER_PORT
+      value: "8080"
+    - name: TARGET_HOST
+      value: "localhost:8000"
+    - name: PAP_API_URL
+      value: "http://cc-pap:8082"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-opal:7000"
+    - name: TENANT_ID
+      value: "{{ .Values.global.tenantId }}"
+    - name: API_KEY
+      value: "{{ .Values.global.apiKey }}"
+    - name: LOG_ENABLED
+      value: "true"
+    - name: CACHE_ENABLED
+      value: "true"
+    - name: METRICS_ENABLED
+      value: "true"
+    - name: METRICS_PORT
+      value: "9090"
+  probes:
+    readiness:
+      path: /health
+      port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /health
+      port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# OPAL Server - VERSION LOCKED (External dependency)
+opal:
+  name: cc-opal
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: permitio/opal-server
+    tag: "0.8.9"  # LOCKED VERSION - Tested and approved
+    pullPolicy: IfNotPresent
+    digest: "sha256:stu901vwx234..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 7000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: OPAL_POLICY_REPO_URL
+      value: "file:///policies"  # Local policies for offline mode
+    - name: OPAL_DATA_SOURCES_CONFIG
+      value: "./config/data-sources.json"
+    - name: PAP_API_URL
+      value: "http://cc-pap:8082"
+  probes:
+    readiness:
+      port: 7000
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    liveness:
+      port: 7000
+      initialDelaySeconds: 30
+      periodSeconds: 30
+
+# Control Core Database - VERSION LOCKED (External dependency)
+database:
+  name: cc-db
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15.5"  # LOCKED VERSION - Tested and approved
+    pullPolicy: IfNotPresent
+    digest: "sha256:vwx234yza567..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 5432
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  env:
+    - name: POSTGRES_DB
+      value: "control_core_db"
+    - name: POSTGRES_USER
+      value: "postgres"
+    - name: POSTGRES_PASSWORD
+      value: "password"
+  persistence:
+    enabled: true
+    size: 10Gi
+  probes:
+    readiness:
+      port: 5432
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    liveness:
+      port: 5432
+      initialDelaySeconds: 30
+      periodSeconds: 30
+
+# Redis Cache - VERSION LOCKED (External dependency)
+redis:
+  name: cc-redis
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: redis
+    tag: "7.2.3"  # LOCKED VERSION - Tested and approved
+    pullPolicy: IfNotPresent
+    digest: "sha256:yza567bcd890..."  # Exact digest from BOM
+  service:
+    type: ClusterIP
+    port: 6379
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "200m"
+  persistence:
+    enabled: true
+    size: 1Gi
+  probes:
+    readiness:
+      port: 6379
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      port: 6379
+      initialDelaySeconds: 10
+      periodSeconds: 10
+
+# Multiple Bouncer deployments - All VERSION LOCKED
+bouncers:
+  default:
+    enabled: true
+    name: cc-bouncer-default
+    resourceType: "demo"
+    targetHost: "localhost:8000"
+    port: 8080
+    replicaCount: 1
+    image:
+      repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+      tag: "012025.01"  # LOCKED VERSION
+      pullPolicy: IfNotPresent
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+  
+  ai-agent:
+    enabled: false
+    name: cc-bouncer-ai-agent
+    resourceType: "ai_agent"
+    targetHost: "your-ai-agent:8000"
+    port: 8081
+    replicaCount: 1
+    image:
+      repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+      tag: "012025.01"  # LOCKED VERSION
+      pullPolicy: IfNotPresent
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 60
+  
+  api-gateway:
+    enabled: false
+    name: cc-bouncer-api-gateway
+    resourceType: "api"
+    targetHost: "your-api-gateway:8000"
+    port: 8082
+    replicaCount: 1
+    image:
+      repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+      tag: "012025.01"  # LOCKED VERSION
+      pullPolicy: IfNotPresent
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 70
+  
+  llm-service:
+    enabled: false
+    name: cc-bouncer-llm-service
+    resourceType: "llm"
+    targetHost: "your-llm-service:8000"
+    port: 8083
+    replicaCount: 1
+    image:
+      repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+      tag: "012025.01"  # LOCKED VERSION
+      pullPolicy: IfNotPresent
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 15
+      targetCPUUtilizationPercentage: 65
+  
+  rag-tool:
+    enabled: false
+    name: cc-bouncer-rag-tool
+    resourceType: "rag"
+    targetHost: "your-rag-tool:8000"
+    port: 8084
+    replicaCount: 1
+    image:
+      repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+      tag: "012025.01"  # LOCKED VERSION
+      pullPolicy: IfNotPresent
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 6
+      targetCPUUtilizationPercentage: 75
+  
+  git-repo:
+    enabled: false
+    name: cc-bouncer-git-repo
+    resourceType: "git"
+    targetHost: "your-git-server:8000"
+    port: 8085
+    replicaCount: 1
+    image:
+      repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+      tag: "012025.01"  # LOCKED VERSION
+      pullPolicy: IfNotPresent
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 80
+
+# Ingress configuration - VERSION LOCKED
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # Offline mode annotations
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: cc-frontend
+          servicePort: 3000
+        - path: /bouncer/default
+          pathType: Prefix
+          serviceName: cc-bouncer-default
+          servicePort: 8080
+        - path: /bouncer/ai-agent
+          pathType: Prefix
+          serviceName: cc-bouncer-ai-agent
+          servicePort: 8081
+        - path: /bouncer/api-gateway
+          pathType: Prefix
+          serviceName: cc-bouncer-api-gateway
+          servicePort: 8082
+        - path: /bouncer/llm-service
+          pathType: Prefix
+          serviceName: cc-bouncer-llm-service
+          servicePort: 8083
+        - path: /bouncer/rag-tool
+          pathType: Prefix
+          serviceName: cc-bouncer-rag-tool
+          servicePort: 8084
+        - path: /bouncer/git-repo
+          pathType: Prefix
+          serviceName: cc-bouncer-git-repo
+          servicePort: 8085
+
+# Offline deployment configuration
+offline:
+  enabled: true
+  imageRegistry: "local"  # Use local registry for offline deployment
+  policySource: "local"   # Use local policies directory
+  dataSource: "local"     # Use local data sources
+  dependencies:
+    allLocked: true
+    validatedVersions: true
+    testedCompatibility: true

@@ -1,0 +1,119 @@
+{
+  "version": "1.0.0",
+  "summary": "OSFI Guideline B-10 Outsourcing and Third-Party Risk Management for Canadian FRFIs",
+  "detailed_description": "This policy template implements OSFI Guideline B-10 controls for outsourcing arrangements and third-party service provider risk management. OSFI requires financial institutions to maintain effective oversight of all material outsourcing arrangements, particularly those involving customer data, critical functions, or services provided to foreign jurisdictions.\n\nThe policy enforces comprehensive due diligence before engaging service providers, board approval for material outsourcing arrangements, ongoing performance monitoring, data security requirements for offshore arrangements, audit rights in contracts, concentration risk assessment, and business continuity validation. It ensures compliance with OSFI's expectations that institutions retain ultimate accountability for outsourced activities and maintain the ability to manage associated risks.\n\nKey capabilities include pre-engagement due diligence validation, materiality assessment enforcement, board-level approval workflows, ongoing vendor performance monitoring, cross-border data transfer controls, audit right verification, concentration risk limits, and business continuity plan validation for critical outsourced services.",
+  "use_cases": [
+    {
+      "title": "RBC: Cloud Migration to AWS Canada with OSFI Oversight",
+      "description": "Deploy osfi-b10-third-party-risk for major cloud outsourcing arrangement",
+      "scenario": "RBC migrates core banking workloads to AWS Canada (Montreal and Calgary regions) in $200M transformation. OSFI material outsourcing review: (1) Board approval required (spend >$100M, affects 10M+ customers), (2) Due diligence on AWS security and resilience, (3) Data residency controls (Canadian data stays in Canada), (4) Right to audit and SOC 2 Type II reports, (5) Exit strategy if AWS contract terminates. Policy enforces: Board Technology Committee approval before contract signature, verification of AWS SOC 2 Type II + CSA STAR reports, data sovereignty controls in every workload (ca-central-1 region lock), quarterly AWS business reviews with RBC technology risk team, annual right-to-audit exercises, contract includes 12-month exit assistance. OSFI approval: Material outsourcing accepted with strong risk controls, quarterly RBC reporting to OSFI on cloud operations."
+    },
+    {
+      "title": "Desjardins: Outsourced Contact Center Operations",
+      "description": "Implement osfi-b10-third-party-risk for customer service outsourcing to Philippines",
+      "scenario": "Desjardins outsources after-hours customer service (8PM-8AM ET) to Manila contact center handling 2,000 calls/night for 7M members. OSFI/AMF Quebec offshore outsourcing scrutiny: (1) Customer data transferred to Philippines - cross-border safeguards required, (2) Contact center access to core banking systems - security controls needed, (3) Quebec French language requirements, (4) Business continuity if Philippines facility unavailable. Policy enforces: Privacy impact assessment completed (approved by Privacy Officer), data encryption in transit and at rest, VPN access to systems (no direct internet exposure), PCI DSS compliance for payment card data, bilingual service capability validation, Canadian backup contact center (Moncton) with 24-hour activation capability. Monitoring: Quality audits (95% satisfaction target, actual 93%), security incidents (zero in 18 months), language compliance (98% French service availability). Regulatory rating: Satisfactory outsourcing risk management."
+    },
+    {
+      "title": "TD: Fintech Partnership Concentration Risk",
+      "description": "Use osfi-b10-third-party-risk to manage concentration in fintech ecosystem",
+      "scenario": "TD partners with Stripe for payment processing across all digital channels (TD App, online banking, merchant services) representing 35% of TD's transaction volume. OSFI concentration risk concern: Over-reliance on single payment provider creates systemic risk if Stripe experiences outage or financial distress. Policy enforces: Concentration risk assessment required when single vendor exceeds 5% of revenue or transaction volume, executive risk committee approval for concentration >20%, dual-provider strategy mandated for concentration >30%, business continuity testing with vendor failure scenario, alternative provider relationship maintained (standby contract). Mitigation implemented: Moneris added as backup processor (10% of volume routed for warm standby), quarterly failover tests (successfully processed 50K transactions via Moneris in 4-hour test), Stripe business continuity plan reviewed annually, quarterly monitoring of Stripe financial health. OSFI review: Concentration risk adequately managed with effective mitigation controls."
+    },
+    {
+      "title": "Scotiabank: Third-Party Data Breach - Change Healthcare Incident",
+      "description": "Deploy osfi-b10-third-party-risk for managing third-party data breach response",
+      "scenario": "Scotiabank uses third-party data provider for credit bureau services. Provider suffers ransomware attack exposing 500K Canadian consumer credit records. OSFI incident notification and third-party risk management review: (1) How quickly did Scotiabank detect provider breach, (2) Customer notification procedures, (3) Contract audit rights exercised, (4) Provider security controls validation. Policy enforced: Real-time monitoring of critical vendor security status (SIEM integration), automated incident response if vendor breach detected (assumed Scotiabank data also compromised), OSFI notification within 72 hours of becoming aware, customer notification within 7 days per PIPEDA, contract audit right immediately exercised (forensic team on-site within 48 hours), provider placed on enhanced monitoring for 12 months. Outcome: 487K Scotiabank customers potentially affected, notification sent Day 6, zero customer fraud losses (credit monitoring provided), OSFI examination: Adequate third-party incident response, recommended enhanced vendor security requirements in future contracts."
+    },
+    {
+      "title": "National Bank: Material Outsourcing Determination",
+      "description": "Apply osfi-b10-third-party-risk for materiality assessment framework",
+      "scenario": "National Bank establishes framework to determine which outsourcing arrangements are 'material' requiring board approval per OSFI B-10. Materiality criteria: (1) Annual spend >$10M, (2) Affects >100K customers, (3) Critical to business operations (RTO <4 hours), (4) Involves transfer of sensitive data offshore, (5) Represents >5% of functional area budget. Examples assessed: Cloud provider (AWS) - MATERIAL ($50M, 3M customers, critical, offshore); Payroll provider (ADP) - NON-MATERIAL ($2M, 5K employees, non-critical); Core banking vendor (Temenos) - MATERIAL ($100M, all customers, critical, onshore). Policy enforces: Automated materiality calculation based on criteria, board approval workflow for material outsourcing, simplified approval (CIO + CRO) for non-material, annual re-assessment of all outsourcing arrangements. Governance: 12 material arrangements (board-approved), 87 non-material (executive-approved), 100% compliance with board approval requirements. OSFI review: Well-defined materiality framework, strong board oversight."
+    },
+    {
+      "title": "Manulife: Audit Rights in Cloud Services Agreements",
+      "description": "Implement osfi-b10-third-party-risk for right-to-audit enforcement",
+      "scenario": "Manulife negotiates with Microsoft Azure for cloud infrastructure supporting insurance policy administration for 11M Canadian policyholders. OSFI B-10 requirement: Right to audit all material outsourcing arrangements. Microsoft standard contract: Customers may rely on third-party audits (SOC 2, ISO 27001) in lieu of direct audit. OSFI position: Third-party audits acceptable for cloud infrastructure providers, but must be supplemented with contractual audit rights for cause (security incident, regulatory examination). Policy enforces: All outsourcing contracts must include audit rights clause, contracts >$5M require right-to-audit on-site within 30 days notice, cloud providers may use SOC 2 Type II as primary evidence + right-to-audit for cause, contract review checklist validates audit rights before signature. Contract negotiation: Microsoft agrees to right-to-audit for cause + quarterly meetings to review SOC 2 findings + Azure Canada roadmap. OSFI acceptance: Audit rights framework approved as meeting B-10 requirements for cloud services."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Outsourcing or third-party risk action",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Vendor Management",
+          "integration_method": "Workflow engine",
+          "example_api": "POST /vendor/engage"
+        }
+      ],
+      "configuration_notes": "Map vendor management workflows to policy actions",
+      "plain_english": "What third-party risk activity is being performed",
+      "how_to_fetch": "Configure vendor lifecycle actions in Control Core",
+      "example_values": [
+        "engage_service_provider",
+        "sign_outsourcing_contract",
+        "transfer_data_offshore"
+      ],
+      "example_value": "read"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Vendor Management System",
+      "GRC Platform",
+      "Contract Management",
+      "Data Classification System"
+    ],
+    "complexity_score": "High - Requires vendor management integration and OSFI materiality assessment"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Review OSFI B-10",
+      "Define materiality criteria",
+      "Integrate vendor management",
+      "Configure board approval workflow"
+    ],
+    "sandbox_testing": [
+      "Test vendor onboarding with/without due diligence",
+      "Test board approval for material outsourcing"
+    ],
+    "production_deployment": [
+      "Obtain board approval for policy",
+      "Deploy with shadow mode",
+      "Enable for new vendor engagements first"
+    ],
+    "monitoring_setup": [
+      "Track vendor onboarding blocked events",
+      "Monitor material outsourcing requiring board approval"
+    ]
+  },
+  "compliance_frameworks": [
+    "OSFI B-10",
+    "OSFI B-13",
+    "SOC 2",
+    "PIPEDA"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "osfi",
+    "third-party-risk",
+    "outsourcing",
+    "vendor-management",
+    "b-10"
+  ],
+  "related_templates": [
+    "osfi-b13-technology-cyber-risk",
+    "osfi-e21-operational-risk"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 10,
+    "user_attributes": 0,
+    "resource_attributes": 3,
+    "context_attributes": 7
+  },
+  "integration_guide": {
+    "overview": "Integrate with vendor management and GRC platforms for third-party risk oversight",
+    "steps_by_system": []
+  }
+}

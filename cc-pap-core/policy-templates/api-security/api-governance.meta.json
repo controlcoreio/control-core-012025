@@ -1,0 +1,908 @@
+{
+  "version": "1.0.0",
+  "summary": "Policy to enforce API security and governance requirements This policy ensures APIs are secure, well-governed, and compliant Allow API access if security requirements are met",
+  "detailed_description": "This policy template implements Api Governance controls for Api Security. It provides comprehensive authorization and governance capabilities with real-time policy evaluation. \n\nThe policy evaluates 23 different conditions including user attributes, resource properties, and contextual information. Policy decisions are made dynamically based on the current state of the system, user context, and resource characteristics. \n\nKey capabilities:\n- Real-time authorization decisions with sub-millisecond evaluation\n- Comprehensive audit logging for all policy evaluations\n- Dynamic context enrichment from multiple data sources\n- Fine-grained attribute-based access control (ABAC)\n- Support for both allow and deny rules with conflict resolution\n\n\nThis template is designed to be deployed in Control Core's policy engine and can be customized to meet your specific requirements. It follows best practices for policy authoring and includes comprehensive error handling.",
+  "use_cases": [
+    {
+      "title": "Zero Trust Implementation: Contractor Access to Production",
+      "description": "Deploy api-governance.meta as part of zero trust architecture for external access",
+      "scenario": "Financial services firm with 200 external contractors needs zero trust controls for production access. Security team requirements: (1) Contractors never have standing access - must request each time, (2) Access limited to specific IP ranges and time windows, (3) All contractor actions logged and reviewed, (4) Sensitive data masked for contractors. Policy enforces: Time-bound access (max 4 hours), geofencing (only from contractor office IPs), session recording for all production access, automatic data masking for PII/financial data, manager approval required with business justification. Result: Prevented 3 potential data exfiltration attempts, reduced contractor access from permanent to just-in-time."
+    },
+    {
+      "title": "Insider Threat Prevention: Privileged User Monitoring",
+      "description": "Use api-governance.meta to detect and prevent insider threats",
+      "scenario": "Tech company with 50 database administrators having access to customer data (10M records). Security operations needs: (1) Detect unusual database queries (volume, timing, content), (2) Prevent bulk data downloads, (3) Alert on access to sensitive tables outside business hours, (4) Block access to personal connections. Policy implementation: Baseline normal behavior per DBA (avg 500 queries/day), alert on >2,000 queries or >100MB downloads in 1 hour, block queries with >10,000 rows after hours, require SOC approval for production access on weekends, automatic temporary suspension on 3 suspicious activities. Detection: Identified compromised DBA account downloading customer list, prevented $2M data breach."
+    },
+    {
+      "title": "API Security: Third-Party Integration Rate Limiting",
+      "description": "Apply api-governance.meta to protect APIs from abuse and attacks",
+      "scenario": "E-commerce platform with 500 third-party integrations via APIs, handling 100K API calls/minute. Security requirements: (1) Prevent credential stuffing attacks, (2) Stop data scraping bots, (3) Enforce fair use policies, (4) Protect against DDoS. Policy enforces: Rate limits by partner tier (Tier 1: 1000 req/min, Tier 2: 100 req/min), adaptive throttling during attacks, block suspicious patterns (same User-Agent with 1000+ IPs), circuit breaker after 3 authentication failures, cost attribution for over-limit partners. Results: Blocked 50M bot requests/month, prevented 2 DDoS attempts, reduced API abuse from 12% to <1% of traffic."
+    },
+    {
+      "title": "Incident Response: Automated Containment During Breach",
+      "description": "Leverage api-governance.meta for rapid incident containment",
+      "scenario": "Healthcare provider detects ransomware on file server at 2 AM. Incident response plan requires: (1) Isolate affected systems within 15 minutes, (2) Prevent lateral movement, (3) Preserve forensic evidence, (4) Maintain audit trail of all actions. Policy enables: Automated isolation of compromised server (disable all network ACLs), block user account associated with initial compromise, alert on any authentication attempts from that account, log all command execution on affected systems, notify CISO and IR team via SMS/email. Containment achieved in 8 minutes, ransomware limited to 1 server instead of spreading to 200+ systems, total damage: $50K vs estimated $5M."
+    },
+    {
+      "title": "Cloud Security: Multi-Cloud Access Control",
+      "description": "Implement api-governance.meta across AWS, Azure, and GCP environments",
+      "scenario": "Global enterprise with resources in AWS (500 accounts), Azure (200 subscriptions), and GCP (100 projects). CISO requirements: (1) Consistent access policies across all clouds, (2) Prevent public S3 buckets, (3) Enforce MFA for all cloud console access, (4) Track privileged access across clouds. Policy implementation: Centralized policy management integrated with AWS IAM, Azure RBAC, GCP IAM, automated scanning for public storage (S3/Blob/GCS) with auto-remediation, MFA required for console access (enforced via SAML), cross-cloud access reports for audit. Results: Eliminated 150 public buckets, standardized access across clouds, reduced IAM policy inconsistencies from 40% to 5%."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "The action attribute used in policy evaluation.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "REST API Endpoints",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Policy Information Point (PIP)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Database Queries",
+          "integration_method": "Direct SQL query - Control Core connects to application database to check resource ownership, classification tags",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'action' at policy evaluation time. This attribute will be included in the authorization request context. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'action' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'action':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'action' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "context.alerting_configured",
+      "type": "object",
+      "description": "Context attribute 'alerting_configured' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.alerting_configured' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.alerting_configured' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.alerting_configured':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.alerting_configured' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"attribute\": \"value\", \"verified\": true}"
+    },
+    {
+      "name": "context.alternative_endpoint_provided",
+      "type": "string",
+      "description": "Context attribute 'alternative_endpoint_provided' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.alternative_endpoint_provided' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.alternative_endpoint_provided' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.alternative_endpoint_provided':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.alternative_endpoint_provided' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "context.api_documentation_complete",
+      "type": "object",
+      "description": "Context attribute 'api_documentation_complete' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.api_documentation_complete' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.api_documentation_complete' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.api_documentation_complete':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.api_documentation_complete' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"attribute\": \"value\", \"verified\": true}"
+    },
+    {
+      "name": "context.authentication_valid",
+      "type": "string",
+      "description": "Context attribute 'authentication_valid' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.authentication_valid' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.authentication_valid' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.authentication_valid':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.authentication_valid' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "context.authorization_verified",
+      "type": "object",
+      "description": "Context attribute 'authorization_verified' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.authorization_verified' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.authorization_verified' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.authorization_verified':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.authorization_verified' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"method\": \"mfa\", \"verified\": true, \"timestamp\": \"2024-10-23T14:30:00Z\"}"
+    },
+    {
+      "name": "context.data_classification",
+      "type": "object",
+      "description": "Context attribute 'data_classification' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.data_classification' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.data_classification' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.data_classification':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.data_classification' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"level\": \"confidential\", \"categories\": [\"pii\", \"financial\"]}"
+    },
+    {
+      "name": "context.data_encryption_enabled",
+      "type": "boolean",
+      "description": "Context attribute 'data_encryption_enabled' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.data_encryption_enabled' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.data_encryption_enabled' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.data_encryption_enabled':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.data_encryption_enabled' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.deprecation_notice_period",
+      "type": "object",
+      "description": "Context attribute 'deprecation_notice_period' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.deprecation_notice_period' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.deprecation_notice_period' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.deprecation_notice_period':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.deprecation_notice_period' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"attribute\": \"value\", \"verified\": true}"
+    },
+    {
+      "name": "context.metrics_collection_enabled",
+      "type": "boolean",
+      "description": "Context attribute 'metrics_collection_enabled' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.metrics_collection_enabled' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.metrics_collection_enabled' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.metrics_collection_enabled':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.metrics_collection_enabled' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.migration_guide_available",
+      "type": "string",
+      "description": "Context attribute 'migration_guide_available' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.migration_guide_available' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.migration_guide_available' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.migration_guide_available':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.migration_guide_available' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [
+        "value1",
+        "value2",
+        "value3"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "context.monitoring_enabled",
+      "type": "boolean",
+      "description": "Context attribute 'monitoring_enabled' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.monitoring_enabled' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.monitoring_enabled' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.monitoring_enabled':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.monitoring_enabled' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.owasp_compliance_verified",
+      "type": "object",
+      "description": "Context attribute 'owasp_compliance_verified' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.owasp_compliance_verified' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.owasp_compliance_verified' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.owasp_compliance_verified':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.owasp_compliance_verified' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"status\": true, \"frameworks\": [\"SOC2\", \"HIPAA\"]}"
+    },
+    {
+      "name": "context.penetration_testing_completed",
+      "type": "object",
+      "description": "Context attribute 'penetration_testing_completed' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.penetration_testing_completed' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.penetration_testing_completed' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.penetration_testing_completed':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.penetration_testing_completed' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"attribute\": \"value\", \"verified\": true}"
+    },
+    {
+      "name": "context.privacy_controls_enabled",
+      "type": "boolean",
+      "description": "Context attribute 'privacy_controls_enabled' - provides environmental or situational information about the request. This enables dynamic, context-aware policy decisions.",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Event Streaming Platforms (Kafka, Kinesis)",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "External APIs and Data Sources",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        },
+        {
+          "name": "Real-time Data Pipelines",
+          "integration_method": "API integration - Control Core fetches this attribute via REST API call during policy evaluation",
+          "example_api": "Example: GET /api/attributes/{attributeName}?userId={userId}"
+        }
+      ],
+      "configuration_notes": "Configure Control Core to fetch 'context.privacy_controls_enabled' at policy evaluation time. This attribute will be included in the authorization request context. Set up a Context Generation Service to provide real-time context data. Map this attribute in your Policy Enforcement Point (PEP) configuration.",
+      "plain_english": "Runtime evaluation of 'context.privacy_controls_enabled' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.privacy_controls_enabled':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.privacy_controls_enabled' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "Application Code",
+          "api_endpoint": "Application sends action in request",
+          "field_mapping": "action",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.action",
+          "system": "API Gateway",
+          "api_endpoint": "Map HTTP method to action",
+          "field_mapping": "GET→read, POST→create, DELETE→delete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.alternative_endpoint_provided",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.alternative_endpoint_provided",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.api_documentation_complete",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.api_documentation_complete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.authentication_valid",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.authentication_valid",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.authorization_verified",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.authorization_verified",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.data_classification",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.data_classification",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.data_encryption_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.data_encryption_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.deprecation_notice_period",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.deprecation_notice_period",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.metrics_collection_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.metrics_collection_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.migration_guide_available",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.migration_guide_available",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.monitoring_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.monitoring_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.owasp_compliance_verified",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.owasp_compliance_verified",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.penetration_testing_completed",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.penetration_testing_completed",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.privacy_controls_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.privacy_controls_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.rate_limit",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.rate_limit",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.rate_limit_compliant",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.rate_limit_compliant",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.request_rate",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.request_rate",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.scope_authorized",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.scope_authorized",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.security_scan_passed",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.security_scan_passed",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.ssl_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.ssl_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.valid_api_key",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.valid_api_key",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.resource.type",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "resource.type",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "monitoring_and_logging": [
+        {
+          "condition": "input.context.alerting_configured",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.alerting_configured",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ]
+    },
+    "systems_needed": [
+      "API Gateway",
+      "Application Code",
+      "Custom data source"
+    ],
+    "complexity_score": "High - Complex policy with many conditions and data sources"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Review policy requirements and ensure all prerequisites are met",
+      "2. Configure data sources and integrations in Control Core",
+      "3. Map required attributes (23 conditions identified) to your data sources",
+      "4. Deploy policy to Sandbox environment using Control Core Admin UI",
+      "5. Configure test users, resources, and scenarios in Sandbox",
+      "6. Run comprehensive tests with various authorization scenarios",
+      "7. Monitor policy evaluation logs and adjust conditions as needed",
+      "8. Validate audit logging and compliance reporting",
+      "9. Conduct user acceptance testing with stakeholders",
+      "10. Promote to Production with gradual rollout (shadow mode, then enforcement)",
+      "11. Set up monitoring alerts for policy violations and errors",
+      "12. Document policy configuration and operational procedures"
+    ],
+    "sandbox_testing": [
+      "🧪 Deploy to Sandbox environment first:",
+      "   1. Create test users with various attribute combinations",
+      "   2. Set up test resources with different classifications",
+      "   3. Run test scenarios:",
+      "      • Resource with correct classification → ALLOW",
+      "      • Resource marked as restricted → DENY for non-owners",
+      "   4. Verify audit logs capture all evaluations",
+      "   5. Check performance (policy evaluation < 100ms)",
+      "   6. Test error handling (missing attributes, null values)"
+    ],
+    "configuration_tips": [
+      "Start with permissive policies and gradually tighten restrictions",
+      "Use policy versioning to track changes and enable rollbacks",
+      "Implement comprehensive logging before enforcement",
+      "Test in shadow mode to observe behavior without blocking access",
+      "Document all customizations and environment-specific settings",
+      "Set up monitoring dashboards for policy metrics",
+      "Create runbooks for common policy-related incidents",
+      "Establish a policy review and update schedule"
+    ],
+    "production_deployment": [
+      "🚀 Production deployment checklist:",
+      "   1. ✅ All sandbox tests passing",
+      "   2. ✅ Stakeholder approval documented",
+      "   3. ✅ Rollback plan prepared",
+      "   4. ✅ Deploy in shadow mode (log only, don't enforce) for 24-48 hours",
+      "   5. ✅ Review shadow mode logs for unexpected denials",
+      "   6. ✅ Adjust policy based on real traffic patterns",
+      "   7. ✅ Enable enforcement mode with gradual rollout (10% → 50% → 100%)",
+      "   8. ✅ Monitor error rates and user feedback",
+      "   9. ✅ Document deployment for compliance audit trail"
+    ],
+    "troubleshooting": [
+      "Check Control Core logs if policy evaluation fails",
+      "Verify all required attributes are available in request context",
+      "Ensure data source integrations are healthy and responsive",
+      "Review audit logs to understand policy decisions",
+      "Use Control Core's policy testing tools to debug conditions",
+      "Check for network connectivity issues between PEP and PDP",
+      "Verify policy syntax and structure using validator",
+      "Contact Control Core support for persistent issues"
+    ],
+    "prerequisites": [
+      "✅ Inventory all systems needed for 23 conditions in this policy",
+      "✅ Verify API access and credentials for each system",
+      "✅ Test API endpoints return expected data format",
+      "✅ Document field mappings between your systems and policy conditions",
+      "✅ Ensure network connectivity from Control Core to all data sources"
+    ],
+    "data_source_configuration": [
+      "\n📦 Data Sources:",
+      "   • Configure Application Code integration for 'input.action'",
+      "     - API: Application sends action in request",
+      "     - Field: action",
+      "     - Method: REST API",
+      "   • Configure API Gateway integration for 'input.action'",
+      "     - API: Map HTTP method to action",
+      "     - Field: GET→read, POST→create, DELETE→delete",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.context.alternative_endpoint_provided'",
+      "     - API: REST API endpoint",
+      "     - Field: context.alternative_endpoint_provided",
+      "     - Method: REST API",
+      "\n📦 Monitoring And Logging:",
+      "   • Configure Custom data source integration for 'input.context.alerting_configured'",
+      "     - API: REST API endpoint",
+      "     - Field: context.alerting_configured",
+      "     - Method: REST API"
+    ],
+    "policy_customization": [
+      "🔧 Review and customize the following conditions for your environment:",
+      "   • Resource conditions (1): resource.type",
+      "   • Context conditions (21): context.alerting_configured, context.alternative_endpoint_provided, context.api_documentation_complete",
+      "",
+      "📝 Modification guidelines:",
+      "   • Update attribute names to match your system's field names",
+      "   • Adjust threshold values (e.g., risk scores, time windows)",
+      "   • Add/remove conditions based on your requirements",
+      "   • Test each condition individually before combining",
+      "",
+      "💾 Save modified policy with version tag for tracking"
+    ],
+    "monitoring_setup": [
+      "📊 Set up monitoring and alerts:",
+      "   • Policy evaluation count (baseline: track for 1 week)",
+      "   • Denial rate (alert if > 5% of requests)",
+      "   • Evaluation latency (alert if > 200ms p95)",
+      "   • Missing attribute errors (alert on any occurrence)",
+      "   • Condition-specific metrics:",
+      "     1. Monitor 'input.action' - track null/missing values",
+      "     2. Monitor 'input.context.alerting_configured' - track null/missing values",
+      "     3. Monitor 'input.context.alternative_endpoint_provided' - track null/missing values",
+      "     4. Monitor 'input.context.api_documentation_complete' - track null/missing values",
+      "     5. Monitor 'input.context.authentication_valid' - track null/missing values"
+    ]
+  },
+  "compliance_frameworks": [
+    "ISO 27001",
+    "SOC 2 Type II"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "compliance",
+    "api-security",
+    "governance",
+    "encryption",
+    "rbac",
+    "monitoring"
+  ],
+  "related_templates": [
+    "zero-trust-network-access",
+    "multi-factor-authentication",
+    "least-privilege-access",
+    "api-rate-limiting-throttling"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 23,
+    "user_attributes": 0,
+    "resource_attributes": 1,
+    "context_attributes": 21
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technical stack to fetch the required attributes.",
+    "steps_by_system": [
+      {
+        "system": "Application Code",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Application Code",
+          "2. Test API access: Application sends action in request",
+          "3. In Control Core: Settings → Integrations → Add Application Code",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: action"
+      },
+      {
+        "system": "API Gateway",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for API Gateway",
+          "2. Test API access: Map HTTP method to action",
+          "3. In Control Core: Settings → Integrations → Add API Gateway",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: GET→read, POST→create, DELETE→delete"
+      },
+      {
+        "system": "Custom data source",
+        "attributes_needed": [
+          "input.context.alternative_endpoint_provided",
+          "input.context.api_documentation_complete",
+          "input.context.authentication_valid",
+          "input.context.authorization_verified",
+          "input.context.data_classification",
+          "input.context.data_encryption_enabled",
+          "input.context.deprecation_notice_period",
+          "input.context.metrics_collection_enabled",
+          "input.context.migration_guide_available",
+          "input.context.monitoring_enabled",
+          "input.context.owasp_compliance_verified",
+          "input.context.penetration_testing_completed",
+          "input.context.privacy_controls_enabled",
+          "input.context.rate_limit",
+          "input.context.rate_limit_compliant",
+          "input.context.request_rate",
+          "input.context.scope_authorized",
+          "input.context.security_scan_passed",
+          "input.context.ssl_enabled",
+          "input.context.valid_api_key",
+          "input.resource.type",
+          "input.context.alerting_configured"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Custom data source",
+          "2. Test API access: REST API endpoint",
+          "3. In Control Core: Settings → Integrations → Add Custom data source",
+          "4. Configure field mappings for 22 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: context.alternative_endpoint_provided, context.api_documentation_complete, context.authentication_valid"
+      }
+    ]
+  }
+}

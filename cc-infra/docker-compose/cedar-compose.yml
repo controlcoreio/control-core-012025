@@ -1,0 +1,68 @@
+# Cedar Agent Docker Compose Configuration
+# Future enhancement for AWS Cedar Policy Store support
+# Based on permitio/cedar-agent: https://github.com/permitio/cedar-agent
+
+version: '3.8'
+
+services:
+  # Cedar Agent - Future Policy Engine
+  cc-cedar-agent:
+    image: permitio/cedar-agent:latest
+    container_name: cc-cedar-agent
+    ports:
+      - "8180:8180"
+    environment:
+      - CEDAR_AGENT_PORT=8180
+      - CEDAR_AGENT_ADDR=0.0.0.0
+      - CEDAR_AGENT_LOG_LEVEL=info
+      - CEDAR_AGENT_AUTHENTICATION=${CEDAR_AGENT_AUTH_TOKEN:-}
+    volumes:
+      - ./cedar/schema.json:/app/schema.json:ro
+      - ./cedar/policies.json:/app/policies.json:ro
+      - ./cedar/data.json:/app/data.json:ro
+    networks:
+      - controlcore
+    restart: unless-stopped
+    profiles:
+      - cedar  # Only start with --profile cedar
+
+  # Cedar Agent with Redis Store (Future)
+  cc-cedar-agent-redis:
+    image: permitio/cedar-agent:latest
+    container_name: cc-cedar-agent-redis
+    ports:
+      - "8181:8180"
+    environment:
+      - CEDAR_AGENT_PORT=8180
+      - CEDAR_AGENT_ADDR=0.0.0.0
+      - CEDAR_AGENT_LOG_LEVEL=info
+      - CEDAR_AGENT_AUTHENTICATION=${CEDAR_AGENT_AUTH_TOKEN:-}
+      - CEDAR_AGENT_REDIS_URL=redis://cc-redis:6379
+    depends_on:
+      - cc-redis
+    networks:
+      - controlcore
+    restart: unless-stopped
+    profiles:
+      - cedar-redis  # Only start with --profile cedar-redis
+
+  # Redis for Cedar Agent (if using Redis store)
+  cc-redis:
+    image: redis:7-alpine
+    container_name: cc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - controlcore
+    restart: unless-stopped
+    profiles:
+      - cedar-redis
+
+networks:
+  controlcore:
+    external: true
+
+volumes:
+  redis_data:

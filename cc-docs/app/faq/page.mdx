@@ -1,0 +1,1358 @@
+# Frequently Asked Questions (FAQ)
+
+Comprehensive answers to common questions about Control Core deployment, configuration, policy management, integrations, and compliance.
+
+## General Questions
+
+### What is Control Core?
+
+Control Core is a centralized authorization and compliance platform built for AI-driven enterprises. It enforces business, security, and compliance rules through policy-based access control (PBAC), enabling organizations to secure interactions between AI initiatives and legacy technology without custom-coded access logic.
+
+### Who should use Control Core?
+
+Control Core is ideal for:
+- **Financial Institutions**: Banks, credit unions, fintech companies needing FINTRAC, OSFI, AML compliance
+- **Healthcare Organizations**: Hospitals, clinics requiring HIPAA/PHIPA compliance
+- **Enterprises**: Organizations with complex authorization requirements
+- **AI Companies**: Companies deploying AI agents, LLMs, RAG systems
+- **Regulated Industries**: Any industry with compliance requirements (GDPR, SOC 2, PCI-DSS)
+
+### What makes Control Core different from traditional access control?
+
+Traditional access control is hard-coded in applications. Control Core provides:
+- **Centralized Policies**: One place to manage all authorization rules
+- **Real-Time Enforcement**: Sub-100ms policy evaluation
+- **Context-Aware Decisions**: Policies use real-time data from integrated systems
+- **No Code Changes**: Apply policies without modifying applications
+- **Compliance Automation**: Built-in support for regulatory requirements
+
+### How does Control Core enforce policies without changing application code?
+
+Control Core uses a Policy Enforcement Point (Bouncer) that sits between clients and your application as a reverse proxy. Requests are intercepted, evaluated against policies, and allowed or denied before reaching your application.
+
+### What is the performance impact?
+
+Control Core adds minimal latency:
+- **Policy Evaluation**: < 10ms (cached) to 50ms (uncached)
+- **Total Request Overhead**: < 100ms on average
+- **Caching**: 85-95% cache hit rate in production
+- **Scalability**: Handles 10,000+ requests per second per Bouncer instance
+
+## Deployment Questions
+
+### Which deployment model should I choose?
+
+**90-day Pilot (Kickstart)**:
+- Best for: Evaluation, small teams, development
+- Deployment: Hosted Control Plane + self-hosted Bouncer
+- Requirements: 2GB RAM, 1 CPU, Docker
+- Duration: 90 days to evaluate
+
+**Pro**:
+- Best for: Production environments, teams wanting managed Control Plane
+- Deployment: Hosted Control Plane + self-hosted Bouncer
+- Requirements: 2GB RAM, 1 CPU, Docker
+- Support: Priority support with SLA
+
+**Enterprise**:
+- Best for: Large organizations, high-traffic, compliance requirements
+- Deployment: Fully self-hosted or managed
+- Requirements: Kubernetes cluster, 16GB+ RAM
+- Support: Dedicated support team, 24/7
+
+### Can I try Control Core before committing?
+
+Yes! The 90-day Pilot plan allows you to evaluate Control Core for 90 days with full features.
+
+### How long does deployment take?
+
+- **90-day Pilot/Pro**: 15-30 minutes (Bouncer deployment only)
+- **Enterprise Docker Compose**: 30-60 minutes
+- **Enterprise Kubernetes**: 2-4 hours (including cluster setup)
+
+### Can I deploy Control Core on-premises?
+
+Yes! The Enterprise plan supports complete on-premises deployment with full control over infrastructure and data sovereignty.
+
+### What cloud providers are supported?
+
+All major cloud providers:
+- **AWS**: EKS, ECS, EC2, RDS, ElastiCache
+- **Azure**: AKS, Container Instances, Azure Database, Azure Cache
+- **Google Cloud**: GKE, Cloud Run, Cloud SQL, Memorystore
+- **DigitalOcean, Linode, etc.**: Any provider with Kubernetes support
+
+### Can I deploy in multiple regions?
+
+Yes! Enterprise deployments support multi-region architecture with:
+- Regional Control Planes
+- OPAL replication across regions
+- Regional Bouncer fleets
+- Cross-region policy synchronization
+
+### How do I upgrade Control Core?
+
+**90-day Pilot/Pro**: Automatic updates for hosted Control Plane. Bouncer updates via package download.
+
+**Enterprise**: 
+```bash
+# Pull latest images
+helm repo update
+helm upgrade control-core controlcore/control-core --namespace control-core
+
+# Or for Docker Compose
+docker-compose pull
+docker-compose up -d
+```
+
+### What happens if Control Core goes down?
+
+**Fail-safe mode**:
+- Bouncer can operate independently with cached policies
+- Last-known-good policies continue to enforce
+- Decisions cached for configured TTL
+- Graceful degradation to default-deny (configurable)
+
+### How do I backup Control Core?
+
+**Database backup**:
+```bash
+# Automated daily backups
+pg_dump control_core_db | gzip > backup_$(date +%Y%m%d).sql.gz
+```
+
+**Kubernetes backup** (with Velero):
+```bash
+velero backup create control-core-backup --include-namespaces control-core
+```
+
+## Policy Management Questions
+
+### Do I need to know Rego to use Control Core?
+
+No! Control Core provides:
+- **Visual Policy Builder**: No-code policy creation
+- **Policy Templates**: Pre-built policies for common scenarios
+- **AI-Assisted Policy Creation**: Generate policies from natural language (coming soon)
+
+However, learning Rego enables more advanced policies.
+
+### How do I test policies before deploying to production?
+
+1. Deploy to **Sandbox environment** first
+2. Run comprehensive **test cases**
+3. Test with **Demo Application**
+4. Review **decision logs**
+5. Get **peer review** (optional)
+6. **Promote to production** when confident
+
+### Can I rollback a policy?
+
+Yes! Every policy change is versioned:
+```bash
+# In Console: Policies → History → Select version → Rollback
+# Via API:
+curl -X POST https://api.controlcore.com/api/v1/policies/123/rollback?version=5
+```
+
+Rollback is immediate (< 5 seconds to all Bouncers).
+
+### How long does it take for policy changes to apply?
+
+- **Sandbox**: Immediate (< 1 second)
+- **Production**: 5-30 seconds (depending on Bouncer fleet size)
+- **With caching**: New requests use new policy immediately
+- **Cached decisions**: Respect existing cache TTL (typically 1-5 minutes)
+
+### Can multiple policies apply to the same resource?
+
+Yes! Control Core supports:
+- **Policy chaining**: Multiple policies evaluated in order
+- **Policy priority**: Higher priority policies evaluated first
+- **Combining logic**: AND/OR combinations
+- **Conflict resolution**: Configurable (deny-overrides, allow-overrides, etc.)
+
+### What happens if a policy has bugs?
+
+Control Core provides safety mechanisms:
+- **Syntax validation**: Prevents invalid Rego from deploying
+- **Test requirements**: Require passing tests before deployment
+- **Sandbox testing**: Safe environment for validation
+- **Quick rollback**: Instant rollback to previous version
+- **Error handling**: Policy errors default to deny (fail-secure)
+
+### How do I debug a policy?
+
+**Tools available**:
+1. **Test framework**: Run test cases in Console
+2. **Decision logs**: See actual input and output
+3. **OPA Playground**: Test policies at https://play.openpolicyagent.org/
+4. **Debug output**: Add debug variables to policies
+5. **Evaluation traces**: Detailed trace of policy evaluation
+
+### Can I import existing policies?
+
+Yes! Control Core supports:
+- **Git import**: Import from GitHub, GitLab, Bitbucket
+- **File upload**: Upload `.rego` files
+- **API import**: Programmatic policy import
+- **Bulk import**: Import multiple policies at once
+
+## Integration Questions
+
+### What is a Policy Information Point (PIP)?
+
+A PIP is an integration with an external data source (like Okta, Workday, databases) that provides real-time context for policy decisions. PIPs enable policies to access current user data, customer information, and other contextual data.
+
+### How do I connect an external data source?
+
+1. Navigate to **Integrations** → **Data Sources**
+2. Click **Add Data Source**
+3. Select provider (Okta, Azure AD, database, etc.)
+4. Authenticate (OAuth, API key, credentials)
+5. Test connection
+6. Map attributes
+7. Save and sync
+
+Takes 5-10 minutes for most integrations.
+
+### How often does data sync from PIPs?
+
+Configurable per integration:
+- **Real-time** (webhooks): < 1 second
+- **Every 5 minutes**: Near real-time
+- **Hourly**: Standard for most use cases
+- **Daily**: For static reference data
+- **Weekly**: For organizational structures
+
+### Does PIP data go to all Bouncers automatically?
+
+Yes! Configure once in the Control Plane, and all Bouncers automatically receive the data via OPAL synchronization.
+
+### What if a PIP integration fails?
+
+Control Core handles failures gracefully:
+- Policies use last-cached data
+- Failed integration marked with error status
+- Admins notified via configured alerts
+- Auto-retry on next sync interval
+- Audit log records the failure
+
+### Can I use data from multiple sources in one policy?
+
+Yes! Policies can combine data from multiple PIPs:
+```rego
+allow if {
+    # From Okta
+    user := data.policy_data.okta.users[input.user.id]
+    
+    # From Workday
+    employee := data.policy_data.workday.employees[input.user.id]
+    
+    # From Database
+    customer := data.policy_data.database.customers[input.customer_id]
+    
+    # Make decision using all three
+}
+```
+
+### How secure is data from PIPs?
+
+- **Encryption in transit**: TLS 1.3 for all connections
+- **Encryption at rest**: AES-256 for stored credentials
+- **Secrets management**: Integration with Vault, AWS Secrets Manager
+- **Access control**: Only authorized admins can configure PIPs
+- **Audit logging**: All PIP operations logged
+- **Data minimization**: Select only necessary fields
+
+### Can I build custom integrations?
+
+Yes! Control Core provides:
+- **Custom REST API connector**: For any REST API
+- **SDK for custom connectors**: Build Python connectors
+- **OpenAPI support**: Auto-discover from OpenAPI specs
+- **GraphQL support**: Connect to GraphQL APIs
+- **Professional services**: We can build custom integrations for you
+
+## Compliance Questions
+
+### Does Control Core help with FINTRAC compliance?
+
+Yes! Control Core provides:
+- **LCTR templates**: Large Cash Transaction Reporting ($10,000+ CAD)
+- **STR detection**: Suspicious Transaction Report indicators
+- **Third-party determination**: Automatic tracking
+- **Record keeping**: 5-year audit trail
+- **Automated reporting**: Integration with compliance systems
+
+### How does Control Core support OSFI guidelines?
+
+Control Core enforces:
+- **B-10 Segregation of Duties**: Automatic detection of conflicting roles
+- **E-21 Cyber Security**: MFA, privileged access management
+- **Data Residency**: Geographic data restrictions
+- **Audit Requirements**: Comprehensive logging
+- **Risk Management**: Risk-based access controls
+
+### What AML requirements does Control Core address?
+
+- **KYC Verification**: Customer due diligence policies
+- **EDD (Enhanced Due Diligence)**: For high-risk customers
+- **PEP Screening**: Politically Exposed Person handling
+- **Sanctions Screening**: OFAC, UN, EU sanctions lists
+- **Transaction Monitoring**: Suspicious pattern detection
+- **Record Keeping**: 5-year retention
+
+### How does Control Core help with HIPAA compliance?
+
+- **Minimum Necessary Rule**: Field-level access control
+- **Access Controls**: Role-based PHI access
+- **Break-the-Glass**: Emergency access with audit
+- **Audit Logging**: 6-year retention
+- **Encryption**: Data at rest and in transit
+- **Business Associate Support**: BAA available
+
+### Is Control Core GDPR compliant?
+
+Yes! Control Core supports:
+- **Right to Access** (Article 15): Data subject access requests
+- **Right to Erasure** (Article 17): Right to be forgotten
+- **Purpose Limitation** (Article 5): Consent-based processing
+- **Data Portability** (Article 20): Export user data
+- **Privacy by Design**: Built-in privacy controls
+- **Audit Trail**: Processing activity records
+
+### Can Control Core enforce PCI-DSS requirements?
+
+Yes! Control Core enforces:
+- **Requirement 7**: Restrict access to cardholder data by business need-to-know
+- **Requirement 8**: Unique ID for each user, no shared accounts
+- **Requirement 10**: Audit trail of all access to cardholder data
+- **Session timeouts**: 15-minute idle timeout
+- **Strong authentication**: MFA for CDE access
+
+### How does Control Core handle SOC 2 compliance?
+
+Control Core supports SOC 2 Trust Service Criteria:
+- **CC6.1**: Logical access controls
+- **CC6.2**: Prior authorization for credentials
+- **CC7.2**: System monitoring
+- **CC8.1**: Change management for policies
+- **Audit logging**: Comprehensive activity tracking
+- **Access reviews**: Regular access certification
+
+## Performance Questions
+
+### How fast are policy decisions?
+
+- **Cached decisions**: 5-10ms
+- **Uncached decisions**: 20-50ms
+- **Complex policies**: 50-100ms
+- **With PIP data**: 30-80ms (depends on data size)
+- **P95 latency**: < 100ms
+
+### How do I improve policy performance?
+
+1. **Enable caching**: Set appropriate cache TTLs
+2. **Optimize policies**: Avoid expensive operations
+3. **Use early returns**: Check cheap conditions first
+4. **Index PIP data**: Ensure data is indexed
+5. **Scale Bouncers**: Add more Bouncer instances
+6. **Increase cache size**: Allocate more memory
+
+### What is the cache hit rate?
+
+Typical production cache hit rates:
+- **Policy cache**: 90-95%
+- **Decision cache**: 80-90%
+- **PIP data cache**: 85-90%
+
+### How many requests can Control Core handle?
+
+**Per Bouncer instance**:
+- **Sustained**: 500-1,000 requests/second
+- **Peak**: 2,000-3,000 requests/second
+- **Daily**: 50-100 million requests
+
+**Scaled deployment**:
+- **10 Bouncers**: 5,000-10,000 requests/second
+- **50 Bouncers**: 25,000-50,000 requests/second
+- **100 Bouncers**: 50,000-100,000 requests/second
+
+### Does Control Core support auto-scaling?
+
+Yes! Kubernetes deployments support:
+- **Horizontal Pod Autoscaler (HPA)**: Scale based on CPU, memory, custom metrics
+- **Cluster Autoscaler**: Add nodes automatically
+- **Scaling metrics**: Request rate, policy evaluation time, cache hit rate
+- **Custom metrics**: Define your own scaling triggers
+
+### How much memory does Control Core use?
+
+**Per component**:
+- **Policy Administration Console**: 512MB-1GB
+- **Policy Administration API**: 1GB-2GB
+- **Bouncer/PEP**: 512MB-1GB
+- **OPAL Server**: 512MB-1GB
+- **Database**: 2GB-8GB (depends on data volume)
+- **Redis**: 512MB-2GB (depends on cache size)
+
+## Security Questions
+
+### How secure is Control Core?
+
+Control Core implements defense-in-depth security:
+- **Encryption**: AES-256 at rest, TLS 1.3 in transit
+- **Authentication**: Support for SAML, OAuth 2.0, MFA
+- **Network Security**: VPC isolation, network policies
+- **Runtime Security**: Container scanning, pod security policies
+- **Secrets Management**: Integration with Vault, AWS Secrets Manager
+- **Audit Logging**: Comprehensive activity tracking
+- **Compliance**: FINTRAC, OSFI, HIPAA, GDPR, SOC 2, PCI-DSS
+
+### Do you have SOC 2 certification?
+
+Control Core is SOC 2 Type II compliant. Reports available under NDA for Enterprise customers.
+
+### How is data encrypted?
+
+**At Rest**:
+- Database: AES-256 encryption
+- Secrets: Encrypted with KMS (AWS KMS, Azure Key Vault)
+- Backups: Encrypted before storage
+
+**In Transit**:
+- TLS 1.3 for all API communications
+- mTLS for service-to-service (optional)
+- Certificate pinning (optional)
+
+### Can I use my own SSL certificates?
+
+Yes! Control Core supports:
+- Let's Encrypt (automatic)
+- Custom certificates (upload)
+- Corporate CA certificates
+- Wildcard certificates
+- cert-manager (Kubernetes)
+
+### How are secrets managed?
+
+Control Core integrates with:
+- **HashiCorp Vault**: Recommended for enterprise
+- **AWS Secrets Manager**: For AWS deployments
+- **Azure Key Vault**: For Azure deployments
+- **Google Secret Manager**: For GCP deployments
+- **Kubernetes Secrets**: For basic deployments
+
+### What authentication methods are supported?
+
+- **Built-in**: Username/password with bcrypt hashing
+- **SAML 2.0**: Okta, Azure AD, OneLogin, etc.
+- **OAuth 2.0**: Auth0, Google, GitHub
+- **OIDC**: OpenID Connect providers
+- **LDAP/Active Directory**: Enterprise directory services
+- **Multi-Factor Authentication (MFA)**: TOTP, SMS, email
+
+### How does MFA work with Control Core?
+
+Control Core supports:
+- **Setup**: Users enroll via QR code (TOTP)
+- **Enforcement**: Require MFA for sensitive operations
+- **Verification**: MFA checked in policies
+- **Bypass**: Emergency access with audit
+- **Backup codes**: For recovery
+
+## Policy Questions
+
+### What is Rego?
+
+Rego is a declarative policy language used by Open Policy Agent (OPA). It's designed for expressing complex authorization logic in a safe, testable way.
+
+### Do I need to learn Rego?
+
+Not necessarily:
+- **Visual Policy Builder**: Create policies without code
+- **Templates**: Use pre-built policy templates
+- **AI-Assisted**: Generate policies from requirements (coming soon)
+
+For advanced use cases, Rego knowledge is helpful.
+
+### Where can I learn Rego?
+
+- **Control Core Rego Guidelines**: [/guides/rego-guidelines](/guides/rego-guidelines)
+- **OPA Documentation**: https://www.openpolicyagent.org/docs/latest/
+- **OPA Playground**: https://play.openpolicyagent.org/
+- **Interactive Tutorials**: https://www.openpolicyagent.org/docs/latest/learn/
+
+### How do I test policies?
+
+Control Core provides multiple testing methods:
+- **Inline tests**: Write tests directly in policy files
+- **Test cases**: Create test cases in Console UI
+- **Demo Application**: Test with realistic application
+- **Sandbox environment**: Safe testing before production
+- **Decision logs**: Review actual decisions
+
+### Can policies call external APIs?
+
+Not directly from Rego (by design - policies should be deterministic). Instead:
+- **Use PIPs**: Integrate external data via PIPs
+- **Pre-fetch data**: OPAL fetches data before policy evaluation
+- **Webhooks**: Trigger external actions after decisions
+
+### How do I handle complex authorization logic?
+
+Use Control Core's advanced patterns:
+- **Helper functions**: Break complex logic into reusable functions
+- **Policy composition**: Combine multiple policies
+- **Hierarchical policies**: Parent-child policy relationships
+- **Conditional logic**: If-then-else patterns in Rego
+
+### Can I have different policies for different environments?
+
+Yes! Control Core supports:
+- **Sandbox environment**: For testing
+- **Staging environment**: For pre-production validation
+- **Production environment**: For live enforcement
+- **Environment-specific policies**: Different rules per environment
+
+### How many policies can I have?
+
+No hard limit! Production deployments commonly have:
+- **Small**: 10-50 policies
+- **Medium**: 50-200 policies
+- **Large**: 200-1000+ policies
+
+Performance remains excellent even with 1000+ policies due to intelligent caching.
+
+### Can I organize policies into folders?
+
+Yes! Organize policies by:
+- Application (api, web, mobile)
+- Function (authentication, authorization, compliance)
+- Department (finance, hr, operations)
+- Environment (dev, staging, production)
+
+## FINTRAC/AML Compliance Questions
+
+### What FINTRAC transactions does Control Core help monitor?
+
+- **Large Cash Transaction Reports (LCTR)**: $10,000+ CAD cash transactions
+- **Suspicious Transaction Reports (STR)**: Unusual patterns, structuring, etc.
+- **Electronic Funds Transfer (EFT)**: $10,000+ international transfers
+- **Third-Party Determination**: Conducting on behalf of another party
+
+### How does Control Core detect suspicious transactions?
+
+Built-in indicators:
+- **Structuring**: Multiple transactions just under threshold
+- **Unusual amounts**: Significantly higher than customer's normal pattern
+- **Rapid funds movement**: Money in and out quickly
+- **High-risk jurisdictions**: Transactions to/from sanctioned countries
+- **No apparent business purpose**: Transactions without clear rationale
+- **Customer behavior**: Reluctance to provide information
+
+### Can Control Core integrate with AML systems?
+
+Yes! Control Core integrates with:
+- **ComplyAdvantage**: KYC/AML verification
+- **Refinitiv World-Check**: PEP and sanctions screening
+- **LexisNexis**: Identity verification and fraud detection
+- **Custom AML systems**: Via API integration
+
+### How does Control Core handle PEP (Politically Exposed Person) screening?
+
+```rego
+# Automatic PEP screening
+allow if {
+    customer := data.customers[input.customer_id]
+    
+    # Not a PEP - standard processing
+    customer.pep_status == false
+}
+
+allow if {
+    # PEP requires enhanced due diligence
+    customer.pep_status == true
+    customer.enhanced_due_diligence == true
+    customer.senior_management_approval == true
+    
+    # Compliance officer review
+    input.user.roles[_] == "compliance-officer"
+}
+```
+
+### How does Control Core support OSFI segregation of duties?
+
+Automatic enforcement:
+```rego
+# Detect conflicting roles automatically
+has_conflicts if {
+    "transaction-initiator" in input.user.roles
+    "transaction-approver" in input.user.roles
+}
+
+# Block if conflicts detected
+allow if {
+    not has_conflicts
+}
+```
+
+No manual checking required!
+
+### What AML sanctions lists are supported?
+
+- **OFAC SDN**: US Treasury sanctions list
+- **UN Sanctions**: United Nations sanctions
+- **EU Sanctions**: European Union sanctions
+- **UK Sanctions**: UK Office of Financial Sanctions
+- **DFATD**: Canadian sanctions list
+- **Custom lists**: Import your own
+
+### How does Control Core support Customer Due Diligence (CDD)?
+
+Enforce CDD requirements:
+- **Identity verification**: Require verified identification
+- **Beneficial ownership**: For entities, identify 25%+ owners
+- **Source of funds**: Verify for medium/high-risk customers
+- **Risk assessment**: Annual review requirements
+- **Ongoing monitoring**: Based on risk level
+
+## OSFI Compliance Questions
+
+### How does Control Core implement OSFI Guideline B-10?
+
+**Segregation of Duties**:
+- Automatic detection of conflicting roles
+- Prevention of maker-checker conflicts
+- Dual authorization for high-value transactions
+- Audit trail of all approvals
+
+**Outsourcing Controls**:
+- Third-party vendor access restrictions
+- Monitoring and audit of vendor activities
+- Contractual compliance verification
+
+### Does Control Core support OSFI E-21 cyber security requirements?
+
+Yes:
+- **MFA for sensitive operations**
+- **Privileged access management**: Time-limited, monitored
+- **Session recording**: Optional for privileged accounts
+- **Access from approved locations only**
+- **Just-in-time access**: Temporary elevated permissions
+
+### How does Control Core enforce data residency (OSFI)?
+
+```rego
+# Ensure Canadian data stays in Canada
+allow if {
+    resource := data.resources[input.resource.id]
+    resource.data_residency == "Canada"
+    
+    # User accessing from Canada
+    input.context.geo_location.country == "CA"
+}
+```
+
+## Healthcare Compliance Questions
+
+### How does Control Core enforce HIPAA minimum necessary rule?
+
+Field-level access control:
+```rego
+# Only necessary fields for purpose
+allow if {
+    purpose := input.context.purpose_of_use
+    requested_fields := input.query.fields
+    
+    every field in requested_fields {
+        field in necessary_fields[purpose]
+    }
+}
+```
+
+### How does break-the-glass emergency access work?
+
+```rego
+# Emergency access with logging
+allow if {
+    input.context.emergency == true
+    input.user.roles[_] in ["physician", "emergency-staff"]
+    
+    # Must provide justification
+    input.context.emergency_justification != null
+    
+    # Audit enabled
+    input.context.audit_enabled == true
+}
+```
+
+Emergency accesses are flagged for post-review.
+
+### How long are HIPAA audit logs retained?
+
+Configurable, minimum 6 years per HIPAA requirements. Control Core default: 7 years.
+
+### Does Control Core support consent management?
+
+Yes:
+```rego
+# Check patient consent
+allow if {
+    consent := data.patient_consents[input.patient_id]
+    input.context.purpose in consent.approved_purposes
+    consent.status == "active"
+    consent.expiry > time.now_ns()
+}
+```
+
+## AI Security Questions
+
+### How does Control Core protect AI agents?
+
+- **Prompt filtering**: Block prompts with PII, injection attempts
+- **Content sanitization**: Remove sensitive data from responses
+- **Usage quotas**: Limit requests, tokens, costs per user
+- **Provider policies**: Different rules for different AI providers
+- **Context injection**: Add compliance guidelines to prompts
+- **Audit logging**: All AI interactions logged
+
+### Can Control Core filter AI responses in real-time?
+
+Yes! Control Core supports:
+- **Pre-prompt injection**: Add context before sending to AI
+- **Post-response filtering**: Sanitize AI responses
+- **Pattern matching**: Detect and mask PII, credentials
+- **Content policy**: Block prohibited content
+- **Real-time**: < 50ms overhead
+
+### Does Control Core work with all LLM providers?
+
+Yes! Tested with:
+- **OpenAI**: GPT-3.5, GPT-4
+- **Anthropic**: Claude models
+- **Google**: Gemini models
+- **Azure OpenAI**: Enterprise AI services
+- **Hugging Face**: Open-source models
+- **Ollama**: Local models
+- **Custom**: Any LLM with REST API
+
+### How does Control Core secure RAG systems?
+
+- **Query validation**: Prevent injection attacks
+- **Source authorization**: Verify user can access source documents
+- **Result filtering**: Filter retrieved documents by permissions
+- **Audit logging**: Track all RAG queries
+- **Context limits**: Limit number of sources retrieved
+
+### Can Control Core prevent prompt injection?
+
+Yes:
+```rego
+prompt_injection_detected if {
+    lower_prompt := lower(input.context.prompt)
+    injection_patterns := [
+        "ignore previous instructions",
+        "disregard safety",
+        "jailbreak"
+    ]
+    some pattern in injection_patterns
+    contains(lower_prompt, pattern)
+}
+
+allow if {
+    not prompt_injection_detected
+}
+```
+
+## Scaling Questions
+
+### How do I scale Control Core horizontally?
+
+**Policy Administration Components**:
+```bash
+# Kubernetes
+kubectl scale deployment controlcore-api --replicas=10
+
+# Add more Bouncer instances
+kubectl scale deployment controlcore-bouncer --replicas=20
+```
+
+### Can Control Core auto-scale?
+
+Yes! Kubernetes deployments support:
+- **HPA**: Based on CPU, memory, request rate
+- **Cluster Autoscaler**: Add nodes automatically
+- **Custom metrics**: Scale on policy evaluation time, cache hit rate
+
+### What are the limits of Control Core?
+
+**No inherent limits**:
+- Policies: Unlimited
+- Bouncers: Unlimited
+- Decisions per day: Billions (with proper scaling)
+- Users: Unlimited
+- Resources: Unlimited
+
+**Practical limits** (before needing to scale):
+- Single Bouncer: 1,000 req/sec
+- Single API instance: 500 req/sec
+- Single database: 10,000 connections
+
+### How do I optimize for high traffic?
+
+1. **Scale Bouncers**: 10+ instances behind load balancer
+2. **Increase cache**: Larger cache, longer TTL
+3. **Database read replicas**: Distribute read load
+4. **Redis cluster**: Distributed cache
+5. **CDN**: Cache static content
+6. **Geographic distribution**: Multi-region deployment
+
+## Cost Questions
+
+### How is Control Core priced?
+
+**90-day Pilot**: 90-day evaluation period
+**Pro**: Monthly subscription per Bouncer
+**Enterprise**: Custom pricing based on:
+- Number of Bouncers
+- Policy evaluations per month
+- Support level
+- Professional services
+
+Contact sales@controlcore.io for pricing.
+
+### What's included in the 90-day Pilot?
+
+- Full Control Core platform
+- All features (policies, integrations, monitoring)
+- Community support
+- Documentation and guides
+- 90 days to evaluate
+- Easy upgrade to Pro or Enterprise
+
+### Are there hidden costs?
+
+No hidden costs! You pay only for:
+- Control Core subscription
+- Your cloud infrastructure (if self-hosted)
+- Optional: Professional services, training
+
+### Do I pay for policy evaluations?
+
+No! Unlimited policy evaluations on all plans. You pay for:
+- **90-day Pilot**: Evaluation period only
+- **Pro**: Per Bouncer subscription
+- **Enterprise**: Custom pricing, not per-evaluation
+
+## Operational Questions
+
+### Who manages the Control Plane?
+
+**90-day Pilot/Pro**: Control Core manages hosted Control Plane
+**Enterprise Self-Hosted**: You manage your Control Plane
+**Enterprise Managed**: Control Core manages in your cloud (optional)
+
+### What monitoring is included?
+
+Built-in monitoring:
+- **System health**: All components
+- **Performance metrics**: Latency, throughput, errors
+- **Decision logs**: All authorization decisions
+- **Policy metrics**: Evaluation time, usage
+- **Integration metrics**: PIP sync status, errors
+
+**Integrates with**:
+- Prometheus, Grafana
+- Datadog, New Relic
+- CloudWatch, Azure Monitor, Stackdriver
+- ELK/EFK stack
+
+### How do I view audit logs?
+
+Multiple ways:
+- **Console UI**: Monitoring → Audit Logs (filterable, exportable)
+- **API**: Query via REST API
+- **Export**: CSV, JSON export for compliance
+- **SIEM Integration**: Send to Splunk, Datadog, etc.
+
+### What SLA does Control Core provide?
+
+**90-day Pilot**: Best effort, community support
+**Pro**: 99.5% uptime SLA, priority support
+**Enterprise**: 99.9% or 99.95% uptime SLA (customizable), 24/7 support
+
+### Can I get professional services?
+
+Yes! Available services:
+- **Deployment assistance**: Help with complex deployments
+- **Policy development**: Expert policy creation
+- **Custom integrations**: Build custom connectors
+- **Training**: On-site or remote training
+- **Migration**: Migrate from existing systems
+
+### How do I get support?
+
+**90-day Pilot**: 
+- GitHub Discussions
+- Documentation
+- Community Slack
+
+**Pro**:
+- Priority email support
+- Response time: < 24 hours
+- Slack channel
+
+**Enterprise**:
+- 24/7 support
+- Dedicated support team
+- Response time: < 4 hours (critical), < 1 hour (emergency)
+- Slack channel
+- Phone support
+
+## Technical Questions
+
+### What databases are supported?
+
+**For Control Core**:
+- PostgreSQL 12+ (required)
+- Redis 6+ (required for caching)
+
+**For PIP integrations**:
+- PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Snowflake, BigQuery, etc.
+
+### What programming languages can I use?
+
+Control Core provides:
+- **Rego**: For policy development
+- **Python SDK**: For API integration
+- **JavaScript/TypeScript SDK**: For API integration
+- **Go SDK**: For custom Bouncer extensions
+- **REST API**: Language-agnostic
+
+### Can I run Control Core on ARM processors?
+
+Yes! Control Core supports:
+- **ARM64**: AWS Graviton, Apple Silicon
+- **AMD64**: Standard x86_64 processors
+- **Multi-arch**: Docker images for both architectures
+
+### Does Control Core support IPv6?
+
+Yes! Full IPv6 support for:
+- Load balancers
+- Bouncers
+- API endpoints
+- Database connections
+
+### Can I use Control Core with Kubernetes?
+
+Yes! Control Core is cloud-native:
+- **Helm charts**: Official Helm charts
+- **Operators**: Kubernetes operators (coming soon)
+- **Service mesh**: Istio, Linkerd support
+- **Ingress**: NGINX, Traefik, cloud providers
+
+### Does Control Core support Docker Compose?
+
+Yes! Perfect for:
+- Development environments
+- Small deployments
+- Testing
+- Demo environments
+
+### Can I integrate with my CI/CD pipeline?
+
+Yes! Control Core supports:
+- **Policy validation**: In CI/CD pipelines
+- **Automated testing**: Run policy tests
+- **Git-based workflows**: Policies in Git
+- **API deployment**: Programmatic policy deployment
+
+Example:
+```yaml
+# .github/workflows/policy-ci.yml
+- name: Validate Policy
+  run: opa check policies/
+- name: Run Tests
+  run: opa test policies/
+- name: Deploy to Sandbox
+  run: curl -X POST https://api.controlcore.com/api/v1/policies/deploy
+```
+
+## Migration Questions
+
+### How do I migrate from existing authorization system?
+
+**Typical migration**:
+1. **Phase 1**: Deploy Control Core alongside existing system
+2. **Phase 2**: Model existing rules in Control Core policies
+3. **Phase 3**: Test Control Core with shadow mode (log only)
+4. **Phase 4**: Gradually move resources to Control Core
+5. **Phase 5**: Decommission old system
+
+### Can Control Core coexist with existing IAM?
+
+Yes! Control Core complements IAM:
+- **IAM**: Handles authentication, user management
+- **Control Core**: Handles fine-grained authorization
+- **Integration**: Connect IAM as PIP data source
+
+### How long does migration typically take?
+
+- **Simple**: 2-4 weeks (basic RBAC replacement)
+- **Medium**: 2-3 months (complex authorization, some integrations)
+- **Complex**: 3-6 months (many integrations, compliance requirements)
+
+Professional services can accelerate migration.
+
+### Will migration disrupt my users?
+
+No! Migration can be done with zero downtime:
+- Deploy Control Core alongside existing system
+- Test thoroughly before switching
+- Gradual rollout to user groups
+- Instant rollback if issues
+
+### Can I migrate policies from OPA?
+
+Yes! If you're already using OPA:
+- Import existing Rego policies
+- Adapt to Control Core input schema
+- Test with Control Core
+- Deploy
+
+Most OPA policies work with minimal changes.
+
+## Enterprise Questions
+
+### What's included in Enterprise support?
+
+- **24/7 support**: Around-the-clock assistance
+- **Dedicated team**: Named support engineers
+- **SLA**: 99.9%+ uptime guarantee
+- **Response times**: < 4 hours standard, < 1 hour critical
+- **Phone support**: Direct phone line
+- **Slack channel**: Dedicated channel
+- **Quarterly reviews**: Business reviews
+- **Roadmap input**: Influence product direction
+
+### Can Control Core be deployed in air-gapped environments?
+
+Yes! Enterprise deployments support:
+- Complete offline operation
+- Local container registry
+- Manual updates
+- No internet connectivity required
+
+### Does Control Core support multi-tenancy?
+
+Yes! Control Core Pro and Enterprise plans provide complete tenant isolation:
+- **Secure isolation**: Your policies and data are completely isolated from other customers
+- **Dedicated environments**: Your own secure Control Plane instance
+- **Independent policies**: Your policies never interact with other customers
+- **Usage tracking**: Dedicated metrics and monitoring for your organization
+- **Custom domains**: Your own branded URLs (Enterprise)
+
+### Can I white-label Control Core?
+
+Yes! Enterprise customers can:
+- Custom branding
+- Custom domain names
+- Remove Control Core branding
+- Custom color schemes
+- Custom logos
+
+### What compliance certifications does Control Core have?
+
+- **SOC 2 Type II**: In progress
+- **ISO 27001**: Planned
+- **HIPAA**: BAA available
+- **GDPR**: Compliant
+- **FINTRAC/OSFI**: Compliant by design
+
+## Troubleshooting Questions
+
+### Why is my Bouncer not connecting to Control Plane?
+
+Check:
+```bash
+# 1. Network connectivity
+curl https://your-tenant.controlplane.controlcore.io/health
+
+# 2. API key correct
+echo $API_KEY
+
+# 3. Firewall allows outbound HTTPS
+# 4. Check Bouncer logs
+docker-compose logs bouncer | grep -i "control plane"
+```
+
+### Why are policies not syncing?
+
+Check:
+```bash
+# 1. OPAL server status
+curl http://localhost:7000/health
+
+# 2. Bouncer OPAL connection
+curl http://localhost:8080/api/v1/opal/status
+
+# 3. Force sync
+curl -X POST http://localhost:8080/api/v1/opal/sync
+
+# 4. Check OPAL logs
+docker-compose logs opal
+```
+
+### Why is policy evaluation slow?
+
+Common causes:
+- Policy too complex (simplify)
+- Cache disabled (enable caching)
+- No indexes on PIP data (add indexes)
+- Too many policies (consolidate)
+- Database slow (optimize queries)
+
+### How do I debug a policy?
+
+1. **Use decision logs**: See actual input/output
+2. **Add debug output**: Include debug variables in policy
+3. **Test in OPA Playground**: Isolate policy logic
+4. **Use OPA CLI**: `opa eval` for testing
+5. **Check data availability**: Ensure PIP data synced
+
+### Service won't start after update
+
+```bash
+# Check for database migrations
+docker-compose exec api alembic current
+docker-compose exec api alembic upgrade head
+
+# Check for config changes
+diff .env.old .env
+
+# Check logs for errors
+docker-compose logs | grep ERROR
+
+# Rollback if needed
+docker-compose down
+# Restore backup
+docker-compose up -d
+```
+
+## Demo Application Questions
+
+### What is the Demo Application?
+
+A realistic business application with AI features, designed for:
+- Testing policies before production
+- Internal demonstrations
+- Policy development
+- Training and learning
+
+### How do I deploy the Demo Application?
+
+```bash
+cd cc-demoapp
+./infra/start-dev.sh
+
+# Access at http://localhost:3001
+```
+
+### What demo users are available?
+
+- `admin` / `admin123`: Full access
+- `manager` / `manager123`: Management access
+- `analyst` / `analyst123`: Analytics access
+- `hr` / `hr123`: HR data access
+- `finance` / `finance123`: Financial data access
+
+### Can I add custom data to demo app?
+
+Yes! Connect to demo database:
+```bash
+docker exec -it demo-postgres psql -U demo_user -d demo_app
+# Add your custom test data
+```
+
+### How do I reset demo app data?
+
+```bash
+# Reset to factory defaults
+cd cc-demoapp
+./infra/start-dev.sh  # Automatically resets weekly
+
+# Or manually
+cd cc-demoapp-api
+python init_db.py --reset
+```
+
+## Best Practices Questions
+
+### What are Control Core best practices?
+
+**Policy Design**:
+- Default deny (fail secure)
+- Principle of least privilege
+- Keep policies simple
+- Use helper functions
+- Comprehensive testing
+
+**Operations**:
+- Test in sandbox first
+- Monitor decision logs
+- Review policies regularly
+- Keep policies in Git
+- Document policy changes
+
+**Security**:
+- Use MFA for admins
+- Rotate API keys quarterly
+- Monitor audit logs
+- Keep systems updated
+- Follow security guide
+
+### How often should I review policies?
+
+**Recommended**:
+- **Active policies**: Monthly
+- **Compliance policies**: Quarterly (or per regulation)
+- **User access**: Quarterly access certification
+- **Integration configs**: Monthly
+- **Security settings**: Monthly
+
+### Should I use one policy or many?
+
+**Use multiple focused policies**:
+- Easier to test
+- Easier to debug
+- Easier to maintain
+- Easier to understand
+- Better performance (early exit)
+
+Avoid "mega-policies" that do everything.
+
+### How do I organize policies?
+
+**Recommended structure**:
+```
+policies/
+├── authentication/
+│   └── api-key-auth.rego
+├── authorization/
+│   ├── rbac-basic.rego
+│   └── department-access.rego
+├── compliance/
+│   ├── fintrac-lctr.rego
+│   ├── osfi-segregation.rego
+│   └── hipaa-minimum-necessary.rego
+├── ai-security/
+│   ├── prompt-filter.rego
+│   └── content-sanitize.rego
+└── tests/
+    └── *_test.rego
+```
+
+### When should I use PIP integrations?
+
+Use PIPs when:
+- Policies need real-time user status
+- Authorization depends on external data
+- Compliance requires current information
+- User attributes change frequently
+- Resource metadata drives decisions
+
+Don't use PIPs for:
+- Static configuration
+- Simple role checks (unless roles change frequently)
+- Data that never changes
+
+## Miscellaneous Questions
+
+### Can Control Core work offline?
+
+**Bouncer**: Yes, with cached policies and data
+**Control Plane**: Requires connectivity (unless self-hosted)
+**Duration**: Until cache expires (configurable)
+
+### Does Control Core support multi-language?
+
+**UI**: English (additional languages planned)
+**Policies**: Rego (universal)
+**API**: REST (language-agnostic)
+**SDKs**: Python, JavaScript, Go
+
+### Can I contribute to Control Core?
+
+Yes! Control Core has open-source components:
+- OPAL: https://github.com/permitio/opal
+- Policy templates: Submit via GitHub
+- Documentation: Submit improvements
+- Community: Share patterns and examples
+
+### Where can I find examples?
+
+- **[Policy Templates](/guides/policy-templates)**: Pre-built examples
+- **[Rego Guidelines](/guides/rego-guidelines)**: Code examples
+- **Demo Application**: Real-world scenarios
+- **GitHub**: Community examples
+- **Documentation**: Throughout guides
+
+### How do I stay updated?
+
+- **Release notes**: Check /releases
+- **Slack community**: Join discussions
+- **Newsletter**: Subscribe at controlcore.io
+- **Blog**: blog.controlcore.io
+- **Twitter**: @controlcore_io
+
+### Can I request features?
+
+Yes! Submit feature requests:
+- **GitHub Discussions**: Public feature requests
+- **Support email**: support@controlcore.io
+- **Enterprise customers**: Direct to product team
+- **Roadmap**: Quarterly roadmap reviews
+
+### Is there a community?
+
+Yes! Join:
+- **GitHub Discussions**: https://github.com/controlcore/discussions
+- **Slack**: slack.controlcore.io
+- **Discord**: discord.gg/controlcore
+- **LinkedIn**: ControlCore company page
+
+### Where can I find training materials?
+
+- **Documentation**: Comprehensive guides
+- **Demo Application**: Hands-on learning
+- **Video tutorials**: Coming soon
+- **Workshops**: Contact for enterprise training
+- **Certification**: Control Core certification program (coming soon)
+
+### Can Control Core integrate with my existing tools?
+
+Most likely yes! Control Core integrates with:
+- **Identity**: Okta, Azure AD, Auth0, LDAP, etc.
+- **Monitoring**: Prometheus, Grafana, Datadog, etc.
+- **Logging**: ELK, Splunk, etc.
+- **Ticketing**: ServiceNow, Jira, etc.
+- **SIEM**: Splunk, QRadar, ArcSight, etc.
+
+If your tool has a REST API, Control Core can integrate.
+
+## Still Have Questions?
+
+- **[Getting Started Guide](/guides/getting-started)**: Basic concepts and quick start
+- **[Troubleshooting Guide](/guides/troubleshooting)**: Common issues
+- **[API Reference](/guides/api-reference)**: Complete API documentation
+- **Support**: support@controlcore.io
+- **Sales**: sales@controlcore.io
+- **Community**: GitHub Discussions
+
+---
+
+**Can't find your answer? Contact us at support@controlcore.io or ask in our community forums!**
+

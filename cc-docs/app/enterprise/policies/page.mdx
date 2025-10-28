@@ -1,0 +1,1194 @@
+# Enterprise Policy Management
+
+This guide covers enterprise-scale policy development, governance, testing, versioning, and deployment strategies for Control Core, with specific focus on regulatory compliance requirements.
+
+## Policy Lifecycle Management
+
+### Policy Development Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Enterprise Policy Lifecycle                │
+└─────────────────────────────────────────────────────────────┘
+
+1. Requirements Gathering
+   ├─ Compliance requirements (FINTRAC, OSFI, etc.)
+   ├─ Business requirements
+   └─ Security requirements
+   
+2. Policy Design
+   ├─ Policy templates selection
+   ├─ Custom policy development
+   └─ Attribute mapping (PIP integration)
+   
+3. Policy Development
+   ├─ Write Rego policies
+   ├─ Code review
+   └─ Version control (Git)
+   
+4. Policy Testing
+   ├─ Unit tests
+   ├─ Integration tests
+   └─ Compliance validation
+   
+5. Policy Deployment
+   ├─ Staging environment
+   ├─ Production approval
+   └─ Gradual rollout
+   
+6. Policy Monitoring
+   ├─ Performance metrics
+   ├─ Audit compliance
+   └─ Policy effectiveness
+   
+7. Policy Maintenance
+   ├─ Regular review
+   ├─ Updates for new regulations
+   └─ Deprecation management
+```
+
+## Policy Organization
+
+### Directory Structure
+
+Organize policies for enterprise scale:
+
+```
+policies/
+├── README.md
+├── .version
+├── compliance/
+│   ├── fintrac/
+│   │   ├── large_cash_transactions.rego
+│   │   ├── suspicious_transactions.rego
+│   │   ├── kyc_verification.rego
+│   │   └── tests/
+│   │       ├── large_cash_test.rego
+│   │       └── suspicious_test.rego
+│   ├── osfi/
+│   │   ├── b10_outsourcing.rego
+│   │   ├── e21_operational_risk.rego
+│   │   └── tests/
+│   ├── aml/
+│   │   ├── customer_due_diligence.rego
+│   │   ├── transaction_monitoring.rego
+│   │   └── tests/
+│   ├── gdpr/
+│   │   ├── data_access_control.rego
+│   │   ├── consent_management.rego
+│   │   └── tests/
+│   └── hipaa/
+│       ├── phi_access_control.rego
+│       ├── audit_controls.rego
+│       └── tests/
+├── application/
+│   ├── api_access.rego
+│   ├── resource_permissions.rego
+│   └── tests/
+├── identity/
+│   ├── authentication.rego
+│   ├── role_based_access.rego
+│   ├── attribute_based_access.rego
+│   └── tests/
+├── data/
+│   ├── users.json
+│   ├── roles.json
+│   └── resources.json
+├── helpers/
+│   ├── time_utils.rego
+│   ├── string_utils.rego
+│   └── validation_utils.rego
+└── ci/
+    ├── .gitlab-ci.yml
+    ├── .github/workflows/policy-ci.yml
+    └── scripts/
+        ├── test.sh
+        ├── validate.sh
+        └── deploy.sh
+```
+
+### Naming Conventions
+
+**Policy Files**:
+- Use snake_case: `transaction_monitoring.rego`
+- Be descriptive: `fintrac_large_cash_transaction.rego`
+- Avoid abbreviations unless industry standard
+
+**Package Names**:
+```rego
+# ✅ Good
+package compliance.fintrac.transaction_monitoring
+package application.api.resource_access
+package identity.rbac
+
+# ❌ Bad
+package policy1
+package my_policy
+package temp
+```
+
+**Rule Names**:
+```rego
+# ✅ Good
+allow if { ... }
+deny_reason := "Insufficient privileges"
+requires_mfa if { ... }
+exceeds_transaction_limit if { ... }
+
+# ❌ Bad
+rule1 if { ... }
+check if { ... }
+xyz := true
+```
+
+## Policy Versioning
+
+### Semantic Versioning
+
+Use semantic versioning for policy releases:
+
+```
+MAJOR.MINOR.PATCH
+
+Example: 2.1.3
+├─ 2: Major version (breaking changes)
+├─ 1: Minor version (new features, backward compatible)
+└─ 3: Patch version (bug fixes)
+```
+
+**Version File** (`.version`):
+
+```json
+{
+  "version": "2.1.3",
+  "releaseDate": "2025-01-15",
+  "description": "Added FINTRAC EFT reporting threshold",
+  "changes": [
+    "Added EFT transaction monitoring (>$10,000 CAD)",
+    "Updated KYC verification for business accounts",
+    "Fixed time zone handling in transaction reporting"
+  ],
+  "breakingChanges": [],
+  "compliance": {
+    "fintrac": "compliant",
+    "osfi": "compliant",
+    "gdpr": "compliant"
+  }
+}
+```
+
+### Git Workflow
+
+**Branching Strategy**:
+
+```
+main (production)
+├── develop (development)
+│   ├── feature/fintrac-eft-monitoring
+│   ├── feature/osfi-b10-controls
+│   └── bugfix/kyc-date-validation
+└── hotfix/critical-compliance-fix
+
+Tags:
+├── v2.1.3 (production)
+├── v2.1.2 (production)
+└── v2.1.1 (production)
+```
+
+**Commit Message Convention**:
+
+```bash
+# Format: <type>(<scope>): <subject>
+
+# Examples:
+git commit -m "feat(fintrac): add EFT transaction monitoring"
+git commit -m "fix(osfi): correct vendor approval validation"
+git commit -m "docs(aml): update KYC verification requirements"
+git commit -m "test(fintrac): add tests for large cash transactions"
+git commit -m "refactor(compliance): consolidate date helpers"
+
+# Types:
+# - feat: New feature
+# - fix: Bug fix
+# - docs: Documentation
+# - test: Testing
+# - refactor: Code refactoring
+# - perf: Performance improvement
+# - chore: Maintenance
+```
+
+## Enterprise Policy Patterns
+
+### 1. Financial Services Compliance
+
+#### FINTRAC: Large Cash Transaction Reporting (LCTR)
+
+```rego
+package compliance.fintrac.lctr
+
+import rego.v1
+
+# FINTRAC requires reporting of cash transactions >= $10,000 CAD
+default requires_lctr_reporting := false
+
+requires_lctr_reporting if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    input.transaction.type == "cash"
+}
+
+# Allow transaction but flag for reporting
+allow if {
+    # User must be authorized
+    input.user.roles[_] in ["teller", "financial-advisor", "branch-manager"]
+    
+    # User must be FINTRAC certified
+    input.user.attributes.fintrac_certified == true
+    
+    # Branch must be compliant
+    branch := data.branches[input.context.branch_id]
+    branch.fintrac_compliant == true
+    
+    # Log for FINTRAC reporting
+    requires_lctr_reporting
+}
+
+# Deny if user not FINTRAC certified
+deny_reason := "User must be FINTRAC certified for large cash transactions" if {
+    requires_lctr_reporting
+    input.user.attributes.fintrac_certified != true
+}
+
+# Metadata for reporting
+report_metadata := metadata if {
+    requires_lctr_reporting
+    metadata := {
+        "report_type": "LCTR",
+        "amount": input.transaction.amount,
+        "currency": input.transaction.currency,
+        "customer_id": input.resource.attributes.customer_id,
+        "transaction_date": input.context.timestamp,
+        "branch_id": input.context.branch_id,
+        "reporting_deadline": time.add_date(
+            time.parse_rfc3339_ns(input.context.timestamp),
+            0, 0, 15  # 15 days from transaction
+        )
+    }
+}
+```
+
+#### OSFI B-10: Third-Party Vendor Access
+
+```rego
+package compliance.osfi.b10_outsourcing
+
+import rego.v1
+
+default allow := false
+
+# Third-party vendors must be approved
+allow if {
+    input.user.type == "third_party_vendor"
+    
+    # Vendor must be in approved list
+    vendor := data.approved_vendors[input.user.vendor_id]
+    vendor.approval_status == "active"
+    
+    # Due diligence must be completed
+    vendor.due_diligence.completed == true
+    vendor.due_diligence.last_review_date >= time.add_date(time.now_ns(), 0, -12, 0)  # Within 12 months
+    
+    # Access limited to contracted services
+    input.resource.type in vendor.contracted_services
+    
+    # Service level requirements
+    vendor.sla.meets_requirements == true
+    
+    # Monitoring must be enabled
+    input.context.vendor_monitoring_enabled == true
+    
+    # Audit trail required
+    input.context.audit_logging_enabled == true
+}
+
+deny_reason := "Vendor not approved or due diligence expired" if {
+    input.user.type == "third_party_vendor"
+    vendor := data.approved_vendors[input.user.vendor_id]
+    not vendor.approval_status == "active"
+}
+
+deny_reason := "Vendor accessing unauthorized service" if {
+    input.user.type == "third_party_vendor"
+    vendor := data.approved_vendors[input.user.vendor_id]
+    not input.resource.type in vendor.contracted_services
+}
+```
+
+### 2. Healthcare Compliance (HIPAA)
+
+#### Protected Health Information (PHI) Access
+
+```rego
+package compliance.hipaa.phi_access
+
+import rego.v1
+
+default allow := false
+
+# HIPAA: Minimum necessary principle
+allow if {
+    # User must have healthcare role
+    input.user.roles[_] in ["physician", "nurse", "pharmacist", "healthcare-admin"]
+    
+    # User must be assigned to patient
+    patient := data.patients[input.resource.attributes.patient_id]
+    input.user.user_id in patient.care_team
+    
+    # Access must be for legitimate healthcare purpose
+    valid_purpose(input.context.access_purpose)
+    
+    # Limit data based on role
+    permitted_fields := role_permitted_fields[input.user.roles[_]]
+    requested_fields := {field | field := input.resource.attributes.requested_fields[_]}
+    requested_fields & permitted_fields == requested_fields
+    
+    # Break-glass: Emergency access
+} else {
+    emergency_access_allowed
+}
+
+valid_purpose(purpose) if {
+    purpose in [
+        "treatment",
+        "payment",
+        "healthcare_operations",
+        "research_with_consent"
+    ]
+}
+
+# Role-based field access
+role_permitted_fields := {
+    "physician": {"diagnosis", "prescriptions", "test_results", "medical_history"},
+    "nurse": {"vital_signs", "prescriptions", "care_notes"},
+    "pharmacist": {"prescriptions", "allergies", "current_medications"},
+    "billing": {"insurance_info", "billing_codes"}
+}
+
+# Emergency access (break-glass)
+emergency_access_allowed if {
+    input.context.emergency == true
+    input.user.roles[_] in ["physician", "nurse", "emergency-staff"]
+    
+    # Requires post-access audit
+    input.context.emergency_justification != ""
+}
+
+# Audit requirements
+audit_metadata := {
+    "user_id": input.user.user_id,
+    "patient_id": input.resource.attributes.patient_id,
+    "access_time": time.now_ns(),
+    "purpose": input.context.access_purpose,
+    "fields_accessed": input.resource.attributes.requested_fields,
+    "emergency_access": input.context.emergency,
+    "justification": input.context.emergency_justification
+}
+```
+
+### 3. AI/LLM Security
+
+#### Prompt Injection Prevention
+
+```rego
+package security.ai.prompt_injection
+
+import rego.v1
+
+default allow := true
+default deny_reason := ""
+
+# Detect prompt injection attempts
+deny_reason := "Potential prompt injection detected" if {
+    has_injection_pattern
+}
+
+has_injection_pattern if {
+    # Check for common injection patterns
+    lower_prompt := lower(input.resource.attributes.prompt)
+    injection_patterns := [
+        "ignore previous instructions",
+        "forget everything above",
+        "new instructions:",
+        "system prompt:",
+        "you are now",
+        "disregard",
+        "override"
+    ]
+    pattern := injection_patterns[_]
+    contains(lower_prompt, pattern)
+}
+
+# Content filtering
+deny_reason := "Prompt contains restricted content" if {
+    restricted_content_detected
+}
+
+restricted_content_detected if {
+    prompt := input.resource.attributes.prompt
+    
+    # PII detection
+    contains_ssn(prompt)
+} else if {
+    # Sensitive data
+    data.sensitive_keywords[keyword]
+    contains(lower(prompt), lower(keyword))
+}
+
+contains_ssn(text) if {
+    # Simple SSN pattern (US)
+    regex.match(`\d{3}-\d{2}-\d{4}`, text)
+}
+
+# Rate limiting for AI endpoints
+deny_reason := "AI request rate limit exceeded" if {
+    user_request_count := count_recent_requests(input.user.user_id)
+    user_request_count > data.rate_limits.ai_requests_per_minute
+}
+
+# Response validation
+validate_response(response) if {
+    # Ensure no PII in response
+    not contains_pii(response.content)
+    
+    # Ensure no injection of malicious content
+    not contains_malicious_content(response.content)
+    
+    # Watermark present (if required)
+    response.metadata.watermarked == true
+}
+```
+
+### 4. Data Residency & Sovereignty
+
+#### GDPR: EU Data Residency
+
+```rego
+package compliance.gdpr.data_residency
+
+import rego.v1
+
+default allow := false
+
+# GDPR: Data must stay in EU
+allow if {
+    # User is EU citizen
+    user := data.users[input.user.user_id]
+    user.citizenship in ["EU", "EEA"]
+    
+    # Accessing EU-hosted resource
+    resource := data.resources[input.resource.resource_id]
+    resource.location in ["eu-west-1", "eu-central-1", "eu-north-1"]
+    
+    # Data processing has legal basis
+    has_legal_basis_for_processing
+}
+
+# Legal basis for processing
+has_legal_basis_for_processing if {
+    # Consent
+    consent := data.user_consents[input.user.user_id]
+    consent.purpose == input.context.processing_purpose
+    consent.granted == true
+    consent.expires_at > time.now_ns()
+} else if {
+    # Contract necessity
+    input.context.processing_purpose == "contract_performance"
+} else if {
+    # Legal obligation
+    input.context.processing_purpose == "legal_compliance"
+} else if {
+    # Legitimate interest (with balancing test)
+    input.context.processing_purpose == "legitimate_interest"
+    data.legitimate_interests[input.context.interest_type].balancing_test_passed == true
+}
+
+# Deny cross-border transfer without safeguards
+deny_reason := "Cross-border data transfer not permitted without adequate safeguards" if {
+    user := data.users[input.user.user_id]
+    user.citizenship in ["EU", "EEA"]
+    
+    resource := data.resources[input.resource.resource_id]
+    not resource.location in ["eu-west-1", "eu-central-1", "eu-north-1"]
+    
+    # Check if Standard Contractual Clauses (SCC) in place
+    not has_transfer_safeguards
+}
+
+has_transfer_safeguards if {
+    transfer := data.cross_border_transfers[input.resource.resource_id]
+    transfer.scc_in_place == true
+    transfer.data_protection_assessment.adequate == true
+}
+
+# Right to erasure (Right to be forgotten)
+allow_erasure if {
+    input.action == "delete"
+    input.resource.type == "personal_data"
+    input.user.user_id == input.resource.attributes.data_subject_id
+    
+    # No legal obligation to retain
+    not retention_required
+}
+
+retention_required if {
+    # Check retention schedules
+    retention := data.retention_schedules[input.resource.type]
+    created_date := time.parse_rfc3339_ns(input.resource.attributes.created_at)
+    retention_end := time.add_date(created_date, 0, retention.months, 0)
+    time.now_ns() < retention_end
+}
+```
+
+## Policy Testing Strategy
+
+### Unit Testing
+
+**Test File Example** (`large_cash_test.rego`):
+
+```rego
+package compliance.fintrac.lctr
+
+import rego.v1
+
+# Test: Allow FINTRAC-certified teller for large cash transaction
+test_allow_certified_teller if {
+    result := allow with input as {
+        "user": {
+            "user_id": "teller001",
+            "roles": ["teller"],
+            "attributes": {"fintrac_certified": true}
+        },
+        "transaction": {
+            "amount": 15000,
+            "currency": "CAD",
+            "type": "cash"
+        },
+        "context": {
+            "branch_id": "branch_001"
+        }
+    } with data.branches as {
+        "branch_001": {"fintrac_compliant": true}
+    }
+    
+    result == true
+}
+
+# Test: Deny non-certified user for large cash transaction
+test_deny_non_certified_user if {
+    result := allow with input as {
+        "user": {
+            "user_id": "teller002",
+            "roles": ["teller"],
+            "attributes": {"fintrac_certified": false}
+        },
+        "transaction": {
+            "amount": 15000,
+            "currency": "CAD",
+            "type": "cash"
+        },
+        "context": {
+            "branch_id": "branch_001"
+        }
+    } with data.branches as {
+        "branch_001": {"fintrac_compliant": true}
+    }
+    
+    result == false
+}
+
+# Test: LCTR reporting metadata
+test_lctr_metadata if {
+    metadata := report_metadata with input as {
+        "transaction": {
+            "amount": 15000,
+            "currency": "CAD",
+            "type": "cash"
+        },
+        "resource": {
+            "attributes": {"customer_id": "cust_123"}
+        },
+        "context": {
+            "timestamp": "2025-01-15T10:00:00Z",
+            "branch_id": "branch_001"
+        }
+    }
+    
+    metadata.report_type == "LCTR"
+    metadata.amount == 15000
+}
+```
+
+**Running Tests**:
+
+```bash
+# Run all tests
+opa test policies/ -v
+
+# Run specific package tests
+opa test policies/compliance/fintrac/ -v
+
+# Generate coverage report
+opa test policies/ --coverage --format=json > coverage.json
+
+# Set coverage threshold
+opa test policies/ --threshold=80
+```
+
+### Integration Testing
+
+**Integration Test Script** (`scripts/integration-test.sh`):
+
+```bash
+#!/bin/bash
+
+# Integration test against running Control Core instance
+
+API_URL="https://api.staging.your-domain.com"
+TOKEN="$STAGING_API_TOKEN"
+
+# Test 1: FINTRAC large cash transaction
+echo "Test 1: FINTRAC large cash transaction"
+curl -X POST "$API_URL/v1/authorize" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "user": {
+      "user_id": "teller001",
+      "roles": ["teller"],
+      "attributes": {"fintrac_certified": true}
+    },
+    "action": "process",
+    "resource": {
+      "type": "transaction",
+      "attributes": {
+        "amount": 15000,
+        "currency": "CAD",
+        "type": "cash"
+      }
+    }
+  }' | jq '.result'
+
+# Expected: {"allow": true, "metadata": {"requires_lctr_reporting": true}}
+
+# Test 2: OSFI vendor access
+echo "Test 2: OSFI vendor access"
+curl -X POST "$API_URL/v1/authorize" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "user": {
+      "user_id": "vendor001",
+      "type": "third_party_vendor",
+      "vendor_id": "v123"
+    },
+    "action": "access",
+    "resource": {
+      "type": "customer_data"
+    }
+  }' | jq '.result'
+
+# Add more tests...
+```
+
+### Compliance Validation
+
+**Compliance Test Suite** (`scripts/compliance-validation.sh`):
+
+```bash
+#!/bin/bash
+
+echo "Running Compliance Validation..."
+
+# FINTRAC Compliance Checks
+echo "✓ Checking FINTRAC compliance..."
+opa test policies/compliance/fintrac/ --threshold=100 || exit 1
+
+# OSFI Compliance Checks
+echo "✓ Checking OSFI compliance..."
+opa test policies/compliance/osfi/ --threshold=100 || exit 1
+
+# AML Compliance Checks
+echo "✓ Checking AML compliance..."
+opa test policies/compliance/aml/ --threshold=100 || exit 1
+
+# GDPR Compliance Checks
+echo "✓ Checking GDPR compliance..."
+opa test policies/compliance/gdpr/ --threshold=100 || exit 1
+
+# Policy lint
+echo "✓ Linting policies..."
+opa check policies/ --strict || exit 1
+
+# Security scan
+echo "✓ Scanning for security issues..."
+./scripts/security-scan.sh || exit 1
+
+echo "✅ All compliance checks passed!"
+```
+
+## CI/CD Integration
+
+### GitHub Actions Workflow
+
+**`.github/workflows/policy-ci.yml`**:
+
+```yaml
+name: Policy CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup OPA
+      uses: open-policy-agent/setup-opa@v2
+      with:
+        version: latest
+    
+    - name: Run OPA tests
+      run: |
+        opa test policies/ -v --threshold=80
+    
+    - name: Generate coverage report
+      run: |
+        opa test policies/ --coverage --format=json > coverage.json
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.json
+  
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Lint policies
+      run: |
+        opa check policies/ --strict
+  
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: FINTRAC compliance validation
+      run: |
+        opa test policies/compliance/fintrac/ --threshold=100
+    
+    - name: OSFI compliance validation
+      run: |
+        opa test policies/compliance/osfi/ --threshold=100
+    
+    - name: Generate compliance report
+      run: |
+        ./scripts/generate-compliance-report.sh
+    
+    - name: Upload compliance report
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-report
+        path: compliance-report.pdf
+  
+  deploy-staging:
+    needs: [test, lint, compliance]
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Deploy to staging
+      run: |
+        ./scripts/deploy.sh staging
+      env:
+        STAGING_API_TOKEN: ${{ secrets.STAGING_API_TOKEN }}
+    
+    - name: Run integration tests
+      run: |
+        ./scripts/integration-test.sh staging
+  
+  deploy-production:
+    needs: [test, lint, compliance]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://console.your-domain.com
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Create release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body_path: CHANGELOG.md
+    
+    - name: Deploy to production
+      run: |
+        ./scripts/deploy.sh production
+      env:
+        PRODUCTION_API_TOKEN: ${{ secrets.PRODUCTION_API_TOKEN }}
+    
+    - name: Verify deployment
+      run: |
+        ./scripts/verify-deployment.sh production
+    
+    - name: Notify stakeholders
+      run: |
+        ./scripts/notify.sh "Policies deployed to production"
+```
+
+### GitLab CI Workflow
+
+**`.gitlab-ci.yml`**:
+
+```yaml
+stages:
+  - test
+  - lint
+  - compliance
+  - deploy-staging
+  - deploy-production
+
+variables:
+  OPA_VERSION: "latest"
+
+test:
+  stage: test
+  image: openpolicyagent/opa:$OPA_VERSION
+  script:
+    - opa test policies/ -v --threshold=80
+    - opa test policies/ --coverage --format=json > coverage.json
+  coverage: '/Coverage: \d+\.\d+/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.json
+
+lint:
+  stage: lint
+  image: openpolicyagent/opa:$OPA_VERSION
+  script:
+    - opa check policies/ --strict
+
+compliance:
+  stage: compliance
+  image: openpolicyagent/opa:$OPA_VERSION
+  script:
+    - opa test policies/compliance/fintrac/ --threshold=100
+    - opa test policies/compliance/osfi/ --threshold=100
+    - ./scripts/generate-compliance-report.sh
+  artifacts:
+    paths:
+      - compliance-report.pdf
+    expire_in: 1 year
+
+deploy-staging:
+  stage: deploy-staging
+  only:
+    - develop
+  script:
+    - ./scripts/deploy.sh staging
+  environment:
+    name: staging
+    url: https://staging.your-domain.com
+
+deploy-production:
+  stage: deploy-production
+  only:
+    - main
+  script:
+    - ./scripts/deploy.sh production
+    - ./scripts/verify-deployment.sh production
+  environment:
+    name: production
+    url: https://console.your-domain.com
+  when: manual  # Require manual approval
+```
+
+## Policy Deployment Strategies
+
+### 1. Blue-Green Deployment
+
+Deploy new policies alongside existing ones, then switch:
+
+```bash
+#!/bin/bash
+# blue-green-deploy.sh
+
+# Deploy new policies to "green" environment
+kubectl apply -f policies-green.yaml
+
+# Run validation tests
+./scripts/validate-green.sh
+
+# If tests pass, switch traffic
+kubectl patch service bouncer -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Monitor for issues
+sleep 300
+
+# If successful, remove blue environment
+kubectl delete -f policies-blue.yaml
+
+echo "Deployment complete"
+```
+
+### 2. Canary Deployment
+
+Gradually roll out new policies to a subset of users:
+
+```bash
+#!/bin/bash
+# canary-deploy.sh
+
+# Deploy canary with 10% traffic
+kubectl apply -f policies-canary.yaml
+kubectl patch ingress bouncer --type='json' -p='[{"op": "add", "path": "/metadata/annotations/nginx.ingress.kubernetes.io~1canary", "value":"true"},{"op": "add", "path": "/metadata/annotations/nginx.ingress.kubernetes.io~1canary-weight", "value":"10"}]'
+
+# Monitor metrics
+echo "Monitoring canary for 30 minutes..."
+sleep 1800
+
+# If metrics good, increase to 50%
+kubectl patch ingress bouncer --type='json' -p='[{"op": "replace", "path": "/metadata/annotations/nginx.ingress.kubernetes.io~1canary-weight", "value":"50"}]'
+
+sleep 1800
+
+# If still good, promote to 100%
+kubectl patch ingress bouncer --type='json' -p='[{"op": "replace", "path": "/metadata/annotations/nginx.ingress.kubernetes.io~1canary-weight", "value":"100"}]'
+
+echo "Canary deployment complete"
+```
+
+### 3. Feature Flags
+
+Use feature flags to enable/disable policies:
+
+```rego
+package feature_flags
+
+import rego.v1
+
+# Check if feature is enabled
+feature_enabled(feature_name) if {
+    flags := data.feature_flags
+    flags[feature_name].enabled == true
+    
+    # Check if user in rollout percentage
+    user_hash := hash_user_id(input.user.user_id)
+    rollout_percentage := flags[feature_name].rollout_percentage
+    user_hash mod 100 < rollout_percentage
+}
+
+# Use in policy
+allow if {
+    # New policy logic (behind feature flag)
+    feature_enabled("new_fintrac_rules")
+    # ... new policy logic
+} else {
+    # Fallback to old policy logic
+    # ... old policy logic
+}
+```
+
+## Policy Governance
+
+### Policy Review Process
+
+```
+┌────────────────────────────────────────────────────────┐
+│            Policy Review & Approval Process            │
+└────────────────────────────────────────────────────────┘
+
+1. Policy Author submits pull request
+   ├─ Policy code
+   ├─ Tests (>80% coverage)
+   ├─ Documentation
+   └─ Compliance checklist
+
+2. Automated Checks (CI/CD)
+   ├─ Syntax validation
+   ├─ Test execution
+   ├─ Coverage threshold
+   ├─ Compliance validation
+   └─ Security scan
+
+3. Code Review
+   ├─ Peer review (2+ approvals)
+   ├─ Policy architect review
+   └─ Security team review
+
+4. Compliance Review (if applicable)
+   ├─ Legal team review
+   ├─ Compliance officer review
+   └─ Risk assessment
+
+5. Approval
+   ├─ CTO/CISO approval for critical policies
+   └─ Policy committee approval for compliance
+
+6. Deployment
+   ├─ Staging deployment
+   ├─ Integration testing
+   ├─ Production deployment (with approval)
+   └─ Monitoring
+
+7. Post-Deployment
+   ├─ Effectiveness monitoring
+   ├─ Audit compliance verification
+   └─ Documentation update
+```
+
+### Policy Ownership
+
+**RACI Matrix**:
+
+| Activity | Policy Author | Security Team | Compliance | Legal | CTO/CISO |
+|----------|--------------|---------------|------------|-------|----------|
+| **Policy Development** | R | C | C | I | I |
+| **Code Review** | I | R | C | I | I |
+| **Compliance Review** | I | C | R | R | A |
+| **Approval** | I | C | A | A | R |
+| **Deployment** | R | C | I | I | A |
+| **Monitoring** | R | R | C | I | I |
+| **Audit** | I | C | R | R | A |
+
+**Legend**:
+- R: Responsible (does the work)
+- A: Accountable (final approval)
+- C: Consulted (provides input)
+- I: Informed (kept in the loop)
+
+### Policy Deprecation
+
+**Deprecation Process**:
+
+1. **Announce deprecation** (90 days notice)
+2. **Add deprecation warning** to policy
+3. **Monitor usage** and notify users
+4. **Provide migration guide**
+5. **Disable policy** after grace period
+6. **Archive** for compliance (7 years)
+
+**Deprecation Example**:
+
+```rego
+package legacy.policy
+
+import rego.v1
+
+# DEPRECATED: This policy will be removed on 2025-04-15
+# Please migrate to compliance.fintrac.lctr.v2
+# Migration guide: https://docs.controlcore.com/policies/migration/lctr-v2
+
+allow if {
+    # Old logic
+    true
+}
+
+# Warning for users
+metadata := {
+    "deprecated": true,
+    "deprecation_date": "2025-01-15",
+    "removal_date": "2025-04-15",
+    "replacement": "compliance.fintrac.lctr.v2",
+    "migration_guide": "https://docs.controlcore.com/policies/migration/lctr-v2"
+}
+```
+
+## Monitoring and Analytics
+
+### Policy Performance Metrics
+
+**Key Metrics**:
+
+| Metric | Target | Alert Threshold |
+|--------|--------|----------------|
+| Policy evaluation latency (P95) | < 50ms | > 100ms |
+| Policy denial rate | < 5% | > 10% |
+| Policy error rate | < 0.1% | > 1% |
+| Policy cache hit rate | > 90% | < 80% |
+| Compliance policy adherence | 100% | < 100% |
+
+### Audit Reports
+
+Generate compliance audit reports:
+
+```bash
+# Generate FINTRAC audit report
+curl -X POST https://api.your-domain.com/v1/reports/audit \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "report_type": "fintrac_compliance",
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31",
+    "include_transactions": true,
+    "include_policy_decisions": true
+  }'
+```
+
+## Best Practices
+
+### 1. Policy Design Principles
+
+- **Principle of Least Privilege**: Deny by default
+- **Separation of Concerns**: One policy, one purpose
+- **Defense in Depth**: Multiple layers of controls
+- **Auditability**: Log all decisions
+- **Performance**: Optimize for speed
+
+### 2. Security Best Practices
+
+- **Never hardcode secrets** in policies
+- **Use data sources** (PIPs) for dynamic data
+- **Validate all inputs** before processing
+- **Sanitize outputs** to prevent leakage
+- **Rate limit** expensive operations
+
+### 3. Compliance Best Practices
+
+- **Document all compliance controls**
+- **Map policies to regulations** (FINTRAC, OSFI, etc.)
+- **Maintain audit trail** for 7+ years
+- **Regular compliance reviews** (quarterly)
+- **Automate compliance testing**
+
+### 4. Performance Best Practices
+
+- **Cache aggressively** where appropriate
+- **Minimize data fetching** from external sources
+- **Use indexes** for large datasets
+- **Profile policies** to find bottlenecks
+- **Optimize Rego** (avoid unnecessary iterations)
+
+## Next Steps
+
+- **[Rego Guidelines](/guides/rego-guidelines)**: Learn Rego best practices
+- **[Policy Templates](/guides/policy-templates)**: Use pre-built templates
+- **[PIP Integration](/integrations)**: Connect real-time data sources
+- **[User Guide](/guides/user-guide)**: Day-to-day policy management
+- **[API Reference](/guides/api-reference)**: Automate policy deployment
+
+---
+
+**Enterprise policy management requires discipline, governance, and automation. Control Core provides the tools—your organization provides the process.**

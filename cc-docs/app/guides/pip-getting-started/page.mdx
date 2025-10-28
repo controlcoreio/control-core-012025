@@ -1,0 +1,378 @@
+---
+title: 'Getting Started with Policy Information Points (PIPs)'
+description: 'Learn how to connect your data sources to Control Core for intelligent, context-aware authorization'
+---
+
+# Getting Started with Policy Information Points (PIPs)
+
+## What is a PIP?
+
+A **Policy Information Point (PIP)** is a data source that provides real-time context and attributes for your access control policies. Think of it as connecting your authorization system to the sources of truth in your organization.
+
+### Why Connect Data Sources?
+
+Without PIPs, your policies are limited to information in the request itself. With PIPs, your policies can access:
+
+- **User Information** from your identity provider (roles, department, manager, clearance level)
+- **Resource Metadata** from databases (owner, sensitivity, environment, status)
+- **HR Context** from your HR system (employment status, start date, certifications)
+- **Business Context** from CRM/ERP systems (customer tier, account status)
+- **Real-Time Context** for dynamic, intelligent authorization decisions
+
+### Real-World Example
+
+**Without PIP:**
+```
+User requests access to "Production Database"
+Policy checks: Does user have "database-admin" role?
+Decision: Simple yes/no based on static role
+```
+
+**With PIP:**
+```
+User requests access to "Production Database"
+Policy checks:
+  - User's department (from Okta)
+  - User's employment status (from Workday)
+  - Resource owner (from PostgreSQL metadata)
+  - Time of day and user's location
+  - User's clearance level and certifications
+Decision: Smart, context-aware authorization
+```
+
+## Quick Start: Connect Your First Data Source
+
+### Step 1: Access PIP Management
+
+You can access PIP Management in two places:
+
+1. **During Onboarding**: In the Getting Started Wizard → "Connect Data Sources" step
+2. **Anytime Later**: Settings → Data Sources
+
+### Step 2: Choose Your Data Source
+
+Click **"Add Data Source"** and select from 13 categories:
+
+**Identity & HR**
+- Identity Provider (Okta, Azure AD, Auth0, LDAP)
+- HR System (Workday, BambooHR, ADP)
+
+**Enterprise Systems**
+- CRM (Salesforce, HubSpot, Dynamics)
+- ERP (SAP, Oracle, NetSuite)
+- Ticketing (ServiceNow, Jira, Zendesk)
+
+**Data & Storage**
+- Database (PostgreSQL, MySQL, MongoDB)
+- Document Storage (SharePoint, Google Drive, S3)
+- Data Warehouse (Snowflake, BigQuery, Redshift)
+
+**Technical**
+- OpenAPI Specification
+- Custom API
+- Configuration Management Database (CMDB)
+
+### Step 3: Configure Connection
+
+Let's walk through connecting **Okta** as an example:
+
+**3.1 Enter Basic Information**
+- **Name**: "Production Okta" (friendly name for your team)
+- **Provider**: Select "Okta"
+
+**3.2 Choose Authentication Method**
+- **OAuth 2.0** (Recommended) - Most secure, tokens auto-refresh
+- **API Key** - Simpler setup, good for read-only access
+- **Username/Password** - For legacy systems only
+
+**3.3 Configure OAuth (if selected)**
+- **Okta Domain**: `your-company.okta.com`
+- **Client ID**: From your Okta admin console
+- **Client Secret**: From your Okta admin console
+- **Scopes**: `openid profile email groups` (default is good!)
+
+> **Where to get OAuth credentials**: In Okta, go to Applications → Create App Integration → API Services or Web App
+
+**3.4 Test Connection**
+
+Click **"Test Connection"** - this is where the magic happens!
+
+The system will:
+1. Connect to your Okta instance
+2. Discover all available user fields
+3. Show you REAL metadata from your Okta
+
+### Step 4: Understanding the Metadata
+
+After successful connection test, you'll see two sections:
+
+#### Available Metadata Fields (LEFT SIDE)
+
+These are **REAL fields from your data source**:
+
+For Okta, you'll see actual fields like:
+- `id` - User ID
+- `email` - Email address  
+- `firstName`, `lastName` - Name fields
+- `status` - User status (ACTIVE, INACTIVE, etc.)
+- `profile.department` - User's department
+- `profile.title` - Job title
+- `groups` - Group memberships
+- `lastLogin` - Last login timestamp
+- **Plus any custom fields you've added to Okta!**
+
+> **This is NOT sample data** - it's the actual schema from your connected system!
+
+#### Authorization Attributes (RIGHT SIDE)
+
+These are **standard attribute names** used in your policies:
+
+- `user.id` - Unique user identifier
+- `user.email` - User email address
+- `user.department` - Department name
+- `user.roles` - Role assignments
+- `user.groups` - Group memberships
+- `user.mfa_enabled` - MFA status
+- `user.clearance_level` - Security clearance
+
+### Step 5: Map the Attributes
+
+**Mapping connects real fields to policy attributes:**
+
+| Policy Attribute (What policies use) | Okta Field (Real field name) |
+|--------------------------------------|------------------------------|
+| `user.email` | → `email` |
+| `user.department` | → `profile.department` |
+| `user.roles` | → `groups` |
+| `user.manager` | → `profile.manager` |
+
+**Why map?**
+- Policies use standard names like `user.department`
+- Different providers have different field names (Okta: `profile.department`, Azure AD: `department`)
+- Mapping lets you **switch providers without rewriting policies**!
+
+### Step 6: Configure Sync Settings
+
+**Sync Frequency**: How often to refresh data from the source
+- **Real-time (Webhooks)**: Instant updates when data changes (best for critical data)
+- **Every 5 minutes**: Near real-time
+- **Hourly**: Standard refresh rate (good for most use cases)
+- **Daily**: For relatively static data
+- **Weekly**: For reference data
+
+**Recommendation**: Start with "Hourly" - you can adjust later!
+
+### Step 7: Save and You're Done!
+
+Click **"Save Information Source"**
+
+Your data source is now connected! Within minutes:
+1. Control Core fetches user data from Okta
+2. Applies your attribute mappings
+3. Makes the data available to ALL your policies
+4. Distributes to ALL your Bouncers (PEPs) automatically
+
+## Common Use Cases
+
+### Use Case 1: Department-Based Access
+
+**Scenario**: Only Engineering team can access development APIs
+
+**Setup:**
+1. Connect Okta (for user department)
+2. Map `user.department` → `profile.department`
+
+**Policy** (automatically gets department from Okta):
+```
+Allow access if:
+  - User's department = "Engineering"
+  - Resource environment = "development"
+```
+
+### Use Case 2: Resource Ownership
+
+**Scenario**: Users can only access resources they own
+
+**Setup:**
+1. Connect Okta (for user ID)
+2. Connect PostgreSQL (for resource metadata)
+3. Map `user.id` → `id`
+4. Map `resource.owner_id` → `owner_id` (from database)
+
+**Policy** (gets data from both sources):
+```
+Allow access if:
+  - Resource owner = Current user ID
+  OR
+  - User has "admin" role
+```
+
+### Use Case 3: Compliance & Clearance
+
+**Scenario**: Only certified employees can access PII data
+
+**Setup:**
+1. Connect Workday (for employee certifications)
+2. Connect PostgreSQL (for data classification)
+3. Map `user.certifications` → `certifications`
+4. Map `resource.classification` → `data_classification`
+
+**Policy**:
+```
+Allow access if:
+  - User has "PII-Handler" certification
+  - User's background check = "Passed"
+  - Resource classification = "PII"
+```
+
+## Understanding Multi-Bouncer Architecture
+
+### The Big Question: "We have 5 Bouncers protecting different apps - do we configure PIPs 5 times?"
+
+**Answer: NO! Configure ONCE, benefit EVERYWHERE!**
+
+Here's how it works:
+
+```
+You Configure (ONE TIME):
+┌─────────────────────────────┐
+│   Control Core PAP          │
+│                             │
+│   PIP Connections:          │
+│   ✓ Okta                    │
+│   ✓ PostgreSQL              │
+│   ✓ Workday                 │
+└──────────┬──────────────────┘
+           │
+           │ Publishes to OPAL
+           ▼
+    ┌──────────────┐
+    │ OPAL Server  │ ← Single source of truth
+    └──────┬───────┘
+           │
+           │ Distributes to ALL Bouncers
+           │
+    ┌──────┼──────┬──────┬──────┐
+    │      │      │      │      │
+    ▼      ▼      ▼      ▼      ▼
+┌────────┐ │  │  │  │  │  │  │  │
+│Bouncer1│ │  │  │  │  │  │  │  │
+│Protects│ │  │  │  │  │  │  │  │
+│API A   │ │  │  │  │  │  │  │  │
+└────────┘ │  │  │  │  │  │  │  │
+    All bouncers automatically
+    get the same fresh data!
+```
+
+**Benefits:**
+- Configure data sources ONCE in PAP
+- ALL Bouncers automatically receive the data
+- Consistent authorization decisions across all protected resources
+- Real-time updates propagate to all enforcement points
+
+## FAQs
+
+### Q: Is the metadata I see real or just examples?
+
+**A: It depends on whether you've tested the connection!**
+
+- **Before Testing**: You see sample fields (examples of what might be available)
+- **After Testing**: You see REAL fields from your actual data source!
+
+When you click "Test Connection" and it succeeds, the system:
+1. Connects to your Okta/Database/API
+2. Discovers the actual schema
+3. Shows you the real fields available
+
+For example, after testing Okta, you'll see:
+- Your actual custom attributes
+- Your specific group names
+- Your configured profile fields
+
+### Q: Do I need to set up Authorization Attributes before connecting data sources?
+
+**A: NO! Authorization Attributes are pre-defined by Control Core.**
+
+The Authorization Attributes (like `user.department`, `user.roles`) are standard attribute names recommended by Control Core for policy writing. They're always available.
+
+You just need to **map** them to your provider's field names:
+- `user.department` → Maps to → `profile.department` (in Okta)
+- `user.department` → Maps to → `department` (in Azure AD)
+
+This standardization means your policies work with any provider!
+
+### Q: What if my data source isn't in the list?
+
+You have options:
+
+1. **Use "Custom API"** - Works with any REST API
+2. **Use "Custom" provider** - Within each category
+3. **Request Integration** - Click "Request New Integration" button
+4. **Contact Support** - We can help build custom connectors
+
+### Q: How often should I sync data?
+
+**Recommendations:**
+
+- **Hourly**: Good default for most use cases
+- **Every 15 minutes**: For frequently changing data
+- **Real-time (Webhooks)**: For critical security decisions
+- **Daily**: For relatively static reference data
+
+**Rule of thumb**: More frequent = more current data, but higher load on source systems
+
+### Q: Is my data secure?
+
+**Absolutely! Control Core uses enterprise-grade security:**
+
+- **Credentials Encrypted**: AES-256 encryption for all stored credentials
+- **TLS in Transit**: All API calls use HTTPS/TLS
+- **Secure Storage**: Credentials stored separately from configuration
+- **Audit Logging**: Every data access is logged
+- **Sensitivity-Based Caching**: Sensitive data cached for shorter periods
+- **No Plain Text**: Passwords and secrets never stored unencrypted
+
+### Q: Can I edit a connection after it's created?
+
+**Yes!** Go to Settings → Data Sources → Click on connection → Edit
+
+You can change:
+- Authentication credentials
+- Sync frequency
+- Attribute mappings
+- Connection settings
+
+Note: Changes take effect on the next sync cycle.
+
+### Q: What happens if a connection fails?
+
+**Control Core handles failures gracefully:**
+
+1. **Connection marked as "Error"** - You'll see the status
+2. **Policies still work** - Use last cached data
+3. **Alerts sent** - Admins notified of failure
+4. **Auto-retry** - System attempts reconnection
+5. **Audit logged** - Failure details captured
+
+You can manually retry or fix credentials and re-test.
+
+## Next Steps
+
+Now that you understand PIPs, you can:
+
+1. **Connect More Sources**: Add databases, HR systems, CRM
+2. **Write Policies**: Use your mapped attributes in policies
+3. **Monitor Connections**: Check sync status and health
+4. **Optimize**: Adjust sync frequencies based on usage
+
+## Need Help?
+
+- **Admin Guide**: For detailed configuration and monitoring
+- **Developer Guide**: For policy development and API integration
+- **Support**: Help & Support icon (?) in top navigation
+- **Community**: Join our Discord for questions and discussions
+
+---
+
+**You've successfully connected your first data source! Your policies now have real-time context from your organization's systems.** 🎉
+

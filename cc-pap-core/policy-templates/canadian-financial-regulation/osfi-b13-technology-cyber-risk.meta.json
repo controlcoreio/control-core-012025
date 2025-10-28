@@ -1,0 +1,556 @@
+{
+  "version": "1.0.0",
+  "summary": "OSFI Guideline B-13 Technology and Cyber Risk Management compliance for Canadian financial institutions",
+  "detailed_description": "This policy template implements OSFI Guideline B-13 Technology and Cyber Risk Management controls for Canadian financial institutions. It provides comprehensive authorization and governance capabilities mandated by Canada's federal banking regulator for federally regulated financial institutions (FRFIs) including banks, trust companies, and insurance companies.\n\nThe policy enforces critical cyber security controls, third-party technology risk management, incident response requirements, cyber resilience testing, executive oversight, and business continuity planning. It ensures financial institutions maintain robust technology risk management frameworks aligned with OSFI's expectations for operational resilience, cyber security preparedness, and technology governance.\n\nKey capabilities:\n- Real-time enforcement of cyber security controls for critical systems\n- Third-party vendor risk assessment requirements before onboarding\n- Mandatory incident response activation for high-severity events\n- Annual cyber resilience testing validation\n- Executive-level approval for major technology investments\n- Multi-factor authentication for data center access\n- Change management controls for production deployments\n- Business continuity and disaster recovery plan validation\n- Quarterly technology risk reporting to board of directors\n\nThis template is designed for deployment in Control Core's policy engine and can be customized to meet institution-specific requirements while maintaining OSFI B-13 compliance.",
+  "use_cases": [
+    {
+      "title": "RBC: Core Banking System Access Controls",
+      "description": "Deploy osfi-b13-technology-cyber-risk for Canada's largest bank protecting core banking infrastructure",
+      "scenario": "Royal Bank of Canada secures access to core banking systems processing 18M customer accounts and $1.7T in assets. OSFI examination focuses on: (1) Cyber controls for 15,000 employees accessing critical systems, (2) MFA enforcement for privileged access, (3) Patch management currency for 5,000+ servers, (4) Third-party vendor risk assessments. Policy enforces: MFA required for all core banking access, automated blocking if patches >30 days old, vendor risk assessment completion before contract signing, quarterly cyber metrics to board including penetration test results. OSFI exam result: Strong rating on technology risk management, zero findings on B-13 compliance."
+    },
+    {
+      "title": "TD Bank: Third-Party Fintech Integration Risk",
+      "description": "Implement osfi-b13-technology-cyber-risk for TD's fintech partnership ecosystem",
+      "scenario": "TD Bank partners with 23 fintech companies for digital banking innovation serving 27M customers. OSFI scrutiny on: (1) Due diligence for each fintech integration, (2) API security controls, (3) Data sharing agreements, (4) Continuous monitoring of third-party cyber posture. Policy requires: Vendor risk assessment (questionnaire + technical review) before API access, annual penetration testing of all integrations, real-time monitoring of API call patterns, automatic suspension if vendor suffers data breach. Result: 100% vendor due diligence completion, zero third-party security incidents in 18 months, OSFI commendation for proactive risk management."
+    },
+    {
+      "title": "Scotiabank: Incident Response for Ransomware Attack",
+      "description": "Use osfi-b13-technology-cyber-risk to validate incident response readiness",
+      "scenario": "Scotiabank conducts quarterly cyber resilience exercises simulating ransomware attacks affecting 24,000 employees across Americas. OSFI expects: (1) Incident response plan tested at least annually, (2) Recovery time objectives (RTO) < 4 hours for critical systems, (3) Communication protocols to OSFI within 72 hours of material incident, (4) Board notification within 24 hours of critical incident. Policy enforces: Blocking production changes during simulated incidents, automated OSFI notification workflow for severity 1 events, executive dashboards showing RTO compliance, annual tabletop exercises with board participation. Cyber drill result: Achieved 2.5hr RTO (beat 4hr target), zero gaps in incident response procedures."
+    },
+    {
+      "title": "Desjardins Credit Union: Data Breach Prevention Post-2019 Incident",
+      "description": "Deploy osfi-b13-technology-cyber-risk following major 2019 data breach affecting 9.7M members",
+      "scenario": "Desjardins implements enhanced controls after 2019 insider breach exposed 9.7M member records. Regulator (AMF Quebec + OSFI for capital markets) mandate: (1) Enhanced monitoring of privileged user access, (2) Data exfiltration prevention, (3) Insider threat detection, (4) Customer notification within 72 hours. Policy enforces: All database administrator actions require approval + dual control, automated blocking if >1000 customer records accessed in single query, real-time alerting on unusual data export patterns, quarterly access reviews for all privileged users. Post-implementation: Zero insider incidents in 3 years, $108M invested in cyber controls, regulator rating upgraded from 'needs improvement' to 'strong'."
+    },
+    {
+      "title": "Wealthsimple: Cloud Infrastructure Security for Digital-First Bank",
+      "description": "Apply osfi-b13-technology-cyber-risk for cloud-native financial services platform",
+      "scenario": "Wealthsimple operates 100% cloud infrastructure (AWS Canada) serving 3M customers with $20B AUM. OSFI assessment of cloud-specific risks: (1) Shared responsibility model implementation, (2) Canadian data residency compliance, (3) Cloud Security Posture Management (CSPM), (4) Encryption at rest and in transit. Policy requires: All production workloads in ca-central-1 (Montreal) region, encryption keys managed in Canadian HSM, CSPM scans daily with auto-remediation for critical findings, quarterly AWS Control Tower compliance reports to board. OSFI review: Innovative cloud controls accepted as meeting B-13 requirements, approved as blueprint for other digital banks."
+    },
+    {
+      "title": "Manulife: Technology Investment Governance",
+      "description": "Implement osfi-b13-technology-cyber-risk for major technology transformation",
+      "scenario": "Manulife invests $4B over 5 years in technology modernization affecting 37M customers globally (including 11M Canadian policyholders). OSFI governance review: (1) Board Technology Committee oversight of major investments, (2) Technology risk assessments for projects >$10M, (3) Cybersecurity impact analysis for all customer-facing systems, (4) Quarterly reporting to board on technology initiatives. Policy enforces: CIO approval required for projects $1M-$10M, Board Technology Committee approval for projects >$10M, mandatory cyber risk assessment before budget approval, automated tracking of project cyber metrics (vulnerabilities, pen test results), quarterly board dashboards showing technology risk posture. Result: 100% major project governance compliance, OSFI rated technology risk management as 'strong'."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "The action being performed (access, deploy, approve, etc.)",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "API Gateway",
+          "integration_method": "HTTP header mapping - Control Core extracts action from request method and path",
+          "example_api": "GET /api/systems/{id} → action: access_system"
+        },
+        {
+          "name": "Application Code",
+          "integration_method": "Direct attribute injection - Application includes action in authorization request",
+          "example_api": "POST /authorize with body: {action: 'deploy_to_production'}"
+        }
+      ],
+      "configuration_notes": "Map HTTP methods and API paths to business actions in Control Core PEP configuration. Example: POST /deployments → deploy_to_production",
+      "plain_english": "What operation is being attempted (access, deploy, approve, modify, etc.)",
+      "how_to_fetch": "Configure in Control Core: Settings → Policy Enforcement Points → Action Mapping. Define rules like: GET → read, POST → create, PUT → update, DELETE → delete. For granular actions, use path-based mapping.",
+      "example_values": [
+        "access_critical_system",
+        "deploy_to_production",
+        "approve_technology_investment",
+        "onboard_technology_vendor"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Type of resource being accessed (system, infrastructure, project, etc.)",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "CMDB (ServiceNow, BMC)",
+          "integration_method": "API integration - Control Core queries CMDB for resource classification",
+          "example_api": "GET /api/cmdb/ci/{resourceId}/classification"
+        },
+        {
+          "name": "Resource Registry",
+          "integration_method": "Database query - Control Core looks up resource metadata",
+          "example_api": "SELECT type, classification FROM resources WHERE id = ?"
+        }
+      ],
+      "configuration_notes": "Integrate Control Core with your Configuration Management Database (CMDB) or resource registry. Map CI types to policy resource types.",
+      "plain_english": "What type of system or resource is being accessed",
+      "how_to_fetch": "In Control Core: Settings → Data Sources → Add CMDB Integration. Map CI classes to resource types (e.g., CI Class 'Database' → resource.type 'core_banking_system')",
+      "example_values": [
+        "core_banking_system",
+        "third_party_service",
+        "production_infrastructure",
+        "technology_project"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "resource.classification",
+      "type": "string",
+      "description": "Security classification of the resource (tier_3_plus, critical, confidential)",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Asset Management System",
+          "integration_method": "REST API - Control Core fetches asset classification",
+          "example_api": "GET /api/assets/{id}/classification"
+        }
+      ],
+      "configuration_notes": "Ensure all critical infrastructure is classified according to OSFI tier system (Tier 1-4). Tier 3+ requires enhanced controls.",
+      "plain_english": "Criticality classification of the system or infrastructure",
+      "how_to_fetch": "Configure asset management integration in Control Core to fetch classification tags. Map to OSFI tier system.",
+      "example_values": [
+        "tier_3_plus",
+        "critical",
+        "high",
+        "medium"
+      ],
+      "example_value": "confidential"
+    },
+    {
+      "name": "context.cyber_controls_implemented",
+      "type": "boolean",
+      "description": "Whether required cyber security controls are active for this resource",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Security Orchestration Platform (SOAR)",
+          "integration_method": "API integration - Real-time control validation",
+          "example_api": "GET /api/security/controls/status?resource={id}"
+        },
+        {
+          "name": "Compliance Dashboard",
+          "integration_method": "REST API - Fetch compliance status",
+          "example_api": "GET /api/compliance/controls?system={id}"
+        }
+      ],
+      "configuration_notes": "Integrate with security tools (EDR, SIEM, vulnerability scanners) to validate control implementation status",
+      "plain_english": "Are all required security controls (firewall, encryption, monitoring, etc.) active and functional",
+      "how_to_fetch": "Configure Control Core to query your security orchestration platform or compliance dashboard for real-time control status",
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.vendor_risk_assessment_completed",
+      "type": "boolean",
+      "description": "Whether vendor risk assessment has been completed per OSFI B-10 requirements",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Vendor Management System",
+          "integration_method": "API integration - Query vendor due diligence status",
+          "example_api": "GET /api/vendors/{id}/risk-assessment"
+        },
+        {
+          "name": "GRC Platform (Archer, MetricStream)",
+          "integration_method": "REST API - Fetch assessment completion status",
+          "example_api": "GET /api/grc/assessments?vendor={id}&type=risk"
+        }
+      ],
+      "configuration_notes": "Track vendor risk assessments in your GRC platform. Ensure assessments cover cyber risk, financial stability, and operational resilience.",
+      "plain_english": "Has a comprehensive risk assessment been completed for this technology vendor",
+      "how_to_fetch": "Integrate Control Core with vendor management system. Check for completed assessment with status 'approved' within last 12 months.",
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.incident_response_plan_activated",
+      "type": "boolean",
+      "description": "Whether incident response plan has been activated for this security event",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Incident Management Platform (PagerDuty, ServiceNow)",
+          "integration_method": "API integration - Check incident status",
+          "example_api": "GET /api/incidents/{id}/response-status"
+        }
+      ],
+      "configuration_notes": "Integrate with incident management platform to track IR plan activation. OSFI expects documented procedures and activation evidence.",
+      "plain_english": "Has the incident response team been mobilized for this security event",
+      "how_to_fetch": "Configure Control Core to query incident management platform for IR plan status and team assignment",
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "user.role",
+      "type": "string",
+      "description": "User's role in the organization (cio, ceo, developer, etc.)",
+      "required": true,
+      "data_sources": [
+        {
+          "name": "Identity Provider (Okta, Azure AD)",
+          "integration_method": "SCIM/SAML attributes - Role from IdP groups",
+          "example_api": "GET /api/users/{id}/groups → map to roles"
+        },
+        {
+          "name": "HRIS (Workday, SAP SuccessFactors)",
+          "integration_method": "REST API - Fetch job title and role",
+          "example_api": "GET /api/hr/employees/{id}/position"
+        }
+      ],
+      "configuration_notes": "Map IdP groups or HRIS job titles to policy roles. Ensure CIO, CTO, CISO, CEO roles are accurately identified for oversight requirements.",
+      "plain_english": "What is the user's role or job function in the organization",
+      "how_to_fetch": "Configure Control Core IdP integration. Map AD groups or Okta groups to policy roles. Example: 'CN=IT-Leadership,OU=Groups' → role: 'cio'",
+      "example_values": [
+        "cio",
+        "ceo",
+        "ciso",
+        "developer",
+        "security_analyst",
+        "board_member"
+      ],
+      "example_value": "user"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "API Gateway",
+          "api_endpoint": "HTTP method and path mapping",
+          "field_mapping": "GET/POST/PUT/DELETE + path → action",
+          "integration_method": "HTTP header inspection",
+          "setup_notes": "Configure action mapping in Control Core PEP",
+          "documentation": "https://docs.controlcore.io/integrations/api-gateway"
+        },
+        {
+          "condition": "input.resource.type",
+          "system": "CMDB (ServiceNow)",
+          "api_endpoint": "GET /api/now/table/cmdb_ci",
+          "field_mapping": "sys_class_name → resource.type",
+          "integration_method": "REST API",
+          "setup_notes": "Obtain ServiceNow API credentials with cmdb_read role",
+          "documentation": "https://developer.servicenow.com/dev.do#!/reference/api/tokyo/rest/c_TableAPI"
+        },
+        {
+          "condition": "input.resource.classification",
+          "system": "Asset Management",
+          "api_endpoint": "GET /api/assets/{id}/classification",
+          "field_mapping": "classification_tier → resource.classification",
+          "integration_method": "REST API",
+          "setup_notes": "Classify all assets per OSFI tier system (1-4)",
+          "documentation": "Internal asset management documentation"
+        },
+        {
+          "condition": "input.context.cyber_controls_implemented",
+          "system": "Security Orchestration (SOAR)",
+          "api_endpoint": "GET /api/security/controls/status",
+          "field_mapping": "controls_active → cyber_controls_implemented",
+          "integration_method": "REST API",
+          "setup_notes": "Aggregate control status from EDR, firewall, SIEM",
+          "documentation": "SOAR platform API documentation"
+        },
+        {
+          "condition": "input.context.vendor_risk_assessment_completed",
+          "system": "GRC Platform (Archer, MetricStream)",
+          "api_endpoint": "GET /api/vendors/{id}/assessments",
+          "field_mapping": "latest_assessment.status → assessment_completed",
+          "integration_method": "REST API",
+          "setup_notes": "Track vendor assessments with annual refresh",
+          "documentation": "GRC platform API guide"
+        },
+        {
+          "condition": "input.user.role",
+          "system": "Identity Provider (Okta, Azure AD)",
+          "api_endpoint": "GET /api/users/{id}/profile",
+          "field_mapping": "groups → role (mapped)",
+          "integration_method": "SCIM 2.0 or SAML attributes",
+          "setup_notes": "Map IdP groups to policy roles (cio, ceo, etc.)",
+          "documentation": "https://docs.controlcore.io/integrations/identity"
+        }
+      ]
+    },
+    "systems_needed": [
+      "API Gateway",
+      "CMDB (ServiceNow, BMC)",
+      "Asset Management System",
+      "Security Orchestration Platform (SOAR)",
+      "GRC Platform",
+      "Identity Provider (Okta, Azure AD)",
+      "Incident Management (PagerDuty, ServiceNow)",
+      "HRIS (Workday, SAP)"
+    ],
+    "complexity_score": "High - Requires integration with 6+ enterprise systems and OSFI-specific workflows"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Review OSFI Guideline B-13 requirements and map to your institution's technology risk framework",
+      "2. Identify all Tier 3+ critical systems requiring enhanced cyber controls",
+      "3. Integrate Control Core with CMDB, GRC platform, and security tools",
+      "4. Configure resource classification and tier mapping in Control Core",
+      "5. Map user roles (CIO, CEO, CISO) from IdP to policy roles",
+      "6. Deploy policy to Sandbox environment for testing",
+      "7. Test with sample scenarios: core banking access, vendor onboarding, incident response",
+      "8. Validate audit logging captures all policy evaluations for OSFI examination evidence",
+      "9. Configure alerting for policy violations and control failures",
+      "10. Train security and compliance teams on policy administration",
+      "11. Obtain CIO/CISO approval for production deployment",
+      "12. Deploy to Production with shadow mode for 1 week (log only, no enforcement)",
+      "13. Review shadow mode logs with technology risk team",
+      "14. Enable enforcement mode with phased rollout (critical systems first)",
+      "15. Schedule quarterly review with Board Technology Committee"
+    ],
+    "sandbox_testing": [
+      "🧪 Test these scenarios in Sandbox before production:",
+      "   1. Core Banking Access: User with MFA → ALLOW, User without MFA → DENY",
+      "   2. Vendor Onboarding: Vendor with completed risk assessment → ALLOW, Vendor without assessment → DENY",
+      "   3. Production Deployment: Change with approval + security testing → ALLOW, Change without approval → DENY",
+      "   4. Incident Response: High severity incident triggers IR plan activation check",
+      "   5. Executive Oversight: $5M tech investment without CIO approval → DENY",
+      "   6. Cyber Resilience: System without testing in 400 days → FLAG for testing required",
+      "   7. Data Center Access: User with MFA to Tier 3+ facility → ALLOW, User without MFA → DENY",
+      "   8. Board Reporting: Technology risk report from authorized analyst → ALLOW",
+      "   9. Performance: All policy evaluations complete in <50ms (target: <20ms)",
+      "   10. Audit Log: Verify all DENY decisions logged with justification for OSFI review"
+    ],
+    "configuration_tips": [
+      "Align resource classification with OSFI's critical system identification methodology",
+      "Use your institution's existing technology risk taxonomy (don't recreate classifications)",
+      "Leverage CMDB as source of truth for system criticality and ownership",
+      "Integrate with change management system (ServiceNow, Jira) for deployment approvals",
+      "Connect to your GRC platform for vendor risk assessment status",
+      "Configure real-time alerting to CISO/CIO for critical policy violations",
+      "Set up quarterly metrics dashboards for Board Technology Committee",
+      "Document all policy customizations for OSFI examination evidence",
+      "Implement graduated enforcement: shadow mode → critical systems → all systems",
+      "Schedule annual policy review aligned with OSFI self-assessment cycle"
+    ],
+    "production_deployment": [
+      "🚀 OSFI-compliant production deployment:",
+      "   1. ✅ Obtain approval from CIO, CISO, and Chief Risk Officer",
+      "   2. ✅ Document policy purpose and expected impact for OSFI examination",
+      "   3. ✅ Deploy in shadow mode for 1-2 weeks to baseline deny rate",
+      "   4. ✅ Review shadow mode denials with application owners (expect 2-5% initial deny rate)",
+      "   5. ✅ Adjust policy based on legitimate business use cases identified in shadow mode",
+      "   6. ✅ Enable enforcement for Tier 4 (most critical) systems first",
+      "   7. ✅ Monitor for 1 week, then expand to Tier 3 systems",
+      "   8. ✅ Full enforcement across all tiers after 4 weeks of phased rollout",
+      "   9. ✅ Set up quarterly metrics: policy evaluations, deny rate, control failures, vendor risk issues",
+      "   10. ✅ Include policy metrics in quarterly Board Technology Committee reporting",
+      "   11. ✅ Document deployment for OSFI examination (technology risk management evidence)",
+      "   12. ✅ Schedule annual policy review and cyber resilience testing validation"
+    ],
+    "troubleshooting": [
+      "If policy blocks legitimate access: Check user MFA status and role mapping in IdP",
+      "If vendor onboarding fails: Verify GRC platform integration and assessment completion status",
+      "If incident response activation check fails: Confirm incident management platform API connectivity",
+      "For high deny rates (>10%): Review resource classification accuracy in CMDB",
+      "If performance is slow (>100ms): Enable attribute caching for CMDB and GRC platform queries",
+      "For missing attributes: Verify data source integrations are healthy and returning expected fields",
+      "If change management blocks fail: Check approval workflow status in change management system",
+      "For OSFI examination evidence: Export policy evaluation logs filtered by time period and resource type",
+      "Contact Control Core support for assistance with OSFI B-13 compliance configuration"
+    ],
+    "prerequisites": [
+      "✅ CMDB populated with all critical systems and accurate classification (Tier 1-4 per OSFI)",
+      "✅ GRC platform tracking vendor risk assessments with workflow status",
+      "✅ Identity Provider configured with role-based groups (CIO, CEO, CISO identified)",
+      "✅ Security tools (EDR, SIEM, vulnerability scanner) integrated with SOAR or compliance dashboard",
+      "✅ Incident management platform (PagerDuty, ServiceNow) configured with IR plan workflows",
+      "✅ Change management system integrated with approval tracking",
+      "✅ Asset management system with security classification for all infrastructure",
+      "✅ Network connectivity from Control Core to all data sources (CMDB, GRC, IdP, etc.)",
+      "✅ OSFI Guideline B-13 reviewed and institution-specific requirements documented",
+      "✅ Board Technology Committee charter and reporting requirements defined"
+    ],
+    "data_source_configuration": [
+      "📦 Critical Integrations:",
+      "   • CMDB (ServiceNow/BMC) for resource.type and resource.classification",
+      "     - API: GET /api/cmdb/ci/{id}",
+      "     - Fields: sys_class_name, u_tier_classification, u_criticality",
+      "     - Caching: 15 minutes (systems don't change frequently)",
+      "   • Identity Provider (Okta/Azure AD) for user.role",
+      "     - API: GET /api/users/{id}/profile or SCIM 2.0",
+      "     - Fields: groups, department, title",
+      "     - Caching: 5 minutes (role changes are infrequent)",
+      "   • GRC Platform for context.vendor_risk_assessment_completed",
+      "     - API: GET /api/vendors/{id}/assessments",
+      "     - Fields: assessment_status, completion_date, next_review_date",
+      "     - Caching: 1 hour (assessments don't change intra-day)",
+      "   • SOAR/Security Dashboard for context.cyber_controls_implemented",
+      "     - API: GET /api/security/posture?resource={id}",
+      "     - Fields: firewall_active, encryption_enabled, monitoring_active, patching_current",
+      "     - Caching: Real-time (no caching for security control status)",
+      "   • Incident Management for context.incident_response_plan_activated",
+      "     - API: GET /api/incidents/{id}/status",
+      "     - Fields: ir_plan_active, severity, response_team_assigned",
+      "     - Caching: Real-time (no caching for active incidents)"
+    ],
+    "policy_customization": [
+      "🔧 Customize for your institution:",
+      "   • Adjust approval thresholds: Currently $1M for CIO approval - align with your authority matrix",
+      "   • Modify cyber resilience testing interval: Currently 365 days - use your testing frequency",
+      "   • Update resource.type values: Map to your CMDB CI classes",
+      "   • Configure role names: Map 'cio', 'ceo', 'ciso' to your IdP group names",
+      "   • Set incident severity levels: Align with your incident classification (critical, high, medium, low)",
+      "",
+      "📝 OSFI-specific customizations:",
+      "   • Define 'critical system' per OSFI's critical system identification methodology",
+      "   • Align tier classification with your institution's OSFI self-assessment",
+      "   • Configure RTO/RPO thresholds based on your OSFI-approved BCDR plan",
+      "   • Map vendor risk rating to your institution's vendor tiering (critical, high, medium, low)",
+      "",
+      "💾 Version control:",
+      "   • Tag policy version when customizing (e.g., v1.0.0-rbc-prod)",
+      "   • Document all changes in policy changelog for audit trail",
+      "   • Maintain test cases for each customization"
+    ],
+    "monitoring_setup": [
+      "📊 OSFI B-13 Monitoring Metrics:",
+      "   • Policy evaluation count by resource type (baseline for capacity planning)",
+      "   • Deny rate for critical system access (alert if >3% - indicates config issue or attack)",
+      "   • Vendor onboarding blocked due to missing risk assessment (escalate to procurement)",
+      "   • Production deployments without change approval (immediate CIO notification)",
+      "   • Incident response plan activation failures (page security operations center)",
+      "   • Cyber resilience testing overdue (monthly report to CIO)",
+      "   • Executive approval bypasses (audit for policy exception justification)",
+      "   • Policy evaluation latency (alert if p95 >100ms - optimize caching)",
+      "   • Missing attribute errors by data source (SLA with system owners to fix)",
+      "   • Quarterly aggregated metrics for Board Technology Committee deck",
+      "",
+      "🔔 Critical Alerts:",
+      "   • Real-time alert to CISO: Critical system accessed without MFA",
+      "   • Real-time alert to CIO: $10M+ technology investment lacking executive approval",
+      "   • Daily digest to Security Operations: All policy denials for review",
+      "   • Weekly report to Compliance: Vendor onboarding delays due to missing assessments",
+      "   • Monthly to CRO: Cyber resilience testing status for all Tier 3+ systems",
+      "   • Quarterly to Board: Technology risk posture including policy effectiveness metrics"
+    ]
+  },
+  "compliance_frameworks": [
+    "OSFI Guideline B-13",
+    "OSFI Guideline B-10",
+    "OSFI Guideline E-21",
+    "SOC 2 Type II",
+    "ISO 27001"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "osfi",
+    "canadian-banking",
+    "cyber-security",
+    "technology-risk",
+    "incident-response",
+    "vendor-risk",
+    "financial-regulation"
+  ],
+  "related_templates": [
+    "osfi-e21-operational-risk",
+    "osfi-b10-third-party-risk",
+    "osfi-d11-data-governance",
+    "soc2-access-control",
+    "iso27001-access-control"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 15,
+    "user_attributes": 1,
+    "resource_attributes": 3,
+    "context_attributes": 11
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technology stack to fetch the required attributes for OSFI B-13 compliance. Most Canadian financial institutions already have these systems - Control Core orchestrates policy decisions across them.",
+    "steps_by_system": [
+      {
+        "system": "CMDB (ServiceNow)",
+        "attributes_needed": [
+          "resource.type",
+          "resource.classification",
+          "resource.criticality"
+        ],
+        "integration_steps": [
+          "1. Obtain ServiceNow API credentials (cmdb_read role minimum)",
+          "2. Test API access: GET /api/now/table/cmdb_ci to retrieve configuration items",
+          "3. In Control Core Admin UI: Settings → Data Sources → Add ServiceNow CMDB",
+          "4. Configure field mappings:",
+          "   - sys_class_name → resource.type",
+          "   - u_tier_classification → resource.classification (map to OSFI tiers)",
+          "   - u_criticality → resource.criticality",
+          "5. Test with sample resources: Query CI for core banking system, verify correct classification returned",
+          "6. Enable caching: 15-minute TTL (systems don't change frequently)",
+          "7. Set up monitoring: Alert if CMDB API latency >500ms or availability <99.9%"
+        ],
+        "example_response": "{\"result\": {\"sys_class_name\": \"cmdb_ci_app_server\", \"u_tier_classification\": \"tier_3\", \"u_criticality\": \"critical\"}}"
+      },
+      {
+        "system": "Identity Provider (Okta/Azure AD)",
+        "attributes_needed": [
+          "user.role",
+          "user.department",
+          "user.title"
+        ],
+        "integration_steps": [
+          "1. Obtain IdP API credentials or configure SCIM/SAML attribute mapping",
+          "2. Test API access: GET /api/v1/users/{id} (Okta) or Microsoft Graph API (Azure AD)",
+          "3. In Control Core: Settings → Integrations → Add Identity Provider",
+          "4. Configure role mapping:",
+          "   - Map 'C-Level-Executives' group → role: 'ceo' or 'cio'",
+          "   - Map 'IT-Leadership' group → role: 'ciso' or 'cto'",
+          "   - Map department + title combinations to roles",
+          "5. Test with executive users: Verify CEO, CIO, CISO roles correctly identified",
+          "6. Enable attribute caching: 5-minute TTL for user attributes",
+          "7. Configure fallback: If IdP unavailable, use cached values (warn in logs)"
+        ],
+        "example_response": "{\"profile\": {\"groups\": [\"IT-Leadership\", \"Technology-Risk-Committee\"], \"department\": \"Technology\", \"title\": \"Chief Information Officer\"}}"
+      },
+      {
+        "system": "GRC Platform (Archer/MetricStream)",
+        "attributes_needed": [
+          "context.vendor_risk_assessment_completed",
+          "context.vendor_due_diligence_passed"
+        ],
+        "integration_steps": [
+          "1. Obtain GRC platform API access (vendor management module)",
+          "2. Test vendor assessment query: GET /api/vendors/{id}/risk-assessments",
+          "3. In Control Core: Settings → Data Sources → Add GRC Platform",
+          "4. Configure assessment validation logic:",
+          "   - Check assessment status = 'Approved'",
+          "   - Verify completion_date within last 12 months (OSFI annual review requirement)",
+          "   - Confirm risk rating ≤ Medium for approval (High/Critical require executive approval)",
+          "5. Test with sample vendors: Low-risk fintech, high-risk offshore cloud provider",
+          "6. Enable caching: 1-hour TTL (assessments don't change frequently)",
+          "7. Set up alerting: Notify procurement if vendor assessment expires in <30 days"
+        ],
+        "example_response": "{\"assessment\": {\"status\": \"Approved\", \"completion_date\": \"2024-08-15\", \"risk_rating\": \"Medium\", \"next_review\": \"2025-08-15\"}}"
+      },
+      {
+        "system": "Security Orchestration (SOAR)",
+        "attributes_needed": [
+          "context.cyber_controls_implemented",
+          "context.system_patching_current"
+        ],
+        "integration_steps": [
+          "1. Configure SOAR to aggregate security control status from EDR, firewall, SIEM, vulnerability scanner",
+          "2. Test control status API: GET /api/security/controls/status?resource={id}",
+          "3. In Control Core: Settings → Data Sources → Add Security Platform",
+          "4. Map control checks:",
+          "   - EDR agent active + up-to-date → endpoint_protection: true",
+          "   - Firewall rules current + no policy violations → network_security: true",
+          "   - SIEM monitoring active → security_monitoring: true",
+          "   - Vulnerability scan <7 days old + no critical findings → patching_current: true",
+          "5. Aggregate boolean: cyber_controls_implemented = all controls true",
+          "6. Test with systems in various states: fully compliant, missing EDR, outdated patches",
+          "7. Enable real-time queries (no caching): Control status changes frequently",
+          "8. Alert on persistent control failures: System failing controls for >24 hours"
+        ],
+        "example_response": "{\"controls\": {\"endpoint_protection\": true, \"network_security\": true, \"security_monitoring\": true, \"patching_current\": false}}"
+      }
+    ]
+  }
+}

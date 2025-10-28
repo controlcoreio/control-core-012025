@@ -1,0 +1,2556 @@
+# Enterprise Deployment Guide
+
+This comprehensive guide covers enterprise-scale deployment of Control Core with auto-scaling, high availability, load balancing, and advanced configurations. Designed for organizations requiring maximum performance, reliability, and scalability.
+
+## Overview
+
+**Enterprise deployment** is ideal for:
+- Large organizations (100+ users, 1M+ policy evaluations/day)
+- High-traffic applications requiring sub-10ms latency
+- Multi-region deployments with global reach
+- Strict compliance and audit requirements
+- Mission-critical applications requiring 99.99% uptime
+- Organizations with dedicated DevOps/SRE teams
+
+## Architecture Patterns
+
+### Standard Enterprise Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       Load Balancer (Layer 7)                   │
+│                  (AWS ALB / NGINX / HAProxy)                    │
+│          SSL Termination │ Health Checks │ Routing              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  Console #1  │    │  Console #2  │    │  Console #3  │
+│  (React/TS)  │    │  (React/TS)  │    │  (React/TS)  │
+│  Port 3000   │    │  Port 3000   │    │  Port 3000   │
+└──────────────┘    └──────────────┘    └──────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   API #1     │    │   API #2     │    │   API #3     │
+│  (FastAPI)   │    │  (FastAPI)   │    │  (FastAPI)   │
+│  Port 8082   │    │  Port 8082   │    │  Port 8082   │
+└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
+       │                   │                    │
+       └───────────────────┼────────────────────┘
+                           │
+                           ▼
+        ┌──────────────────────────────────────┐
+        │      PostgreSQL Primary-Replica       │
+        │  Primary (Write) + 2 Read Replicas   │
+        └──────────────────────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│  OPAL #1    │   │  OPAL #2    │   │  OPAL #3    │
+│  (Leader)   │   │  (Follower) │   │  (Follower) │
+└─────────────┘   └─────────────┘   └─────────────┘
+        │                  │                  │
+        └──────────────────┼──────────────────┘
+                           │ Policy Distribution
+                           │
+┌──────────────────────────┼──────────────────────────┐
+│                          │                          │
+▼                          ▼                          ▼
+┌─────────────────────────────────────────────────────┐
+│           Load Balancer (Bouncer/PEP Fleet)         │
+│        (DNS Round-Robin / AWS NLB / HAProxy)        │
+└──────────┬──────────────────────────────────────────┘
+           │
+┌──────────┼──────────┬──────────┬──────────┬─────────┐
+│          │          │          │          │         │
+▼          ▼          ▼          ▼          ▼         ▼
+┌────┐   ┌────┐   ┌────┐   ┌────┐   ┌────┐   ┌────┐
+│PEP1│   │PEP2│   │PEP3│   │PEP4│   │PEP5│   │PEP-N│
+└────┘   └────┘   └────┘   └────┘   └────┘   └────┘
+  │        │        │        │        │        │
+  └────────┴────────┴────────┴────────┴────────┘
+                     │
+                     ▼
+          ┌──────────────────┐
+          │  Protected Apps  │
+          └──────────────────┘
+```
+
+### Multi-Region Architecture
+
+```
+Region: US-EAST-1                     Region: EU-WEST-1
+┌──────────────────────────┐         ┌──────────────────────────┐
+│  Control Plane (Primary) │◄───────►│ Control Plane (Replica)  │
+│  - Console x3            │  Sync   │  - Console x3            │
+│  - API x5                │         │  - API x5                │
+│  - OPAL x3               │         │  - OPAL x3               │
+│  - DB Primary + Replica  │         │  - DB Read Replicas      │
+│  - PEP Fleet (10)        │         │  - PEP Fleet (10)        │
+└──────────────────────────┘         └──────────────────────────┘
+           │                                    │
+           │                                    │
+           ▼                                    ▼
+    Protected Apps                       Protected Apps
+    (US Users)                          (EU Users)
+
+Region: ASIA-PACIFIC-1
+┌──────────────────────────┐
+│ Control Plane (Replica)  │
+│  - Console x3            │
+│  - API x5                │
+│  - OPAL x3               │
+│  - DB Read Replicas      │
+│  - PEP Fleet (10)        │
+└──────────────────────────┘
+           │
+           ▼
+    Protected Apps
+    (APAC Users)
+```
+
+## Prerequisites
+
+### Infrastructure Requirements
+
+**Minimum Production Configuration**:
+- **Kubernetes Cluster**: v1.24+
+- **Nodes**: 6 nodes minimum (3 control plane, 3 workers)
+- **Memory**: 16GB RAM per node (96GB total minimum)
+- **CPU**: 4 cores per node (24 cores total minimum)
+- **Storage**: 500GB SSD with high IOPS (3000+ IOPS recommended)
+- **Network**: 10 Gbps between nodes, 1 Gbps external
+
+**Recommended Production Configuration**:
+- **Nodes**: 12+ nodes (3 control plane, 9+ workers)
+- **Memory**: 32GB RAM per node
+- **CPU**: 8 cores per node
+- **Storage**: 1TB NVMe SSD with 10,000+ IOPS
+- **Network**: 25 Gbps between nodes, 10 Gbps external
+
+### Software Requirements
+
+- **Kubernetes**: 1.24 or higher
+- **Helm**: 3.0 or higher
+- **kubectl**: Matching cluster version
+- **cert-manager**: For SSL certificate management
+- **Ingress Controller**: NGINX, Traefik, or cloud provider (ALB, etc.)
+- **Metrics Server**: For HPA (Horizontal Pod Autoscaler)
+- **Prometheus**: For monitoring (optional but recommended)
+
+### Cloud Provider Requirements
+
+**AWS**:
+- EKS cluster or self-managed Kubernetes
+- RDS PostgreSQL (db.r6g.xlarge or higher)
+- ElastiCache Redis (cache.r6g.large or higher)
+- Application Load Balancer (ALB)
+- Network Load Balancer (NLB)
+- Route 53 for DNS
+- S3 for backups
+- CloudWatch for logging
+
+**Azure**:
+- AKS cluster
+- Azure Database for PostgreSQL (Flexible Server, Standard_D4s_v3+)
+- Azure Cache for Redis (Standard C1+)
+- Azure Load Balancer
+- Azure DNS
+- Azure Blob Storage for backups
+- Azure Monitor for logging
+
+**Google Cloud**:
+- GKE cluster
+- Cloud SQL for PostgreSQL (db-custom-4-16384+)
+- Memorystore for Redis (M1 tier+)
+- Cloud Load Balancing
+- Cloud DNS
+- Cloud Storage for backups
+- Cloud Logging
+
+## Installation
+
+### Step 1: Prepare Kubernetes Cluster
+
+**Create EKS Cluster** (AWS example):
+
+```bash
+# Install eksctl
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+sudo mv /tmp/eksctl /usr/local/bin
+
+# Create cluster
+eksctl create cluster \
+  --name controlcore-production \
+  --region us-east-1 \
+  --version 1.28 \
+  --nodegroup-name standard-workers \
+  --node-type m5.2xlarge \
+  --nodes 6 \
+  --nodes-min 6 \
+  --nodes-max 20 \
+  --managed \
+  --with-oidc \
+  --ssh-access \
+  --ssh-public-key ~/.ssh/id_rsa.pub \
+  --enable-ssm
+
+# Verify cluster
+kubectl get nodes
+```
+
+**Create AKS Cluster** (Azure example):
+
+```bash
+# Create resource group
+az group create --name controlcore-production --location eastus
+
+# Create AKS cluster
+az aks create \
+  --resource-group controlcore-production \
+  --name controlcore-cluster \
+  --kubernetes-version 1.28.0 \
+  --node-count 6 \
+  --node-vm-size Standard_D8s_v3 \
+  --enable-managed-identity \
+  --enable-cluster-autoscaler \
+  --min-count 6 \
+  --max-count 20 \
+  --network-plugin azure \
+  --load-balancer-sku standard \
+  --generate-ssh-keys
+
+# Get credentials
+az aks get-credentials --resource-group controlcore-production --name controlcore-cluster
+
+# Verify
+kubectl get nodes
+```
+
+**Create GKE Cluster** (GCP example):
+
+```bash
+# Set project and region
+gcloud config set project your-project-id
+gcloud config set compute/region us-central1
+
+# Create GKE cluster
+gcloud container clusters create controlcore-cluster \
+  --region us-central1 \
+  --cluster-version 1.28 \
+  --machine-type n2-standard-8 \
+  --num-nodes 2 \
+  --min-nodes 2 \
+  --max-nodes 7 \
+  --enable-autoscaling \
+  --enable-autorepair \
+  --enable-autoupgrade \
+  --disk-type pd-ssd \
+  --disk-size 100 \
+  --enable-ip-alias \
+  --enable-stackdriver-kubernetes \
+  --addons HorizontalPodAutoscaling,HttpLoadBalancing,GcePersistentDiskCsiDriver \
+  --workload-pool=your-project-id.svc.id.goog \
+  --enable-shielded-nodes \
+  --shielded-secure-boot \
+  --shielded-integrity-monitoring
+
+# Alternative: GKE Autopilot (fully managed)
+gcloud container clusters create-auto controlcore-cluster \
+  --region us-central1 \
+  --cluster-version 1.28
+
+# Get credentials
+gcloud container clusters get-credentials controlcore-cluster --region us-central1
+
+# Verify
+kubectl get nodes
+```
+
+### Step 2: Install Prerequisites
+
+**Install cert-manager**:
+
+```bash
+# Add Jetstack Helm repository
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+# Install cert-manager
+kubectl create namespace cert-manager
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --version v1.13.0 \
+  --set installCRDs=true
+
+# Verify installation
+kubectl get pods -n cert-manager
+```
+
+**Install NGINX Ingress Controller**:
+
+```bash
+# Add NGINX Helm repository
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Install NGINX Ingress
+helm install nginx-ingress ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --set controller.replicaCount=3 \
+  --set controller.service.type=LoadBalancer \
+  --set controller.metrics.enabled=true \
+  --set controller.podAnnotations."prometheus\.io/scrape"=true
+
+# Get Load Balancer IP
+kubectl get svc -n ingress-nginx
+```
+
+**Install Metrics Server** (for HPA):
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# Verify
+kubectl get deployment metrics-server -n kube-system
+```
+
+**Install Prometheus** (optional but recommended):
+
+```bash
+# Add Prometheus Helm repository
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+# Install Prometheus
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace \
+  --set prometheus.prometheusSpec.retention=30d \
+  --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=100Gi \
+  --set grafana.enabled=true \
+  --set grafana.adminPassword=ChangeMeSecurePassword
+
+# Access Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+```
+
+### Step 3: Configure Storage
+
+**Create Storage Class** (AWS EBS example):
+
+```yaml
+# storage-class.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: controlcore-fast-ssd
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+```bash
+kubectl apply -f storage-class.yaml
+```
+
+**GCP Persistent Disk Storage Class**:
+
+```yaml
+# storage-class-gcp.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: controlcore-fast-ssd
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd  # For HA across zones
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+```
+
+```bash
+kubectl apply -f storage-class-gcp.yaml
+```
+
+**Azure Disk Storage Class**:
+
+```yaml
+# storage-class-azure.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: controlcore-fast-ssd
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS  # Premium SSD
+  kind: Managed
+  cachingMode: ReadOnly
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+```
+
+```bash
+kubectl apply -f storage-class-azure.yaml
+```
+
+### Step 4: Create Namespace and Secrets
+
+```bash
+# Create namespace
+kubectl create namespace control-core
+
+# Create secrets
+kubectl create secret generic controlcore-secrets \
+  --namespace control-core \
+  --from-literal=database-password='SecureDBPassword123!' \
+  --from-literal=redis-password='SecureRedisPassword123!' \
+  --from-literal=jwt-secret='SecureJWTSecret123!' \
+  --from-literal=admin-password='SecureAdminPassword123!'
+
+# Create TLS secret (if using custom certificate)
+kubectl create secret tls controlcore-tls \
+  --namespace control-core \
+  --cert=path/to/tls.crt \
+  --key=path/to/tls.key
+```
+
+### Step 5: Deploy PostgreSQL (High Availability)
+
+**Using Helm (Bitnami PostgreSQL HA)**:
+
+```bash
+# Add Bitnami repository
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# Install PostgreSQL with replication
+helm install postgresql bitnami/postgresql-ha \
+  --namespace control-core \
+  --set postgresql.replicaCount=3 \
+  --set postgresql.resources.requests.memory=8Gi \
+  --set postgresql.resources.requests.cpu=2000m \
+  --set postgresql.resources.limits.memory=16Gi \
+  --set postgresql.resources.limits.cpu=4000m \
+  --set pgpool.replicaCount=3 \
+  --set pgpool.resources.requests.memory=2Gi \
+  --set pgpool.resources.requests.cpu=1000m \
+  --set persistence.size=200Gi \
+  --set persistence.storageClass=controlcore-fast-ssd \
+  --set metrics.enabled=true \
+  --set volumePermissions.enabled=true
+
+# Or use managed database (AWS RDS example)
+# Create RDS instance via AWS Console or CLI:
+aws rds create-db-instance \
+  --db-instance-identifier controlcore-db \
+  --db-instance-class db.r6g.2xlarge \
+  --engine postgres \
+  --engine-version 15.3 \
+  --master-username controlcore \
+  --master-user-password SecurePassword123! \
+  --allocated-storage 500 \
+  --storage-type gp3 \
+  --iops 12000 \
+  --multi-az \
+  --backup-retention-period 30 \
+  --preferred-backup-window "03:00-04:00" \
+  --preferred-maintenance-window "mon:04:00-mon:05:00" \
+  --enable-performance-insights \
+  --enable-cloudwatch-logs-exports postgresql
+
+# Google Cloud SQL (GCP example)
+gcloud sql instances create controlcore-db \
+  --database-version=POSTGRES_15 \
+  --tier=db-custom-8-32768 \
+  --region=us-central1 \
+  --network=default \
+  --availability-type=REGIONAL \
+  --storage-type=SSD \
+  --storage-size=500GB \
+  --storage-auto-increase \
+  --backup-start-time=03:00 \
+  --maintenance-window-day=MON \
+  --maintenance-window-hour=04 \
+  --enable-bin-log \
+  --retained-backups-count=30 \
+  --root-password=SecurePassword123!
+
+# Set database flags for performance
+gcloud sql instances patch controlcore-db \
+  --database-flags=shared_buffers=8GB,max_connections=500,effective_cache_size=24GB
+
+# Create database
+gcloud sql databases create control_core_db --instance=controlcore-db
+
+# Create user
+gcloud sql users create controlcore \
+  --instance=controlcore-db \
+  --password=SecurePassword123!
+
+# Azure Database for PostgreSQL (Azure example)
+az postgres flexible-server create \
+  --resource-group controlcore-production \
+  --name controlcore-db \
+  --location eastus \
+  --admin-user controlcore \
+  --admin-password SecurePassword123! \
+  --sku-name Standard_D8s_v3 \
+  --tier GeneralPurpose \
+  --version 15 \
+  --storage-size 512 \
+  --backup-retention 30 \
+  --geo-redundant-backup Enabled \
+  --high-availability ZoneRedundant \
+  --public-access 0.0.0.0-255.255.255.255
+
+# Create database
+az postgres flexible-server db create \
+  --resource-group controlcore-production \
+  --server-name controlcore-db \
+  --database-name control_core_db
+
+# Configure server parameters
+az postgres flexible-server parameter set \
+  --resource-group controlcore-production \
+  --server-name controlcore-db \
+  --name shared_buffers \
+  --value 8388608  # 8GB in KB
+
+az postgres flexible-server parameter set \
+  --resource-group controlcore-production \
+  --server-name controlcore-db \
+  --name max_connections \
+  --value 500
+```
+
+**Database Configuration** (cloud-agnostic):
+
+```yaml
+# database-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-config
+  namespace: control-core
+data:
+  # AWS RDS
+  # host: "controlcore-db.cluster-xxxxx.us-east-1.rds.amazonaws.com"
+  # GCP Cloud SQL
+  # host: "10.x.x.x"  # Private IP or Cloud SQL Proxy
+  # Azure Database
+  # host: "controlcore-db.postgres.database.azure.com"
+  host: "your-database-host"
+  port: "5432"
+  database: "control_core_db"
+  pool_size: "50"
+  max_overflow: "20"
+  pool_timeout: "30"
+  pool_recycle: "3600"
+```
+
+### Step 6: Deploy Redis (High Availability)
+
+**Using Helm (Redis Cluster)**:
+
+```bash
+# Install Redis cluster
+helm install redis bitnami/redis-cluster \
+  --namespace control-core \
+  --set cluster.nodes=6 \
+  --set cluster.replicas=1 \
+  --set password=SecureRedisPassword123! \
+  --set persistence.size=50Gi \
+  --set persistence.storageClass=controlcore-fast-ssd \
+  --set resources.requests.memory=4Gi \
+  --set resources.requests.cpu=1000m \
+  --set metrics.enabled=true
+
+# Or use managed cache (AWS ElastiCache example)
+aws elasticache create-replication-group \
+  --replication-group-id controlcore-cache \
+  --replication-group-description "Control Core Redis Cluster" \
+  --engine redis \
+  --cache-node-type cache.r6g.xlarge \
+  --num-cache-clusters 3 \
+  --automatic-failover-enabled \
+  --at-rest-encryption-enabled \
+  --transit-encryption-enabled \
+  --auth-token SecureRedisPassword123! \
+  --snapshot-retention-limit 7 \
+  --snapshot-window "03:00-05:00"
+
+# GCP Memorystore for Redis
+gcloud redis instances create controlcore-cache \
+  --size=5 \
+  --region=us-central1 \
+  --tier=standard \
+  --redis-version=redis_7_0 \
+  --enable-auth \
+  --auth-string=SecureRedisPassword123! \
+  --transit-encryption-mode=SERVER_AUTHENTICATION \
+  --replica-count=2 \
+  --read-replicas-mode=READ_REPLICAS_ENABLED \
+  --persistence-mode=RDB \
+  --rdb-snapshot-period=12h \
+  --rdb-snapshot-start-time=03:00
+
+# Get connection info
+gcloud redis instances describe controlcore-cache --region=us-central1
+
+# Azure Cache for Redis
+az redis create \
+  --resource-group controlcore-production \
+  --name controlcore-cache \
+  --location eastus \
+  --sku Premium \
+  --vm-size P2 \
+  --enable-non-ssl-port false \
+  --minimum-tls-version 1.2 \
+  --redis-configuration maxmemory-policy=allkeys-lru \
+  --replicas-per-primary 2 \
+  --zones 1 2 3 \
+  --shard-count 2
+
+# Get connection info
+az redis list-keys \
+  --resource-group controlcore-production \
+  --name controlcore-cache
+```
+
+### Step 7: Install Control Core Helm Chart
+
+**Add Control Core Helm Repository**:
+
+```bash
+# Add repository
+helm repo add controlcore https://charts.controlcore.io
+helm repo update
+
+# Pull chart to customize
+helm pull controlcore/control-core --untar
+cd control-core
+```
+
+**Configure values.yaml**:
+
+```yaml
+# values-production.yaml
+
+global:
+  domain: controlcore.yourcompany.com
+  environment: production
+  
+  # Image configuration
+  imageRegistry: controlcore.io
+  imagePullSecrets:
+    - name: controlcore-registry-secret
+
+# Policy Administration Console
+console:
+  enabled: true
+  replicaCount: 3
+  
+  image:
+    repository: controlcore/console
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    hosts:
+      - host: console.controlcore.yourcompany.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: console-tls
+        hosts:
+          - console.controlcore.yourcompany.com
+
+# Policy Administration API
+api:
+  enabled: true
+  replicaCount: 5
+  
+  image:
+    repository: controlcore/api
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    # Custom metrics for scaling
+    metrics:
+      - type: Pods
+        pods:
+          metric:
+            name: http_requests_per_second
+          target:
+            type: AverageValue
+            averageValue: "1000"
+  
+  env:
+    - name: WORKERS
+      value: "4"
+    - name: MAX_REQUESTS
+      value: "10000"
+    - name: MAX_REQUESTS_JITTER
+      value: "1000"
+    - name: TIMEOUT
+      value: "60"
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "1000"
+    hosts:
+      - host: api.controlcore.yourcompany.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: api-tls
+        hosts:
+          - api.controlcore.yourcompany.com
+
+# Policy Synchronization Server (OPAL)
+opal:
+  enabled: true
+  replicaCount: 3
+  
+  image:
+    repository: controlcore/opal-server
+    tag: "0.7.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  # Leader election for HA
+  leaderElection:
+    enabled: true
+    leaseDuration: 15s
+    renewDeadline: 10s
+    retryPeriod: 2s
+  
+  config:
+    broadcast_uri: "postgres://controlcore:password@postgresql:5432/opal_db"
+    data_config_sources:
+      - uri: "https://api.controlcore.yourcompany.com/api/v1/opal/config"
+        config:
+          headers:
+            Authorization: "Bearer ${OPAL_API_KEY}"
+    
+# Policy Enforcement Point (Bouncer/PEP)
+bouncer:
+  enabled: true
+  replicaCount: 10
+  
+  image:
+    repository: controlcore/bouncer
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 10
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+    # Scale based on request rate
+    metrics:
+      - type: Pods
+        pods:
+          metric:
+            name: http_requests_per_second
+          target:
+            type: AverageValue
+            averageValue: "500"
+  
+  # Pod Disruption Budget for high availability
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 5
+  
+  # Pod Topology Spread for better distribution
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app: controlcore-bouncer
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: controlcore-bouncer
+  
+  config:
+    cache:
+      enabled: true
+      policy_ttl: "5m"
+      decision_ttl: "1m"
+      max_size: 50000
+    
+    performance:
+      worker_threads: 8
+      connection_pool_size: 100
+      max_concurrent_requests: 5000
+  
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    ports:
+      - name: http
+        port: 80
+        targetPort: 8080
+        protocol: TCP
+      - name: https
+        port: 443
+        targetPort: 8443
+        protocol: TCP
+
+# Database configuration
+database:
+  # Use external database
+  external: true
+  host: "controlcore-db.cluster-xxxxx.us-east-1.rds.amazonaws.com"
+  port: 5432
+  database: "control_core_db"
+  username: "controlcore"
+  passwordSecret: "controlcore-secrets"
+  passwordKey: "database-password"
+  
+  # Connection pool settings
+  pool:
+    size: 50
+    max_overflow: 20
+    timeout: 30
+    recycle: 3600
+
+# Redis configuration
+redis:
+  # Use external Redis
+  external: true
+  host: "controlcore-cache.xxxxx.cache.amazonaws.com"
+  port: 6379
+  passwordSecret: "controlcore-secrets"
+  passwordKey: "redis-password"
+  
+  # Cluster mode
+  cluster:
+    enabled: true
+    nodes: 6
+
+# Monitoring & Observability
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+      
+  alerting:
+    enabled: true
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+      
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected"
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 30  # days
+  storage:
+    type: s3
+    bucket: controlcore-backups
+    region: us-east-1
+    prefix: production/
+
+# Security
+security:
+  podSecurityPolicy:
+    enabled: true
+  
+  networkPolicy:
+    enabled: true
+    
+  rbac:
+    create: true
+  
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/controlcore-sa-role"
+```
+
+**Install Control Core**:
+
+```bash
+# Install with custom values
+helm install control-core controlcore/control-core \
+  --namespace control-core \
+  --values values-production.yaml \
+  --timeout 10m \
+  --wait
+
+# Verify installation
+helm list -n control-core
+kubectl get pods -n control-core
+kubectl get svc -n control-core
+kubectl get ingress -n control-core
+```
+
+### Step 8: Configure DNS
+
+**Get Load Balancer Address**:
+
+```bash
+# Get Bouncer LB address
+kubectl get svc -n control-core controlcore-bouncer -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+
+# Get Ingress LB address
+kubectl get svc -n ingress-nginx nginx-ingress-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+
+**Configure DNS Records** (Route 53 example):
+
+```bash
+# Console
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "console.controlcore.yourcompany.com",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "INGRESS_LB_HOSTNAME"}]
+      }
+    }]
+  }'
+
+# API
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "api.controlcore.yourcompany.com",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "INGRESS_LB_HOSTNAME"}]
+      }
+    }]
+  }'
+
+# Bouncer (for direct access)
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "bouncer.controlcore.yourcompany.com",
+        "Type": "CNAME",
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "BOUNCER_LB_HOSTNAME"}]
+      }
+    }]
+  }'
+```
+
+## Auto-Scaling Configuration
+
+### Horizontal Pod Autoscaler (HPA)
+
+Control Core components auto-scale based on CPU, memory, and custom metrics.
+
+**Verify HPA Status**:
+
+```bash
+# Check all HPAs
+kubectl get hpa -n control-core
+
+# Expected output:
+NAME                     REFERENCE                   TARGETS         MINPODS   MAXPODS   REPLICAS
+controlcore-console      Deployment/console          45%/70%         3         10        3
+controlcore-api          Deployment/api              60%/70%         5         20        8
+controlcore-bouncer      Deployment/bouncer          55%/60%         10        50        15
+```
+
+**Custom Metrics for Scaling**:
+
+```yaml
+# hpa-custom-metrics.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: controlcore-api-advanced
+  namespace: control-core
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: controlcore-api
+  minReplicas: 5
+  maxReplicas: 50
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    
+    # Request rate scaling
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "1000"
+    
+    # Policy evaluation time scaling
+    - type: Pods
+      pods:
+        metric:
+          name: policy_evaluation_duration_seconds
+        target:
+          type: AverageValue
+          averageValue: "0.050"  # Scale when avg > 50ms
+  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+```
+
+```bash
+kubectl apply -f hpa-custom-metrics.yaml
+```
+
+### Cluster Autoscaler
+
+**AWS EKS**:
+
+```bash
+# Create IAM policy
+cat > cluster-autoscaler-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "autoscaling:DescribeAutoScalingGroups",
+        "autoscaling:DescribeAutoScalingInstances",
+        "autoscaling:DescribeLaunchConfigurations",
+        "autoscaling:DescribeScalingActivities",
+        "autoscaling:DescribeTags",
+        "ec2:DescribeInstanceTypes",
+        "ec2:DescribeLaunchTemplateVersions"
+      ],
+      "Resource": ["*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "autoscaling:SetDesiredCapacity",
+        "autoscaling:TerminateInstanceInAutoScalingGroup",
+        "ec2:DescribeImages",
+        "ec2:GetInstanceTypesFromInstanceRequirements",
+        "eks:DescribeNodegroup"
+      ],
+      "Resource": ["*"]
+    }
+  ]
+}
+EOF
+
+aws iam create-policy \
+  --policy-name ClusterAutoscalerPolicy \
+  --policy-document file://cluster-autoscaler-policy.json
+
+# Deploy cluster autoscaler
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+
+# Annotate deployment
+kubectl -n kube-system annotate deployment.apps/cluster-autoscaler \
+  cluster-autoscaler.kubernetes.io/safe-to-evict="false"
+
+# Set cluster name
+kubectl -n kube-system edit deployment.apps/cluster-autoscaler
+# Add: --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/controlcore-production
+```
+
+**Azure AKS** (already configured if created with `--enable-cluster-autoscaler`):
+
+```bash
+# Update autoscaler settings
+az aks update \
+  --resource-group controlcore-production \
+  --name controlcore-cluster \
+  --update-cluster-autoscaler \
+  --min-count 6 \
+  --max-count 50
+```
+
+**Verification**:
+
+```bash
+# Check autoscaler logs
+kubectl -n kube-system logs -f deployment/cluster-autoscaler
+
+# Check node status
+kubectl get nodes
+kubectl top nodes
+```
+
+## Load Balancing Configuration
+
+### Application Load Balancing (Layer 7)
+
+**NGINX Ingress Configuration**:
+
+```yaml
+# ingress-advanced.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: controlcore-ingress
+  namespace: control-core
+  annotations:
+    # SSL/TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/load-balance: "ewma"  # Exponentially weighted moving average
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"  # IP hash for session affinity
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "1000"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Buffering
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    
+    # Connection limits
+    nginx.ingress.kubernetes.io/limit-connections: "100"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://yourcompany.com"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+    
+    # Custom error pages
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,503"
+    nginx.ingress.kubernetes.io/default-backend: custom-error-pages
+    
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - console.controlcore.yourcompany.com
+        - api.controlcore.yourcompany.com
+      secretName: controlcore-tls
+  rules:
+    - host: console.controlcore.yourcompany.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: controlcore-console
+                port:
+                  number: 3000
+    - host: api.controlcore.yourcompany.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: controlcore-api
+                port:
+                  number: 8082
+```
+
+```bash
+kubectl apply -f ingress-advanced.yaml
+```
+
+### Network Load Balancing (Layer 4)
+
+**For Bouncer/PEP Fleet**:
+
+```yaml
+# bouncer-nlb-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: controlcore-bouncer-nlb
+  namespace: control-core
+  annotations:
+    # AWS NLB annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "2"
+    
+    # Azure Load Balancer annotations
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-protocol: "http"
+    service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/health"
+    
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local  # Preserve client IP
+  selector:
+    app: controlcore-bouncer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800  # 3 hours
+```
+
+```bash
+kubectl apply -f bouncer-nlb-service.yaml
+```
+
+### DNS-Based Load Balancing
+
+**AWS Route 53 Weighted Routing**:
+
+```bash
+# Create weighted record sets for multi-region
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "bouncer.controlcore.yourcompany.com",
+          "Type": "CNAME",
+          "SetIdentifier": "us-east-1",
+          "Weight": 70,
+          "TTL": 60,
+          "ResourceRecords": [{"Value": "us-east-1-bouncer-lb.amazonaws.com"}]
+        }
+      },
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "bouncer.controlcore.yourcompany.com",
+          "Type": "CNAME",
+          "SetIdentifier": "eu-west-1",
+          "Weight": 30,
+          "TTL": 60,
+          "ResourceRecords": [{"Value": "eu-west-1-bouncer-lb.amazonaws.com"}]
+        }
+      }
+    ]
+  }'
+```
+
+**Geo-Routing for Global Deployment**:
+
+```bash
+# US users to US region
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "bouncer.controlcore.yourcompany.com",
+        "Type": "CNAME",
+        "SetIdentifier": "North America",
+        "GeoLocation": {
+          "ContinentCode": "NA"
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "us-east-1-bouncer-lb.amazonaws.com"}]
+      }
+    }]
+  }'
+
+# EU users to EU region
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "bouncer.controlcore.yourcompany.com",
+        "Type": "CNAME",
+        "SetIdentifier": "Europe",
+        "GeoLocation": {
+          "ContinentCode": "EU"
+        },
+        "TTL": 60,
+        "ResourceRecords": [{"Value": "eu-west-1-bouncer-lb.amazonaws.com"}]
+      }
+    }]
+  }'
+```
+
+## High Availability Configuration
+
+### Multi-AZ Deployment
+
+**Node Distribution**:
+
+```yaml
+# pod-topology-spread.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: controlcore-api
+  labels:
+    app: controlcore-api
+spec:
+  topologySpreadConstraints:
+    # Spread across zones
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app: controlcore-api
+    
+    # Spread across nodes
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: controlcore-api
+```
+
+### Pod Disruption Budgets
+
+```yaml
+# pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: controlcore-api-pdb
+  namespace: control-core
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: controlcore-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: controlcore-bouncer-pdb
+  namespace: control-core
+spec:
+  minAvailable: 5
+  selector:
+    matchLabels:
+      app: controlcore-bouncer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: controlcore-opal-pdb
+  namespace: control-core
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: controlcore-opal
+```
+
+```bash
+kubectl apply -f pdb.yaml
+```
+
+### Database High Availability
+
+**PostgreSQL Replication**:
+
+```yaml
+# postgresql-replication.yaml (if self-managed)
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: controlcore-db
+  namespace: control-core
+spec:
+  instances: 3
+  
+  primaryUpdateStrategy: unsupervised
+  
+  postgresql:
+    parameters:
+      max_connections: "500"
+      shared_buffers: "8GB"
+      effective_cache_size: "24GB"
+      maintenance_work_mem: "2GB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "20MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+      max_worker_processes: "8"
+      max_parallel_workers_per_gather: "4"
+      max_parallel_workers: "8"
+      max_parallel_maintenance_workers: "4"
+  
+  bootstrap:
+    initdb:
+      database: control_core_db
+      owner: controlcore
+      secret:
+        name: controlcore-db-secret
+  
+  storage:
+    size: 500Gi
+    storageClass: controlcore-fast-ssd
+  
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://controlcore-backups/postgresql/
+      s3Credentials:
+        accessKeyId:
+          name: aws-credentials
+          key: access-key-id
+        secretAccessKey:
+          name: aws-credentials
+          key: secret-access-key
+      wal:
+        compression: gzip
+        maxParallel: 8
+    retentionPolicy: "30d"
+  
+  monitoring:
+    enabled: true
+```
+
+### Redis Sentinel (if self-managed)
+
+```yaml
+# redis-sentinel.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-sentinel-config
+  namespace: control-core
+data:
+  sentinel.conf: |
+    sentinel monitor mymaster redis-0.redis 6379 2
+    sentinel down-after-milliseconds mymaster 5000
+    sentinel parallel-syncs mymaster 1
+    sentinel failover-timeout mymaster 10000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-sentinel
+  namespace: control-core
+spec:
+  serviceName: redis-sentinel
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis-sentinel
+  template:
+    metadata:
+      labels:
+        app: redis-sentinel
+    spec:
+      containers:
+        - name: sentinel
+          image: redis:7-alpine
+          command:
+            - redis-sentinel
+            - /etc/redis/sentinel.conf
+          ports:
+            - containerPort: 26379
+              name: sentinel
+          volumeMounts:
+            - name: config
+              mountPath: /etc/redis
+      volumes:
+        - name: config
+          configMap:
+            name: redis-sentinel-config
+```
+
+## SSL/TLS Configuration
+
+### Certificate Management with cert-manager
+
+**ClusterIssuer for Let's Encrypt**:
+
+```yaml
+# letsencrypt-issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@yourcompany.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      # HTTP-01 challenge
+      - http01:
+          ingress:
+            class: nginx
+      # DNS-01 challenge (for wildcard certs)
+      - dns01:
+          route53:
+            region: us-east-1
+            accessKeyID: AKIAIOSFODNN7EXAMPLE
+            secretAccessKeySecretRef:
+              name: aws-credentials
+              key: secret-access-key
+```
+
+```bash
+kubectl apply -f letsencrypt-issuer.yaml
+```
+
+**Certificate Resource**:
+
+```yaml
+# certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: controlcore-tls
+  namespace: control-core
+spec:
+  secretName: controlcore-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - controlcore.yourcompany.com
+    - console.controlcore.yourcompany.com
+    - api.controlcore.yourcompany.com
+    - bouncer.controlcore.yourcompany.com
+    - "*.controlcore.yourcompany.com"
+  privateKey:
+    algorithm: RSA
+    size: 4096
+```
+
+```bash
+kubectl apply -f certificate.yaml
+
+# Check certificate status
+kubectl get certificate -n control-core
+kubectl describe certificate controlcore-tls -n control-core
+```
+
+### mTLS Between Services
+
+**Service Mesh with Istio** (optional):
+
+```bash
+# Install Istio
+curl -L https://istio.io/downloadIstio | sh -
+cd istio-*
+export PATH=$PWD/bin:$PATH
+
+# Install Istio with mTLS
+istioctl install --set profile=production -y
+
+# Enable automatic sidecar injection
+kubectl label namespace control-core istio-injection=enabled
+
+# Apply strict mTLS policy
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: control-core
+spec:
+  mtls:
+    mode: STRICT
+EOF
+```
+
+## Recommended Sync Settings
+
+### OPAL Sync Configuration
+
+```yaml
+# opal-sync-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opal-sync-config
+  namespace: control-core
+data:
+  # Policy sync interval (how often to check for policy updates)
+  OPAL_POLICY_REPO_POLLING_INTERVAL: "30"  # seconds
+  
+  # Data source sync intervals (by type)
+  OPAL_DATA_CONFIG_SOURCES_SYNC_INTERVAL: "60"  # seconds
+  
+  # WebSocket keep-alive
+  OPAL_WS_KEEPALIVE_TIME: "30"  # seconds
+  
+  # Statistics reporting interval
+  OPAL_STATISTICS_ENABLED: "true"
+  OPAL_STATISTICS_INTERVAL: "60"  # seconds
+  
+  # Broadcast channel
+  OPAL_BROADCAST_URI: "postgres://controlcore:password@postgresql:5432/opal_db"
+  
+  # Client subscriptions
+  OPAL_CLIENT_TOKEN: "secure-client-token"
+  OPAL_SUBSCRIPTION_RECONNECT_INTERVAL: "5"  # seconds
+  OPAL_SUBSCRIPTION_MAX_RECONNECT_ATTEMPTS: "10"
+```
+
+**Recommendations by Environment**:
+
+| Setting | Development | Staging | Production | High-Traffic Production |
+|---------|-------------|---------|------------|------------------------|
+| Policy Repo Polling | 60s | 30s | 30s | 30s |
+| Data Source Sync | 300s (5m) | 120s (2m) | 60s (1m) | 60s (1m) |
+| WebSocket Keep-Alive | 60s | 30s | 30s | 15s |
+| Statistics Interval | 300s | 60s | 60s | 30s |
+
+### Cache Settings
+
+```yaml
+# cache-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cache-config
+  namespace: control-core
+data:
+  # Policy cache (how long to cache compiled policies)
+  POLICY_CACHE_TTL: "300"  # 5 minutes in seconds
+  POLICY_CACHE_MAX_SIZE: "50000"  # entries
+  
+  # Decision cache (how long to cache authorization decisions)
+  DECISION_CACHE_TTL: "60"  # 1 minute in seconds
+  DECISION_CACHE_MAX_SIZE: "100000"  # entries
+  
+  # User context cache
+  USER_CONTEXT_CACHE_TTL: "300"  # 5 minutes
+  USER_CONTEXT_CACHE_MAX_SIZE: "50000"
+  
+  # Resource metadata cache
+  RESOURCE_CACHE_TTL: "600"  # 10 minutes
+  RESOURCE_CACHE_MAX_SIZE: "50000"
+  
+  # Cache eviction policy
+  CACHE_EVICTION_POLICY: "lru"  # lru, lfu, or ttl
+  
+  # Cache warming (preload frequently accessed data)
+  CACHE_WARMING_ENABLED: "true"
+  CACHE_WARMING_INTERVAL: "3600"  # 1 hour
+```
+
+**Recommendations by Load**:
+
+| Metric | Low Load | Medium Load | High Load | Very High Load |
+|--------|----------|-------------|-----------|----------------|
+| Policy Cache TTL | 10m | 5m | 5m | 3m |
+| Decision Cache TTL | 5m | 1m | 1m | 30s |
+| Policy Cache Size | 10,000 | 50,000 | 100,000 | 500,000 |
+| Decision Cache Size | 50,000 | 100,000 | 500,000 | 1,000,000 |
+
+### Performance Tuning
+
+```yaml
+# performance-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-config
+  namespace: control-core
+data:
+  # API workers
+  API_WORKERS: "8"  # per pod
+  API_WORKER_CLASS: "uvicorn.workers.UvicornWorker"
+  API_WORKER_CONNECTIONS: "1000"
+  API_TIMEOUT: "60"
+  API_KEEPALIVE: "5"
+  
+  # Bouncer/PEP workers
+  BOUNCER_WORKER_THREADS: "16"  # per pod
+  BOUNCER_CONNECTION_POOL_SIZE: "200"
+  BOUNCER_MAX_CONCURRENT_REQUESTS: "10000"
+  BOUNCER_REQUEST_TIMEOUT: "30s"
+  
+  # Database connection pool
+  DB_POOL_SIZE: "50"  # per API pod
+  DB_MAX_OVERFLOW: "20"
+  DB_POOL_TIMEOUT: "30"
+  DB_POOL_RECYCLE: "3600"
+  DB_POOL_PRE_PING: "true"
+  
+  # Redis connection pool
+  REDIS_POOL_SIZE: "50"  # per pod
+  REDIS_MAX_CONNECTIONS: "100"
+  REDIS_SOCKET_KEEPALIVE: "true"
+  REDIS_SOCKET_KEEPALIVE_OPTIONS: "1,10,3"
+```
+
+## Runtime Security
+
+### Pod Security Policies
+
+```yaml
+# pod-security-policy.yaml
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: controlcore-restricted
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false
+```
+
+### Network Policies
+
+```yaml
+# network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: controlcore-network-policy
+  namespace: control-core
+spec:
+  podSelector:
+    matchLabels:
+      app: controlcore
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000  # Console
+        - protocol: TCP
+          port: 8082  # API
+        - protocol: TCP
+          port: 8080  # Bouncer
+    
+    # Allow internal communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app: controlcore
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8082
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 7000  # OPAL
+  
+  egress:
+    # Allow to database
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    
+    # Allow to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # Allow HTTPS egress (for external APIs)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+```
+
+```bash
+kubectl apply -f network-policy.yaml
+```
+
+### Secrets Management
+
+**Using AWS Secrets Manager**:
+
+```yaml
+# external-secrets.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: aws-secretsmanager
+  namespace: control-core
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: controlcore-sa
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: controlcore-secrets
+  namespace: control-core
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: SecretStore
+  target:
+    name: controlcore-secrets
+    creationPolicy: Owner
+  data:
+    - secretKey: database-password
+      remoteRef:
+        key: controlcore/database
+        property: password
+    - secretKey: redis-password
+      remoteRef:
+        key: controlcore/redis
+        property: password
+    - secretKey: jwt-secret
+      remoteRef:
+        key: controlcore/jwt
+        property: secret
+```
+
+**Using HashiCorp Vault**:
+
+```yaml
+# vault-integration.yaml
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: controlcore-vault-auth
+  namespace: control-core
+spec:
+  method: kubernetes
+  mount: kubernetes
+  kubernetes:
+    role: controlcore
+    serviceAccount: controlcore-sa
+---
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
+metadata:
+  name: controlcore-secrets
+  namespace: control-core
+spec:
+  type: kv-v2
+  mount: secret
+  path: controlcore/production
+  destination:
+    name: controlcore-secrets
+    create: true
+  refreshAfter: 30s
+  vaultAuthRef: controlcore-vault-auth
+```
+
+## SAML and SSO Configuration
+
+### Auth0 Integration
+
+```yaml
+# auth0-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth0-config
+  namespace: control-core
+data:
+  AUTH0_DOMAIN: "yourcompany.auth0.com"
+  AUTH0_CLIENT_ID: "your-client-id"
+  AUTH0_AUDIENCE: "https://api.controlcore.yourcompany.com"
+  AUTH0_SCOPE: "openid profile email"
+  AUTH0_CALLBACK_URL: "https://console.controlcore.yourcompany.com/callback"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth0-secret
+  namespace: control-core
+type: Opaque
+stringData:
+  client_secret: "your-auth0-client-secret"
+```
+
+### SAML SSO Configuration
+
+```yaml
+# saml-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: saml-config
+  namespace: control-core
+data:
+  SAML_ENABLED: "true"
+  SAML_IDP_ENTITY_ID: "https://idp.yourcompany.com/saml"
+  SAML_IDP_SSO_URL: "https://idp.yourcompany.com/saml/sso"
+  SAML_IDP_SLO_URL: "https://idp.yourcompany.com/saml/slo"
+  SAML_SP_ENTITY_ID: "https://console.controlcore.yourcompany.com"
+  SAML_SP_ACS_URL: "https://console.controlcore.yourcompany.com/saml/acs"
+  SAML_SP_SLO_URL: "https://console.controlcore.yourcompany.com/saml/slo"
+  
+  # Attribute mapping
+  SAML_ATTR_EMAIL: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+  SAML_ATTR_FIRSTNAME: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+  SAML_ATTR_LASTNAME: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
+  SAML_ATTR_GROUPS: "http://schemas.xmlsoap.org/claims/Group"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: saml-certificates
+  namespace: control-core
+type: Opaque
+data:
+  idp_cert.pem: <base64-encoded-idp-certificate>
+  sp_key.pem: <base64-encoded-sp-private-key>
+  sp_cert.pem: <base64-encoded-sp-certificate>
+```
+
+**SAML Providers**:
+- **Okta**: Configure SAML 2.0 app
+- **Azure AD**: Enterprise Application with SAML SSO
+- **OneLogin**: SAML SSO application
+- **Google Workspace**: Custom SAML app
+- **Ping Identity**: SAML 2.0 connection
+
+## Monitoring and Observability
+
+### Prometheus Metrics
+
+**Service Monitors**:
+
+```yaml
+# servicemonitors.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controlcore-api
+  namespace: control-core
+spec:
+  selector:
+    matchLabels:
+      app: controlcore-api
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controlcore-bouncer
+  namespace: control-core
+spec:
+  selector:
+    matchLabels:
+      app: controlcore-bouncer
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+```
+
+**Key Metrics to Monitor**:
+
+```
+# API Metrics
+http_requests_total - Total HTTP requests
+http_request_duration_seconds - Request latency
+http_requests_in_flight - Current requests being processed
+policy_evaluations_total - Total policy evaluations
+policy_evaluation_duration_seconds - Policy evaluation time
+cache_hits_total - Cache hits
+cache_misses_total - Cache misses
+
+# Bouncer Metrics
+bouncer_requests_total - Total requests through bouncer
+bouncer_allowed_requests - Allowed requests
+bouncer_denied_requests - Denied requests
+bouncer_policy_sync_timestamp - Last policy sync time
+bouncer_target_app_reachable - Target app health (1=healthy, 0=unhealthy)
+
+# Database Metrics
+db_connections_active - Active database connections
+db_connections_idle - Idle database connections
+db_query_duration_seconds - Query execution time
+
+# OPAL Metrics
+opal_connected_clients - Number of connected clients
+opal_policy_updates_total - Total policy updates distributed
+opal_data_updates_total - Total data updates distributed
+```
+
+### Grafana Dashboards
+
+**Import Pre-built Dashboard**:
+
+```bash
+# Get dashboard JSON from Control Core
+curl -o controlcore-dashboard.json \
+  https://downloads.controlcore.io/dashboards/enterprise-v2.json
+
+# Import to Grafana
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+
+# Access Grafana at http://localhost:3000
+# Import dashboard via UI or API
+```
+
+### Logging with ELK/EFK Stack
+
+```bash
+# Install Elasticsearch
+helm repo add elastic https://helm.elastic.co
+helm install elasticsearch elastic/elasticsearch \
+  --namespace logging \
+  --create-namespace \
+  --set replicas=3 \
+  --set resources.requests.memory=4Gi \
+  --set volumeClaimTemplate.resources.requests.storage=100Gi
+
+# Install Kibana
+helm install kibana elastic/kibana \
+  --namespace logging \
+  --set service.type=LoadBalancer
+
+# Install Fluentd (or Fluent Bit for lighter footprint)
+helm repo add fluent https://fluent.github.io/helm-charts
+helm install fluentd fluent/fluentd \
+  --namespace logging \
+  --set elasticsearch.host=elasticsearch-master \
+  --set elasticsearch.port=9200
+```
+
+### Alerting
+
+**Prometheus Alert Rules**:
+
+```yaml
+# alerts.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: controlcore-alerts
+  namespace: control-core
+spec:
+  groups:
+    - name: controlcore.rules
+      interval: 30s
+      rules:
+        # High error rate
+        - alert: HighErrorRate
+          expr: |
+            rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High error rate detected"
+            description: "{{ $labels.instance }} has error rate of {{ $value }}"
+        
+        # High latency
+        - alert: HighLatency
+          expr: |
+            histogram_quantile(0.95, 
+              rate(http_request_duration_seconds_bucket[5m])
+            ) > 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency detected"
+            description: "P95 latency is {{ $value }}s"
+        
+        # Policy sync failure
+        - alert: PolicySyncFailure
+          expr: |
+            time() - bouncer_policy_sync_timestamp > 600
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Policy sync failure"
+            description: "Bouncer {{ $labels.instance }} hasn't synced in 10 minutes"
+        
+        # Pod not ready
+        - alert: PodNotReady
+          expr: |
+            kube_pod_status_phase{namespace="control-core",phase!="Running"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod not ready"
+            description: "Pod {{ $labels.pod }} is not in Running state"
+        
+        # High memory usage
+        - alert: HighMemoryUsage
+          expr: |
+            container_memory_usage_bytes{namespace="control-core"} 
+            / container_spec_memory_limit_bytes{namespace="control-core"} > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage"
+            description: "Container {{ $labels.container }} memory usage is {{ $value }}"
+```
+
+**Alert Manager Configuration**:
+
+```yaml
+# alertmanager-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+      
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'default'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical'
+          continue: true
+        - match:
+            severity: warning
+          receiver: 'warning'
+    
+    receivers:
+      - name: 'default'
+        webhook_configs:
+          - url: 'http://alertmanager-webhook:5000/alerts'
+      
+      - name: 'critical'
+        email_configs:
+          - to: 'ops-critical@yourcompany.com'
+            from: 'alertmanager@yourcompany.com'
+            smarthost: 'smtp.yourcompany.com:587'
+            auth_username: 'alertmanager@yourcompany.com'
+            auth_password: 'password'
+        pagerduty_configs:
+          - service_key: 'your-pagerduty-key'
+        slack_configs:
+          - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+            channel: '#ops-critical'
+            title: 'Critical Alert'
+      
+      - name: 'warning'
+        slack_configs:
+          - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+            channel: '#ops-warnings'
+            title: 'Warning Alert'
+```
+
+## Backup and Disaster Recovery
+
+### Automated Backups
+
+**Velero for Kubernetes Resources**:
+
+```bash
+# Install Velero
+helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
+helm install velero vmware-tanzu/velero \
+  --namespace velero \
+  --create-namespace \
+  --set configuration.provider=aws \
+  --set configuration.backupStorageLocation.bucket=controlcore-backups \
+  --set configuration.backupStorageLocation.config.region=us-east-1 \
+  --set configuration.volumeSnapshotLocation.config.region=us-east-1 \
+  --set initContainers[0].name=velero-plugin-for-aws \
+  --set initContainers[0].image=velero/velero-plugin-for-aws:v1.8.0 \
+  --set initContainers[0].volumeMounts[0].mountPath=/target \
+  --set initContainers[0].volumeMounts[0].name=plugins
+
+# Create backup schedule
+velero schedule create control-core-daily \
+  --schedule="0 2 * * *" \
+  --include-namespaces control-core \
+  --ttl 720h0m0s
+
+# Create on-demand backup
+velero backup create control-core-backup-$(date +%Y%m%d) \
+  --include-namespaces control-core \
+  --wait
+```
+
+**Database Backups**:
+
+```yaml
+# database-backup-cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: control-core
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backup
+              image: postgres:15-alpine
+              env:
+                - name: PGHOST
+                  value: "postgresql"
+                - name: PGUSER
+                  value: "controlcore"
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: controlcore-secrets
+                      key: database-password
+                - name: PGDATABASE
+                  value: "control_core_db"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-credentials
+                      key: access-key-id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-credentials
+                      key: secret-access-key
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  BACKUP_FILE="controlcore-db-$(date +%Y%m%d-%H%M%S).sql.gz"
+                  pg_dump | gzip > /tmp/$BACKUP_FILE
+                  aws s3 cp /tmp/$BACKUP_FILE s3://controlcore-backups/database/$BACKUP_FILE
+                  echo "Backup completed: $BACKUP_FILE"
+          restartPolicy: OnFailure
+```
+
+### Disaster Recovery Procedures
+
+**Recovery Runbook**:
+
+```bash
+# 1. Restore Kubernetes resources
+velero restore create --from-backup control-core-backup-20250125
+
+# 2. Restore database
+aws s3 cp s3://controlcore-backups/database/controlcore-db-20250125-020000.sql.gz .
+gunzip controlcore-db-20250125-020000.sql.gz
+kubectl exec -it postgresql-0 -n control-core -- psql -U controlcore -d control_core_db < controlcore-db-20250125-020000.sql
+
+# 3. Verify services
+kubectl get pods -n control-core
+kubectl get svc -n control-core
+
+# 4. Test health endpoints
+curl https://console.controlcore.yourcompany.com/health
+curl https://api.controlcore.yourcompany.com/api/v1/health
+
+# 5. Verify policy sync
+kubectl logs -n control-core -l app=controlcore-opal
+
+# 6. Test policy evaluation
+curl -X POST https://bouncer.controlcore.yourcompany.com/v1/data/app/authorization/allow \
+  -d '{"input": {"user": {"id": "test"}, "resource": {"id": "test"}, "action": "read"}}'
+```
+
+## Troubleshooting Enterprise Deployments
+
+### Common Issues
+
+**Pod Scheduling Failures**:
+```bash
+# Check node resources
+kubectl top nodes
+
+# Check pod status
+kubectl describe pod <pod-name> -n control-core
+
+# Check events
+kubectl get events -n control-core --sort-by='.lastTimestamp'
+
+# Common solutions:
+# 1. Scale cluster (add more nodes)
+# 2. Adjust resource requests/limits
+# 3. Check PodDisruptionBudget settings
+```
+
+**Database Connection Pool Exhaustion**:
+```bash
+# Check active connections
+kubectl exec -it postgresql-0 -n control-core -- psql -U controlcore -d control_core_db -c \
+  "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';"
+
+# Solution: Increase pool size in values.yaml
+database:
+  pool:
+    size: 100  # Increase from 50
+    max_overflow: 40  # Increase from 20
+```
+
+**High Memory Usage**:
+```bash
+# Check memory usage
+kubectl top pods -n control-core
+
+# Identify memory hogs
+kubectl exec -it <pod-name> -n control-core -- top
+
+# Solutions:
+# 1. Increase cache eviction rate
+# 2. Reduce cache sizes
+# 3. Add more memory to pods
+# 4. Scale horizontally instead of vertically
+```
+
+## Support and Resources
+
+- **[Administrator Guide](/guides/admin)**: System administration
+- **[Troubleshooting](/guides/troubleshooting)**: Common issues
+- **[Security Best Practices](/guides/security)**: Security hardening
+- **Enterprise Support**: support@controlcore.io (24/7 SLA)
+- **Professional Services**: Available for deployment assistance
+
+## Next Steps
+
+- **[Administrator Guide](/guides/admin)**: Learn day-to-day operations
+- **[User Guide](/guides/user-guide)**: Create and deploy policies
+- **[Security Best Practices](/guides/security)**: Harden your deployment
+- **[API Reference](/guides/api-reference)**: Integrate with APIs
+
+---
+
+**Congratulations!** You now have a production-ready, enterprise-scale Control Core deployment with high availability, auto-scaling, and comprehensive monitoring.
+

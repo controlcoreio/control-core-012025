@@ -1,0 +1,1021 @@
+---
+title: 'PIP Management - Administrator Guide'
+description: 'Complete guide for administrators to configure, secure, and monitor Policy Information Points in Control Core'
+---
+
+# Policy Information Point (PIP) Management - Administrator Guide
+
+## Introduction
+
+This guide provides comprehensive information for administrators responsible for configuring and maintaining Control Core's Policy Information Point (PIP) system. You'll learn how to manage data source connections, ensure security and compliance, monitor system health, and optimize performance.
+
+## Architecture Overview
+
+### How PIP Fits into Control Core
+
+```
+┌─────────────────────────────────────────────┐
+│         Control Core PAP                    │
+│    (Policy Administration Point)            │
+│                                             │
+│  ┌────────────────────────────────────────┐│
+│  │     PIP Management System              ││
+│  │  • Connects to Data Sources            ││
+│  │  • Discovers Schema & Attributes       ││
+│  │  • Maps to Standard Policy Attributes  ││
+│  │  • Caches Sensitive Data (Redis)       ││
+│  │  • Syncs on Schedule or Real-time      ││
+│  └──────────────┬─────────────────────────┘│
+└─────────────────┼───────────────────────────┘
+                  │
+                  │ Publishes Policy Data
+                  ▼
+         ┌────────────────────┐
+         │   OPAL Server      │ ← Centralized Hub
+         │  (Policy Sync)     │
+         └────────┬───────────┘
+                  │
+                  │ Distributes to ALL PEPs
+                  │
+    ┌─────────────┼─────────────┬──────────┐
+    │             │             │          │
+    ▼             ▼             ▼          ▼
+┌────────┐   ┌────────┐   ┌────────┐  ┌────────┐
+│Bouncer │   │Bouncer │   │Bouncer │  │Bouncer │
+│  #1    │   │  #2    │   │  #3    │  │  #N    │
+│        │   │        │   │        │  │        │
+│Protects│   │Protects│   │Protects│  │Protects│
+│ API A  │   │ Web UI │   │ AI Bot │  │Mobile  │
+└────────┘   └────────┘   └────────┘  └────────┘
+```
+
+### Multi-PEP Architecture
+
+**Key Concept**: Configure data sources ONCE, benefit EVERYWHERE!
+
+**How It Works:**
+
+1. **Administrator** configures PIP connections in PAP (Settings → Data Sources)
+2. **PIP Service** connects to external systems (Okta, databases, etc.)
+3. **PIP Service** fetches and transforms data into standardized format
+4. **OPAL Server** receives published policy data
+5. **OPAL Server** distributes to ALL connected Bouncers/PEPs
+6. **Each Bouncer** uses the same data for policy decisions
+
+**Example Scenario:**
+
+Your organization has:
+- 3 production APIs (each with a Bouncer)
+- 1 admin dashboard (with a Bouncer)
+- 1 AI assistant (with a Bouncer)
+- 1 mobile app API (with a Bouncer)
+
+**Without PIP**: Configure user context 6 times (painful!)
+**With PIP**: Configure Okta connection ONCE → All 6 Bouncers automatically get user data! ✨
+
+## Supported Data Sources
+
+### Identity & Context Sources
+
+**Okta**
+- OAuth 2.0 / OIDC
+- User profiles, groups, custom attributes
+- MFA status, login history
+- Real-time webhooks supported
+
+**Azure Active Directory**
+- OAuth 2.0 / Microsoft Identity Platform
+- Users, groups, directory roles
+- Extension attributes, licenses
+- Graph API integration
+
+**Auth0**
+- OAuth 2.0 / Management API
+- User profiles, app metadata
+- Identity providers, connections
+- Rules and hooks
+
+**LDAP / Active Directory**
+- Username/Password or API key
+- User accounts, organizational units
+- Group memberships, attributes
+- Schema discovery
+
+**Google Workspace**
+- OAuth 2.0 / Directory API
+- Users, groups, organizational units
+- Admin roles, licenses
+
+### Resource & Data Sources
+
+**PostgreSQL**
+- Username/Password with SSL
+- Schema introspection
+- Table and column discovery
+- Incremental sync support
+
+**MySQL**
+- Username/Password with SSL
+- Database schema discovery
+- Connection pooling
+- Read replicas supported
+
+**MongoDB**
+- Username/Password
+- Collection and field discovery
+- Document schema analysis
+- Aggregation support
+
+**SQL Server**
+- Windows or SQL authentication
+- Schema introspection
+- Stored procedure support
+
+**Oracle Database**
+- TNS or service name connection
+- PL/SQL support
+- Complex schema handling
+
+### Enterprise Systems
+
+**Salesforce (CRM)**
+- OAuth 2.0 or Username/Password
+- Standard and custom objects
+- Field-level selection
+- Real-time webhooks
+
+**ServiceNow (ITSM/CMDB)**
+- OAuth 2.0 or Basic auth
+- Tables: incident, sys_user, cmdb_ci
+- Field selection per table
+- Event subscriptions
+
+**Workday (HR)**
+- OAuth 2.0 or Basic auth
+- Employee, position, organization data
+- Custom fields supported
+- API version selection
+
+**SAP (ERP)**
+- RFC or REST API
+- Client certificate support
+- Business objects
+- Custom BAPIs
+
+### Application Schemas
+
+**OpenAPI Specification**
+- URL or file upload
+- Endpoint discovery
+- Security scheme parsing
+- Model/schema extraction
+
+**GraphQL**
+- Introspection queries
+- Type system analysis
+- Query/mutation discovery
+
+**Custom REST API**
+- Multiple auth methods
+- Header customization
+- Response parsing
+
+## Authentication Methods
+
+### OAuth 2.0 (Recommended)
+
+**Best For:**
+- Production environments
+- SaaS providers (Okta, Salesforce, etc.)
+- Systems requiring high security
+
+**Features:**
+- Token auto-refresh
+- Granular scope control
+- Revocable access
+- No password storage
+
+**Setup Requirements:**
+- Register OAuth application in provider
+- Configure callback URL: `http://localhost:8000/pip/oauth/callback/{provider}`
+- Grant types: Authorization Code, Refresh Token
+- Obtain client ID and secret
+
+**Supported Providers:**
+- Okta, Azure AD, Auth0, Google
+- Salesforce, Workday, ServiceNow
+- HubSpot, Zendesk, and more
+
+### API Key
+
+**Best For:**
+- Simple integrations
+- Read-only access
+- Quick setup scenarios
+
+**Features:**
+- Easy to configure
+- Good for testing
+- Single credential
+
+**Security Considerations:**
+- Keys stored encrypted (AES-256)
+- Rotate keys every 90 days (recommended)
+- Use read-only keys when possible
+- Monitor key usage
+
+**Supported Providers:**
+- BambooHR, HubSpot
+- Zendesk, Freshservice
+- Custom APIs
+
+### Username/Password
+
+**Best For:**
+- LDAP / Active Directory
+- Legacy systems
+- Internal databases
+- On-premise systems
+
+**Features:**
+- Universal support
+- No OAuth setup needed
+- Works with firewalls/proxies
+
+**Security Considerations:**
+- Use strong, unique passwords
+- Enable MFA on the account (if supported)
+- Use read-only accounts when possible
+- Rotate passwords regularly
+
+**Supported Providers:**
+- LDAP, Active Directory
+- PostgreSQL, MySQL, MongoDB
+- Legacy ERP/CRM systems
+
+### Client Certificate
+
+**Best For:**
+- Enterprise ERP systems (SAP, Oracle)
+- Maximum security requirements
+- Mutual TLS scenarios
+
+**Features:**
+- Highest security level
+- No password rotation needed
+- Mutual authentication
+
+**Setup:**
+- Upload client certificate (.pem, .crt)
+- Upload private key (.pem, .key)
+- Optional passphrase for encrypted keys
+
+## Connection Management
+
+### Adding a Connection
+
+**Via Getting Started Wizard:**
+1. Complete wizard → "Connect Data Sources" step
+2. Select data source type
+3. Configure and test
+4. Map attributes
+5. Save
+
+**Via Settings:**
+1. Settings → Data Sources
+2. Click "Add Data Source"
+3. Follow configuration wizard
+4. Test and save
+
+### Testing Connections
+
+**Always test before saving!**
+
+The "Test Connection" button:
+- Makes a real API call to your data source
+- Verifies credentials are valid
+- Discovers available fields (schema introspection)
+- Returns sample data
+- Shows response time
+
+**Success Indicators:**
+- ✅ Green checkmark
+- Response time < 5 seconds
+- Fields discovered
+- Sample data shown
+
+**Failure Indicators:**
+- ❌ Red X
+- Error message (invalid credentials, network error, etc.)
+- No fields discovered
+
+### Editing Connections
+
+**You can edit:**
+- Connection name and description
+- Authentication credentials
+- Sync frequency
+- Attribute mappings
+- Webhook settings
+
+**Changes take effect:**
+- Immediately for credentials
+- On next sync for mappings
+- After manual sync trigger
+
+### Deleting Connections
+
+**Warning**: Deleting a connection:
+- Removes it from sync schedule
+- Stops publishing data to OPAL
+- May break policies using its attributes
+- Cannot be undone
+
+**Best Practice**: Disable instead of delete (set sync_enabled = false)
+
+## Data Synchronization
+
+### Sync Frequencies Explained
+
+**Real-time (Webhooks)**
+- Instant updates when source data changes
+- Requires webhook configuration in source system
+- Best for: Critical security decisions, user status changes
+- Latency: < 1 second
+
+**Every 5 Minutes**
+- Near real-time updates
+- Good balance of freshness and load
+- Best for: Active user sessions, dynamic resources
+- Latency: Up to 5 minutes
+
+**Every 15 Minutes**
+- Frequent refresh
+- Lower load on source systems
+- Best for: User attributes, group memberships
+- Latency: Up to 15 minutes
+
+**Hourly**
+- Standard refresh rate
+- Recommended default
+- Best for: Most use cases
+- Latency: Up to 1 hour
+
+**Daily**
+- Low frequency updates
+- Minimal load
+- Best for: Static data, reference tables
+- Latency: Up to 24 hours
+
+**Weekly**
+- Very low frequency
+- Negligible load
+- Best for: Organizational structure, static mappings
+- Latency: Up to 7 days
+
+### Full vs Incremental Sync
+
+**Full Sync:**
+- Fetches ALL data from source
+- Used for initial load
+- Slower but comprehensive
+- Example: Fetch all 10,000 users from Okta
+
+**Incremental Sync:**
+- Fetches only changes since last sync
+- Requires timestamp field (e.g., `updated_at`)
+- Much faster for large datasets
+- Example: Fetch users modified in last hour
+
+**Recommendation**: Use incremental sync for:
+- Large datasets (>1000 records)
+- Frequently synced connections
+- High-volume sources
+
+### Manual Sync Triggers
+
+Trigger immediate sync without waiting for schedule:
+
+1. Go to Settings → Data Sources
+2. Find connection
+3. Click "Sync Now"
+4. Wait for completion (shows progress)
+
+**Use cases:**
+- Just updated user roles in Okta
+- Need immediate policy update
+- Testing new attribute mappings
+- Troubleshooting sync issues
+
+## OPAL Integration
+
+### How PIP Publishes to OPAL
+
+**Automatic Publishing:**
+
+1. Sync job runs (scheduled or manual)
+2. PIP fetches data from source
+3. Applies attribute mappings
+4. Transforms to standard format
+5. Publishes to OPAL topics
+6. OPAL distributes to all PEPs
+
+**OPAL Topics:**
+
+Each connection publishes to multiple topics:
+- `policy_data:{provider}` (e.g., `policy_data:okta`)
+- `policy_data:{type}` (e.g., `policy_data:identity`)
+- `connection:{id}` (e.g., `connection:1`)
+
+**All subscribed PEPs receive updates automatically!**
+
+### Monitoring OPAL Status
+
+**Check Publishing Status:**
+
+Settings → Data Sources → Connection → View "OPAL Status"
+
+**Shows:**
+- Last publish time
+- Records published
+- OPAL response status
+- Errors (if any)
+
+**Healthy Status:**
+- Last publish: Recent (within sync frequency)
+- Status: "Success"
+- Records: > 0
+- OPAL response: 200 OK
+
+### Troubleshooting OPAL Issues
+
+**Issue**: "OPAL status shows error"
+
+**Solutions:**
+1. Check OPAL server is running
+2. Verify network connectivity
+3. Check OPAL authentication token
+4. Review OPAL server logs
+5. Trigger manual publish
+
+**Issue**: "PEPs not receiving data"
+
+**Solutions:**
+1. Verify PEPs are connected to OPAL
+2. Check OPAL topics match PEP subscriptions
+3. Review PEP logs for errors
+4. Restart PEP to force reconnection
+
+## Security & Compliance
+
+### Credential Encryption
+
+**Storage Security:**
+- AES-256 encryption for all credentials
+- Encryption keys stored separately
+- Keys rotated automatically
+- Never logged in plain text
+
+**In Transit:**
+- TLS 1.2+ for all connections
+- Certificate validation
+- No credential exposure in logs
+
+**Access Control:**
+- Only authorized admins can view/edit
+- Audit trail for all credential access
+- Role-based permissions
+
+### Data Privacy Controls
+
+**Sensitivity Levels:**
+
+Discovered fields are classified:
+- **Public**: Can be cached long-term (1 hour)
+- **Internal**: Standard caching (30 minutes)
+- **Confidential**: Short caching (5 minutes)
+- **Restricted**: Minimal caching (1 minute)
+
+**PII Detection:**
+- Automatic detection of email, phone, SSN
+- Fields containing "password", "secret", "key" marked restricted
+- Custom sensitivity overrides available
+
+**GDPR Compliance:**
+- Data minimization (select only needed fields)
+- Right to be forgotten (clear cache on demand)
+- Audit logging (who accessed what, when)
+- Data retention controls
+
+### Audit Logging
+
+**All PIP operations are logged:**
+
+- Connection created/updated/deleted
+- Authentication success/failure
+- Data fetched from sources
+- Data published to OPAL
+- Token refreshed
+- Sync started/completed/failed
+- Webhook received
+- Sensitive data accessed
+- Configuration changed
+
+**Audit Log Includes:**
+- Event type and severity
+- User who performed action
+- IP address and user agent
+- Timestamp
+- Connection/resource affected
+- Changes made (before/after)
+
+**Viewing Audit Logs:**
+
+Settings → Audit Logs → Filter by:
+- Connection
+- User
+- Date range
+- Event type
+- Severity
+
+**Retention**: 90 days default (configurable up to 365 days for compliance)
+
+## Monitoring & Operations
+
+### Connection Health Monitoring
+
+**Health Indicators:**
+
+- 🟢 **Active**: Connection working, data syncing normally
+- 🟡 **Warning**: Minor issues, using cached data
+- 🔴 **Error**: Connection failed, needs attention
+- ⚪ **Inactive**: Manually disabled
+
+**Monitor:**
+- Last sync time (should be within sync frequency window)
+- Success rate (should be > 95%)
+- Response time (should be < 5 seconds)
+- Error count (should be 0 or low)
+
+**Set up Alerts:**
+
+Configure alerts for:
+- Connection failures (after 3 consecutive failures)
+- Sync delays (> 2x normal frequency)
+- Authentication errors
+- Slow response times (> 10 seconds)
+
+### Sync Job Status
+
+**View Sync History:**
+
+For each connection, you can see:
+- Last 50 sync operations
+- Records processed per sync
+- Sync duration
+- Success/failure status
+- Error messages
+
+**Sync Statistics:**
+- Total syncs: 1,250
+- Successful: 1,245 (99.6%)
+- Failed: 5 (0.4%)
+- Average duration: 2.3 seconds
+- Average records: 856
+
+### Performance Metrics
+
+**Key Metrics to Monitor:**
+
+**Connection Metrics:**
+- Connection response time
+- Data fetch duration
+- Records processed per sync
+- Error rate
+
+**OPAL Metrics:**
+- Publish success rate
+- Publish latency
+- OPAL response time
+- Distribution latency to PEPs
+
+**Cache Metrics:**
+- Cache hit ratio (should be > 80%)
+- Cache size (monitor memory usage)
+- TTL effectiveness
+- Eviction rate
+
+**System Metrics:**
+- CPU usage (PIP service)
+- Memory usage (Redis cache)
+- Network bandwidth
+- Database connection pool
+
+## Data Source Catalog
+
+### Identity Providers
+
+**Okta**
+- **Auth**: OAuth 2.0, API Key
+- **Data**: Users, groups, custom attributes
+- **Update Frequency**: Hourly or real-time (webhooks)
+- **Special Features**: MFA status, last login, app assignments
+
+**Azure Active Directory**
+- **Auth**: OAuth 2.0 (Microsoft Graph)
+- **Data**: Users, groups, directory roles, extension attributes
+- **Update Frequency**: Hourly
+- **Special Features**: Sign-in activity, licenses, on-premises sync status
+
+**Auth0**
+- **Auth**: OAuth 2.0, API Key (Management API)
+- **Data**: Users, app metadata, user metadata, identities
+- **Update Frequency**: Hourly or real-time
+- **Special Features**: Login count, last IP, blocked status
+
+**LDAP / Active Directory**
+- **Auth**: Username/Password
+- **Data**: Users (DN, CN, sAMAccountName), groups, OUs
+- **Update Frequency**: Hourly or daily
+- **Special Features**: Manager hierarchy, account control flags
+
+### Database Systems
+
+**PostgreSQL**
+- **Auth**: Username/Password (SSL supported)
+- **Schema Discovery**: Full table and column introspection
+- **Incremental Sync**: Yes (requires timestamp column)
+- **Best For**: Resource metadata, audit logs, application state
+
+**MySQL**
+- **Auth**: Username/Password (SSL supported)
+- **Schema Discovery**: Full database schema
+- **Incremental Sync**: Yes
+- **Best For**: Application databases, user tables
+
+**MongoDB**
+- **Auth**: Username/Password
+- **Schema Discovery**: Dynamic document structure analysis
+- **Incremental Sync**: Yes (via `_id` or timestamp)
+- **Best For**: Document stores, JSON data
+
+### Enterprise Systems
+
+**Salesforce**
+- **Auth**: OAuth 2.0, Username/Password + Security Token
+- **Objects**: Account, Contact, Opportunity, User, Custom Objects
+- **Field Selection**: Choose specific fields per object
+- **Special Features**: Real-time webhooks, SOQL queries
+
+**ServiceNow**
+- **Auth**: OAuth 2.0, Username/Password
+- **Tables**: sys_user, incident, cmdb_ci, change_request
+- **Special Features**: REST API, table/field selection
+
+**Workday**
+- **Auth**: OAuth 2.0, Username/Password
+- **Modules**: Employees, Positions, Organizations
+- **Special Features**: API versioning, custom reports
+
+### Document Storage
+
+**SharePoint**
+- **Auth**: OAuth 2.0 (Microsoft 365)
+- **Data**: Site metadata, document properties, permissions
+- **Special Features**: Site collections, content types
+
+**Google Drive**
+- **Auth**: OAuth 2.0 (Google Workspace)
+- **Data**: File metadata, sharing permissions, ownership
+- **Special Features**: Team drives, shared drives
+
+**Amazon S3**
+- **Auth**: Access Key ID + Secret Access Key
+- **Data**: Bucket metadata, object tags, ownership
+- **Special Features**: Bucket policies, ACLs
+
+### Data Warehouses
+
+**Snowflake**
+- **Auth**: Username/Password, OAuth 2.0, Key Pair
+- **Data**: Databases, schemas, tables, views
+- **Special Features**: Role hierarchy, grants
+
+**Databricks**
+- **Auth**: OAuth 2.0, Personal Access Token
+- **Data**: Catalogs, schemas, tables, notebooks
+- **Special Features**: Unity Catalog integration
+
+**Google BigQuery**
+- **Auth**: OAuth 2.0, Service Account
+- **Data**: Datasets, tables, views, column metadata
+- **Special Features**: Project-level access
+
+## Security Best Practices
+
+### Principle of Least Privilege
+
+**For IAM Sources:**
+- Create dedicated service account
+- Grant read-only permissions
+- Limit to required scopes (e.g., `read:users`, `read:groups`)
+- Never use admin accounts
+
+**For Databases:**
+- Use read-only database user
+- Grant SELECT only (no INSERT/UPDATE/DELETE)
+- Limit to specific schemas/tables
+- Use connection pooling limits
+
+**For APIs:**
+- Use API keys with minimum permissions
+- Avoid using admin/owner tokens
+- Set IP restrictions if available
+- Enable logging in source system
+
+### Network Security
+
+**Firewall Rules:**
+- Whitelist PAP server IP in data sources
+- Use VPN for on-premise systems
+- Restrict inbound to OPAL and PEPs only
+- Enable TLS/SSL for all connections
+
+**Private Networks:**
+- Use VPC peering for cloud databases
+- Private Link for AWS/Azure resources
+- Direct Connect for on-premise
+- VPN tunnels for hybrid deployments
+
+### Credential Rotation
+
+**Rotation Schedule:**
+- OAuth: Tokens auto-refresh (no manual rotation)
+- API Keys: Rotate every 90 days
+- Passwords: Rotate every 60-90 days
+- Certificates: Renew before expiration
+
+**Rotation Process:**
+1. Generate new credentials in source system
+2. Update in Control Core (Settings → Data Sources → Edit)
+3. Test connection with new credentials
+4. Save (old credentials replaced)
+5. Verify sync continues working
+
+### Compliance Controls
+
+**Data Minimization:**
+- Connect only necessary data sources
+- Select only required fields/tables
+- Use field-level selection
+- Avoid syncing PII unless required
+
+**Access Logging:**
+- Enable audit logging
+- Review logs monthly
+- Set up alerts for anomalies
+- Export logs for compliance reporting
+
+**Data Retention:**
+- Configure cache TTL based on sensitivity
+- Set sync log retention (90-365 days)
+- Purge old audit logs per policy
+- Document retention decisions
+
+## Troubleshooting Guide
+
+### Connection Test Failures
+
+**Error: "Invalid credentials"**
+
+Solutions:
+1. Verify credentials are correct and not expired
+2. Check if account is locked or disabled
+3. Verify OAuth scopes are granted
+4. Re-authenticate OAuth flow
+
+**Error: "Network timeout"**
+
+Solutions:
+1. Check firewall rules allow outbound to data source
+2. Verify DNS resolution works
+3. Test endpoint accessibility from PAP server
+4. Increase timeout setting if source is slow
+
+**Error: "SSL certificate verification failed"**
+
+Solutions:
+1. Verify source has valid SSL certificate
+2. Check certificate expiration
+3. Update trusted CA certificates
+4. Disable SSL verification only for testing (not production)
+
+**Error: "Rate limit exceeded"**
+
+Solutions:
+1. Reduce sync frequency
+2. Enable incremental sync
+3. Reduce batch size
+4. Contact provider to increase limits
+5. Use multiple API keys (if supported)
+
+### Sync Failures
+
+**Sync Status: "Failed"**
+
+Check:
+1. Last error message in sync log
+2. Connection health status
+3. Source system status/downtime
+4. Network connectivity
+5. Token expiration (OAuth)
+
+Solutions:
+1. Refresh OAuth tokens (automatic for most)
+2. Test connection again
+3. Verify source system is accessible
+4. Check for schema changes
+5. Trigger manual sync to retry
+
+**Data Not Appearing in Policies**
+
+Debug checklist:
+1. ✓ Connection status: "Active"?
+2. ✓ Sync enabled: ON?
+3. ✓ Last sync: Recent?
+4. ✓ Records synced: > 0?
+5. ✓ OPAL status: "Success"?
+6. ✓ PEP connected to OPAL?
+7. ✓ Attribute mappings configured?
+
+### Performance Issues
+
+**Slow Sync Times**
+
+Solutions:
+1. Enable incremental sync
+2. Reduce number of fields synced
+3. Increase batch size
+4. Use connection pooling
+5. Optimize database queries
+6. Add indexes to timestamp columns
+
+**High Memory Usage (Redis)**
+
+Solutions:
+1. Reduce cache TTL
+2. Limit number of cached records
+3. Increase Redis memory
+4. Enable eviction policy (LRU)
+5. Reduce sync frequency
+
+## Advanced Topics
+
+### Webhook Configuration
+
+**Setting up Real-Time Updates:**
+
+**In Okta:**
+1. Admin Console → Workflow → Event Hooks
+2. Name: "Control Core PIP Webhook"
+3. URL: `https://your-pap.com/api/pip/webhooks/okta/1`
+4. Events: user.lifecycle.create, user.lifecycle.update, user.lifecycle.deactivate
+5. Secret: Auto-generated by Control Core
+
+**In Salesforce:**
+1. Setup → Platform Events → Event Subscriptions
+2. Create event subscription
+3. Endpoint: `https://your-pap.com/api/pip/webhooks/salesforce/2`
+4. Events: User__e, Account__e, Contact__e
+
+**Benefits:**
+- Instant policy updates (< 1 second)
+- No polling overhead
+- Reduced sync frequency needed
+- Better user experience
+
+### Multi-Region Deployments
+
+**Architecture:**
+
+```
+Primary Region (US-EAST):
+- PAP with PIP connections
+- OPAL Primary Server
+- 3 PEPs
+
+Secondary Region (EU-WEST):
+- OPAL Replica
+- 2 PEPs
+
+Tertiary Region (ASIA):
+- OPAL Replica
+- 2 PEPs
+```
+
+**Configuration:**
+1. Configure PIPs in primary region only
+2. OPAL replicates data to all regions
+3. Regional PEPs subscribe to regional OPAL
+4. Data stays synchronized globally
+
+**Latency:**
+- Primary region: < 1 second
+- Secondary regions: < 5 seconds
+- Acceptable for most use cases
+
+### High Availability
+
+**PIP Service HA:**
+- Active-passive failover
+- Shared PostgreSQL database
+- Shared Redis cache
+- Health checks and auto-failover
+
+**OPAL HA:**
+- OPAL server clustering
+- Load-balanced PEP connections
+- Automatic failover
+- Zero-downtime updates
+
+**Database HA:**
+- PostgreSQL replication
+- Automatic failover
+- Point-in-time recovery
+- Daily backups
+
+## Operational Runbooks
+
+### Daily Operations
+
+**Morning Check:**
+1. Review overnight sync status
+2. Check for failed connections
+3. Review error logs
+4. Verify OPAL health
+
+**Weekly Tasks:**
+1. Review sync statistics
+2. Check cache hit ratios
+3. Analyze performance trends
+4. Review security alerts
+
+**Monthly Tasks:**
+1. Review all connection configurations
+2. Audit credential age
+3. Analyze usage patterns
+4. Plan capacity adjustments
+5. Review compliance reports
+
+### Incident Response
+
+**Connection Failure:**
+1. Check source system status
+2. Verify credentials valid
+3. Test network connectivity
+4. Review error logs
+5. Trigger manual sync
+6. Escalate if unresolved
+
+**OPAL Publishing Failure:**
+1. Check OPAL server health
+2. Verify network connectivity
+3. Review OPAL logs
+4. Restart OPAL if needed
+5. Re-publish from PAP
+
+**Data Staleness:**
+1. Check last successful sync time
+2. Verify sync schedule still active
+3. Check for sync job failures
+4. Trigger manual sync
+5. Investigate sync performance
+
+## Support & Resources
+
+### Getting Help
+
+**Documentation:**
+- Getting Started Guide: For new users
+- Admin Guide: This guide
+- Developer Guide: For policy developers and engineers
+- API Reference: Complete API documentation
+
+**Support Channels:**
+- Help & Support (? icon in application)
+- Discord Community: Real-time help
+- Support Email: support@controlcore.io
+- Documentation: docs.controlcore.io
+
+### Related Guides
+
+- [PIP Getting Started](/guides/pip-getting-started)
+- [PIP Developer Guide](/guides/pip-developer-guide)
+- [Policy Writing Guide](/guides/policy-writing)
+- [OPAL Configuration](/guides/opal-configuration)
+- [Security Best Practices](/security/best-practices)
+
+---
+
+**You're now equipped to manage Control Core's PIP system effectively!** For technical details and policy development, see the Developer Guide.
+

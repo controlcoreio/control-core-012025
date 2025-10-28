@@ -1,0 +1,1252 @@
+# Demo Application Guide
+
+The Control Core Demo Application is a comprehensive, production-ready application designed for testing policies, conducting internal demonstrations, developing new authorization patterns, and learning Control Core capabilities.
+
+## What is the Demo Application?
+
+The Demo Application simulates a real-world business application with AI-powered features, sensitive data, and complex authorization requirements. It's specifically designed to showcase Control Core's policy enforcement capabilities **without any hardcoded access control logic**.
+
+### Key Characteristics
+
+**Intentionally Unprotected**:
+- No built-in access control policies
+- All users can access all features by default
+- Perfect for demonstrating "before and after" policy enforcement
+- Shows immediate impact of Control Core policies
+
+**Production-Ready Architecture**:
+- Enterprise-grade security middleware
+- JWT-based authentication
+- Role-based access control framework (enforced by Control Core)
+- Comprehensive audit logging
+- Real-time data from PostgreSQL database
+
+**Rich Feature Set**:
+- AI Chat Assistant with multiple provider support
+- AI Agents for automated business processes
+- Customer Management (CRM)
+- Employee Management (HRMS)
+- Financial Analytics and Reporting
+- Payment Transaction Processing
+- Medical Center (Healthcare scenarios)
+- Analytics Dashboard
+
+## Why Use the Demo Application?
+
+### 1. Testing Policies
+
+Test your policies in a realistic environment before deploying to production:
+
+**Scenario: Test FINTRAC Policy**
+```bash
+# 1. Deploy demo app
+# 2. Create FINTRAC policy in Control Core
+# 3. Configure Bouncer to protect demo app
+# 4. Test with different users and transaction amounts
+# 5. Verify policy behaves correctly
+# 6. Review audit logs
+# 7. Deploy to production with confidence
+```
+
+### 2. Internal Demonstrations
+
+Demonstrate Control Core capabilities to stakeholders:
+
+**For Executives**:
+- Show immediate value of policy-based access control
+- Demonstrate compliance automation (FINTRAC, OSFI, HIPAA)
+- Real-time policy changes without code deployment
+- Comprehensive audit trail for regulatory requirements
+
+**For Technical Teams**:
+- Policy development workflow
+- Integration with existing systems
+- Performance (sub-100ms decisions)
+- Scalability and reliability
+
+**For Compliance Teams**:
+- Automated compliance enforcement
+- Audit logging and reporting
+- Policy version control
+- Segregation of duties
+
+### 3. Policy Development
+
+Develop and refine policies in a safe environment:
+
+**Development Workflow**:
+```
+1. Create policy in sandbox
+2. Test against demo app
+3. Refine based on results
+4. Add comprehensive test cases
+5. Deploy to production
+```
+
+**Advantages**:
+- Realistic test data
+- Multiple user profiles
+- Various scenarios (financial, healthcare, HR)
+- No risk to production systems
+
+### 4. Learning and Training
+
+Learn Control Core concepts hands-on:
+
+**For New Users**:
+- Understand policy structure
+- Learn Rego language
+- Practice policy testing
+- Explore integrations (PIP)
+
+**For Developers**:
+- Master advanced Rego patterns
+- Build custom integrations
+- Optimize policy performance
+- Implement compliance requirements
+
+## Deployment
+
+### Prerequisites
+
+**System Requirements**:
+- **Memory**: 4GB RAM minimum, 8GB recommended
+- **CPU**: 2 cores minimum, 4 cores recommended
+- **Storage**: 10GB free space
+- **Software**: Docker 20.10+, Docker Compose 2.0+
+
+**Ports Required**:
+- `3001`: Demo Application Frontend
+- `8000`: Demo Application API
+- `5433`: Demo PostgreSQL Database (to avoid conflict with Control Core DB)
+
+### Quick Start Deployment
+
+**Option 1: One-Click Start** (Recommended):
+
+```bash
+# Navigate to demo app directory
+cd cc-demoapp
+
+# Start complete demo environment
+./infra/start-dev.sh
+
+# The script will:
+# 1. Start PostgreSQL with sample data
+# 2. Initialize database schema
+# 3. Load demo users and business data
+# 4. Start API server
+# 5. Start frontend application
+
+# Access demo app
+# Frontend: http://localhost:3001
+# API Docs: http://localhost:8000/docs
+# Database: localhost:5433
+```
+
+**Stop Demo Application**:
+```bash
+./infra/stop-dev.sh
+```
+
+**Reset to Factory Defaults**:
+```bash
+# Resets database and restarts all services
+./infra/start-dev.sh
+```
+
+### Option 2: Manual Deployment
+
+**Step 1: Start Database**
+
+```bash
+cd cc-demoapp-api
+
+# Start PostgreSQL with Docker
+docker run -d \
+  --name demo-postgres \
+  -e POSTGRES_USER=demo_user \
+  -e POSTGRES_PASSWORD=demo_password \
+  -e POSTGRES_DB=demo_app \
+  -p 5433:5432 \
+  postgres:15-alpine
+
+# Initialize database
+python init_db.py
+
+# Verify
+docker exec demo-postgres psql -U demo_user -d demo_app -c "\dt"
+```
+
+**Step 2: Start API Server**
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+export DATABASE_URL="postgresql://demo_user:demo_password@localhost:5433/demo_app"
+export SECRET_KEY="demo_secret_key_change_in_production"
+export JWT_SECRET="demo_jwt_secret_change_in_production"
+
+# Start API
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Verify API is running
+curl http://localhost:8000/health
+# Expected: {"status": "healthy"}
+
+# View API documentation
+# Navigate to: http://localhost:8000/docs
+```
+
+**Step 3: Start Frontend**
+
+```bash
+cd cc-demoapp
+
+# Install dependencies
+npm install
+
+# Configure environment
+export NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+
+# Start development server
+npm run dev
+
+# Or use alternative port if 3000 is taken
+npm run dev:3001
+
+# Access application
+# Navigate to: http://localhost:3001
+```
+
+**Step 4: Verify Deployment**
+
+```bash
+# Check frontend
+curl http://localhost:3001
+
+# Check API health
+curl http://localhost:8000/health
+
+# Check database
+docker exec demo-postgres psql -U demo_user -d demo_app -c "SELECT COUNT(*) FROM users;"
+
+# Should show 5 demo users
+```
+
+### Option 3: Docker Compose Deployment
+
+```bash
+cd cc-demoapp/infra
+
+# Review docker-compose configuration
+cat docker-compose.yml
+
+# Start all services
+docker-compose up -d
+
+# Check services
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+**docker-compose.yml Example**:
+```yaml
+version: '3.8'
+
+services:
+  demo-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: demo_user
+      POSTGRES_PASSWORD: demo_password
+      POSTGRES_DB: demo_app
+    ports:
+      - "5433:5432"
+    volumes:
+      - demo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo_user -d demo_app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  demo-api:
+    build: ../../cc-demoapp-api
+    environment:
+      DATABASE_URL: postgresql://demo_user:demo_password@demo-db:5432/demo_app
+      SECRET_KEY: demo_secret_key
+      JWT_SECRET: demo_jwt_secret
+    ports:
+      - "8000:8000"
+    depends_on:
+      demo-db:
+        condition: service_healthy
+
+  demo-app:
+    build: ..
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3001:3001"
+    depends_on:
+      - demo-api
+
+volumes:
+  demo-db-data:
+```
+
+## Demo Users and Access Levels
+
+The demo application includes 5 pre-configured users with different roles and attributes:
+
+### Admin User
+**Credentials**: `admin` / `admin123`
+
+**Profile**:
+- **Role**: System Administrator
+- **Department**: IT
+- **Security Clearance**: Secret
+- **Groups**: IT_Administrators, System_Admins, Security_Team
+- **MFA**: Enabled
+- **Compliance**: 100% training complete
+
+**Access**:
+- All features and pages
+- All data classifications (public, internal, confidential, secret)
+- User management
+- System configuration
+
+**Use For**:
+- Demonstrating full administrative access
+- Testing unrestricted policies
+- Showing user management features
+
+### Manager User
+**Credentials**: `manager` / `manager123`
+
+**Profile**:
+- **Role**: Operations Manager
+- **Department**: Operations
+- **Security Clearance**: Confidential
+- **Groups**: Operations_Managers, Team_Leads, Project_Managers
+- **Work Schedule**: Hybrid
+- **Compliance**: 95% training complete
+
+**Access**:
+- Management dashboards
+- Team data
+- Public, internal, and confidential data
+
+**Use For**:
+- Demonstrating management-level access
+- Testing department-based policies
+- Showing hybrid work policies
+
+### Analyst User
+**Credentials**: `analyst` / `analyst123`
+
+**Profile**:
+- **Role**: Data Analyst
+- **Department**: Analytics
+- **Security Clearance**: Confidential
+- **Groups**: Data_Analysts, Business_Analysts, Research_Team
+- **Work Schedule**: Remote
+- **MFA**: Disabled (intentionally for testing)
+- **Compliance**: 80% training (pending)
+
+**Access**:
+- Analytics dashboards
+- Reports and visualizations
+- Public and internal data
+
+**Use For**:
+- Demonstrating remote work policies
+- Testing MFA requirements
+- Showing compliance training enforcement
+- Testing risk-based access
+
+### HR User
+**Credentials**: `hr` / `hr123`
+
+**Profile**:
+- **Role**: HR Administrator
+- **Department**: Human Resources
+- **Security Clearance**: Confidential
+- **Groups**: HR_Team, Employee_Management, Compliance_Team
+- **MFA**: Enabled
+
+**Access**:
+- Employee data
+- HR records
+- PII (with restrictions)
+
+**Use For**:
+- Demonstrating PII protection
+- Testing role-based data access
+- Showing healthcare compliance (HIPAA)
+
+### Finance User
+**Credentials**: `finance` / `finance123`
+
+**Profile**:
+- **Role**: Finance Manager
+- **Department**: Finance
+- **Security Clearance**: Secret
+- **Groups**: Finance_Team, Accounting_Team, Audit_Team
+- **MFA**: Enabled
+- **Compliance**: 100% training complete
+
+**Access**:
+- Financial records
+- Transaction data
+- Audit reports
+- All data classifications
+
+**Use For**:
+- Demonstrating financial compliance (FINTRAC, AML)
+- Testing transaction monitoring policies
+- Showing segregation of duties
+
+## Using for Policy Testing
+
+### Testing Workflow
+
+**1. Deploy Demo App**:
+```bash
+cd cc-demoapp
+./infra/start-dev.sh
+```
+
+**2. Configure Bouncer to Protect Demo App**:
+```bash
+# In Bouncer .env file
+TARGET_HOST=localhost:8000  # Demo API
+BOUNCER_PORT=8080
+
+# Restart Bouncer
+docker-compose restart bouncer
+```
+
+**3. Access Demo App Through Bouncer**:
+```bash
+# Direct access (no policy enforcement)
+http://localhost:3001
+
+# Through Bouncer (with policy enforcement)
+# Update demo app API URL to point to bouncer
+export NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+```
+
+**4. Create Test Policy**:
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Test: Only analysts can access analytics
+allow if {
+    input.user.roles[_] == "analyst"
+    input.resource.path == "/analytics"
+}
+```
+
+**5. Test with Different Users**:
+```bash
+# Login as analyst
+# Navigate to /analytics
+# Expected: Access granted
+
+# Login as hr
+# Navigate to /analytics
+# Expected: Access denied
+```
+
+**6. Review Results**:
+- Check decision logs in Control Core
+- Verify expected behavior
+- Refine policy as needed
+
+### Test Scenarios
+
+**Scenario 1: Department-Based Access**
+
+```rego
+# Policy: HR can only access employee data
+package demo.hr_access
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    input.user.department == "Human Resources"
+    input.resource.type == "employee_data"
+}
+```
+
+**Test**:
+- Login as `hr` user → Access employee page ✅
+- Login as `finance` user → Access employee page ❌
+
+**Scenario 2: Financial Compliance (FINTRAC)**
+
+```rego
+# Policy: Large transactions require compliance officer
+package demo.fintrac
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    input.resource.type == "payment_transaction"
+    input.transaction.amount < 10000  # Under FINTRAC threshold
+}
+
+allow if {
+    input.resource.type == "payment_transaction"
+    input.transaction.amount >= 10000  # Over threshold
+    input.user.attributes.fintrac_certified == true
+    input.user.roles[_] == "compliance-officer"
+}
+```
+
+**Test**:
+- Go to Payment Transactions page
+- Try to approve transaction > $10,000 CAD as `finance` user → ❌
+- Try same as `admin` (with fintrac_certified) → ✅
+
+**Scenario 3: Healthcare Compliance (HIPAA)**
+
+```rego
+# Policy: Medical records require care team membership
+package demo.hipaa
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    input.resource.type == "medical_record"
+    patient_id := input.resource.patient_id
+    
+    # Check if user is on care team (from demo database)
+    care_team := data.patient_care_teams[patient_id]
+    input.user.id in care_team.members
+}
+```
+
+**Test**:
+- Configure PIP to connect to demo database
+- Create policy using care team data
+- Test access to medical records
+
+## Using for Internal Demos
+
+### 15-Minute Standard Demo
+
+**Preparation** (5 minutes):
+1. Start demo app and Control Core
+2. Verify all services running
+3. Open two browser windows:
+   - Window 1: Demo app
+   - Window 2: Control Core console
+
+**Demo Flow** (10 minutes):
+
+**Part 1: Show Unprotected State** (2 minutes):
+```
+1. Login to demo app as "analyst" user
+2. Navigate through all pages
+3. Show: "Analyst can see everything - including financial data, employee PII"
+4. Emphasize: "This is how most applications work - trust the application code"
+```
+
+**Part 2: Create and Apply Policy** (3 minutes):
+```
+1. Switch to Control Core window
+2. Navigate to Policies → Create Policy
+3. Create simple policy:
+   
+   package demo.department_access
+   
+   default allow := false
+   
+   allow if {
+       input.user.department == input.resource.department
+   }
+
+4. Save and deploy to production
+5. Explain: "No code changes, no deployment, just policy"
+```
+
+**Part 3: Show Protected State** (3 minutes):
+```
+1. Switch back to demo app
+2. Refresh page
+3. Navigate to financial data (as analyst)
+4. Show: "Access denied - analyst not in finance department"
+5. Login as "finance" user
+6. Show: "Finance user CAN access financial data"
+```
+
+**Part 4: Show Audit Trail** (2 minutes):
+```
+1. Switch to Control Core
+2. Navigate to Monitoring → Decisions
+3. Show real-time decision logs
+4. Highlight: "Every access attempt logged for compliance"
+5. Export audit report
+```
+
+### 30-Minute Comprehensive Demo
+
+**Part 1: Context-Aware Policies** (10 minutes):
+
+1. **Connect Data Source (PIP)**:
+   - Show Okta integration
+   - Real-time user data sync
+   - Attribute mapping
+
+2. **Create Context-Aware Policy**:
+```rego
+package demo.context_aware
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    # Real-time data from Okta
+    user := data.policy_data.okta.identity.users[input.user.id]
+    user.status == "ACTIVE"
+    "Finance_Team" in user.groups
+    
+    # Time-based access
+    is_business_hours
+    
+    # MFA required for sensitive data
+    input.user.attributes.mfa_verified == true
+}
+```
+
+3. **Demonstrate Policy Enforcement**:
+   - Test during business hours ✅
+   - Test outside business hours ❌
+   - Test with/without MFA ✅/❌
+
+**Part 2: Compliance Scenarios** (10 minutes):
+
+1. **FINTRAC Large Cash Transaction**:
+   - Show payment transaction page
+   - Attempt transaction > $10,000 CAD
+   - Show policy requiring FINTRAC certification
+   - Demonstrate automatic logging
+
+2. **OSFI Segregation of Duties**:
+   - Show user with both initiator and approver roles
+   - Demonstrate automatic blocking
+   - Show compliant scenario
+
+**Part 3: AI Security** (10 minutes):
+
+1. **AI Prompt Filtering**:
+   - Navigate to AI Chat
+   - Try prompt with PII → Blocked
+   - Try normal prompt → Allowed
+   - Show filtered response
+
+2. **AI Content Injection**:
+   - Show how Control Core adds context to prompts
+   - Demonstrate response sanitization
+   - Explain compliance benefits
+
+### Demo Best Practices
+
+**Preparation Checklist**:
+- [ ] All services running and healthy
+- [ ] Demo users can login
+- [ ] Sample data loaded
+- [ ] Policies prepared in advance
+- [ ] Browser windows positioned
+- [ ] Network stable
+- [ ] Backup plan if demo breaks
+
+**During Demo**:
+- Start with simple scenarios
+- Build complexity gradually
+- Show real-time changes
+- Highlight compliance benefits
+- Answer questions but stay on track
+- Keep audit logs visible
+
+**Common Demo Mistakes to Avoid**:
+- Don't assume everyone knows Rego
+- Don't rush through policy creation
+- Don't skip the "before" state
+- Don't forget to show audit logs
+- Don't oversell - let product speak
+
+## Using for Policy Development
+
+### Development Workflow
+
+**1. Identify Requirement**:
+```
+Business Need: "Only compliance officers can approve FINTRAC reportable transactions"
+```
+
+**2. Create Test Cases First** (TDD):
+```rego
+package demo.fintrac_tests
+
+import rego.v1
+
+# Test: Compliance officer can approve
+test_compliance_officer_can_approve if {
+    allow with input as {
+        "user": {
+            "id": "user-1",
+            "roles": ["compliance-officer"],
+            "attributes": {"fintrac_certified": true}
+        },
+        "transaction": {
+            "amount": 15000,
+            "currency": "CAD"
+        }
+    }
+}
+
+# Test: Regular user cannot approve
+test_regular_user_denied if {
+    not allow with input as {
+        "user": {
+            "id": "user-2",
+            "roles": ["teller"]
+        },
+        "transaction": {
+            "amount": 15000,
+            "currency": "CAD"
+        }
+    }
+}
+```
+
+**3. Implement Policy**:
+```rego
+package demo.fintrac
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    input.user.roles[_] == "compliance-officer"
+    input.user.attributes.fintrac_certified == true
+}
+```
+
+**4. Test Against Demo App**:
+```bash
+# Login as different users
+# Navigate to payment transactions
+# Try to approve large transactions
+# Verify policy works as expected
+```
+
+**5. Refine and Iterate**:
+- Add edge cases
+- Handle missing data
+- Optimize performance
+- Add documentation
+
+**6. Deploy to Production**:
+- Deploy to sandbox first
+- Test with real users (if safe)
+- Promote to production
+- Monitor decision logs
+
+### Testing Patterns
+
+**Pattern 1: User Role Testing**
+
+```bash
+# Test matrix
+Users: [admin, manager, analyst, hr, finance]
+Resources: [clients, employees, financial, analytics, payments]
+Actions: [read, write, delete, approve]
+
+# Systematically test all combinations
+for user in users:
+    for resource in resources:
+        for action in actions:
+            test(user, resource, action)
+            verify_expected_result()
+```
+
+**Pattern 2: Boundary Testing**
+
+```bash
+# Test transaction thresholds
+test_amounts = [9999, 10000, 10001]  # Around FINTRAC threshold
+
+for amount in test_amounts:
+    test_transaction(amount)
+    verify_reporting_requirement()
+```
+
+**Pattern 3: Context Testing**
+
+```bash
+# Test time-based policies
+test_times = [
+    "2025-01-25T08:00:00Z",  # Before business hours
+    "2025-01-25T12:00:00Z",  # During business hours
+    "2025-01-25T18:00:00Z",  # After business hours
+]
+
+for time in test_times:
+    test_with_time(time)
+    verify_access_decision()
+```
+
+## Using for Learning
+
+### Learning Path
+
+**Week 1: Basics**
+1. Deploy demo app
+2. Explore features as different users
+3. Create first simple policy
+4. Test policy with demo app
+5. Review decision logs
+
+**Week 2: Rego Fundamentals**
+1. Learn Rego syntax
+2. Create RBAC policies
+3. Test with demo users
+4. Add test cases
+5. Practice debugging
+
+**Week 3: Advanced Patterns**
+1. Attribute-based access control
+2. Time and location-based policies
+3. Data filtering
+4. Context-aware policies
+
+**Week 4: Integrations**
+1. Connect demo database as PIP
+2. Use database data in policies
+3. Test multi-source policies
+4. Practice incremental sync
+
+**Week 5: Compliance**
+1. Implement FINTRAC policies
+2. Implement OSFI segregation of duties
+3. Implement HIPAA minimum necessary
+4. Test compliance scenarios
+
+**Week 6: AI Security**
+1. AI agent access control
+2. Prompt filtering
+3. Content injection
+4. Response sanitization
+
+### Hands-On Exercises
+
+**Exercise 1: Basic RBAC**
+
+Task: Create policy where only HR users can access employee data
+
+```rego
+package exercise.hr_access
+
+import rego.v1
+
+# Your solution here
+```
+
+Expected behavior:
+- `hr` user → Can access /employees ✅
+- `finance` user → Cannot access /employees ❌
+
+**Exercise 2: Department-Based Access**
+
+Task: Users can only see data from their department
+
+```rego
+package exercise.department
+
+import rego.v1
+
+# Your solution here
+```
+
+Test with:
+- Finance user accessing financial data ✅
+- Finance user accessing HR data ❌
+
+**Exercise 3: FINTRAC Reporting**
+
+Task: Transactions ≥ $10,000 CAD require FINTRAC-certified officer
+
+```rego
+package exercise.fintrac
+
+import rego.v1
+
+# Your solution here
+```
+
+Test with payment transactions page.
+
+**Exercise 4: Time-Based Access**
+
+Task: Analytics only accessible during business hours (9 AM - 5 PM)
+
+```rego
+package exercise.time_based
+
+import rego.v1
+
+# Your solution here
+```
+
+Test at different times.
+
+## Sample Data Overview
+
+The demo app includes realistic sample data for testing:
+
+### Clients (50+)
+- Mix of small, medium, and large businesses
+- Various industries (tech, finance, healthcare)
+- Different risk levels
+- Geographic diversity
+- Contract statuses
+
+### Employees (25+)
+- Multiple departments (IT, Finance, HR, Operations)
+- Various clearance levels
+- Different work schedules (office, hybrid, remote)
+- Training and compliance statuses
+- Manager hierarchy
+
+### Financial Records (100+)
+- Revenue data across quarters
+- Expense categories
+- Profit margins
+- Budget vs actual
+
+### Transactions (200+)
+- Payment transactions
+- Various amounts (including FINTRAC-reportable)
+- Multiple currencies
+- Different transaction types
+- Timestamps for pattern analysis
+
+### Medical Records (Healthcare Demo)
+- Patient demographics
+- Care team assignments
+- Medical conditions
+- Treatment records
+- Insurance information
+
+## Connecting Demo App to Control Core
+
+### Step 1: Deploy Both Systems
+
+```bash
+# Terminal 1: Control Core
+cd cc-infra/docker-compose
+docker-compose up -d
+
+# Terminal 2: Demo App
+cd cc-demoapp
+./infra/start-dev.sh
+```
+
+### Step 2: Configure Bouncer
+
+```bash
+# Edit Bouncer .env
+nano cc-bouncer/.env
+
+# Set target to demo app
+TARGET_HOST=localhost:8000
+BOUNCER_PORT=8080
+
+# Restart Bouncer
+cd cc-bouncer
+docker-compose restart bouncer
+```
+
+### Step 3: Update Demo App Configuration
+
+```bash
+# Point demo app to Bouncer instead of direct API
+export NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+
+# Restart demo app
+cd cc-demoapp
+npm run dev:3001
+```
+
+### Step 4: Create Resource in Control Core
+
+```bash
+# Via API
+curl -X POST http://localhost:8082/api/v1/resources \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Demo App API",
+    "type": "api",
+    "path": "/api/*",
+    "methods": ["GET", "POST", "PUT", "DELETE"],
+    "attributes": {
+      "application": "demo-app",
+      "environment": "development"
+    }
+  }'
+```
+
+### Step 5: Test End-to-End
+
+```bash
+# 1. Create policy in Control Core
+# 2. Access demo app (goes through Bouncer)
+# 3. Verify policy enforced
+# 4. Check decision logs
+```
+
+## Advanced Usage
+
+### Custom Sample Data
+
+**Add Your Own Test Data**:
+
+```bash
+# Connect to demo database
+docker exec -it demo-postgres psql -U demo_user -d demo_app
+
+# Add custom client
+INSERT INTO clients (name, industry, tier, country, risk_level)
+VALUES ('Test Corp', 'Technology', 'enterprise', 'Canada', 'low');
+
+# Add custom employee
+INSERT INTO employees (name, department, role, clearance_level)
+VALUES ('Test User', 'Finance', 'analyst', 3);
+
+# Add custom transaction
+INSERT INTO payment_transactions (customer_id, amount, currency, type, status)
+VALUES (1, 15000, 'CAD', 'wire_transfer', 'pending');
+```
+
+### Testing with PIP Integration
+
+**Connect Demo Database as PIP**:
+
+1. In Control Core → **Integrations** → **Data Sources**
+2. Add **PostgreSQL** connection:
+   - Host: `localhost`
+   - Port: `5433`
+   - Database: `demo_app`
+   - User: `demo_user`
+   - Password: `demo_password`
+
+3. Map attributes:
+   - `resource.owner` → `owner_id`
+   - `resource.department` → `department`
+   - `customer.risk_score` → `risk_level`
+
+4. Use in policies:
+```rego
+allow if {
+    # Real data from demo database
+    customer := data.policy_data.postgresql.database.customers[input.resource.customer_id]
+    customer.risk_level == "low"
+}
+```
+
+### Performance Testing
+
+**Load Testing**:
+
+```bash
+# Install Apache Bench
+sudo apt-get install apache2-utils
+
+# Test API performance
+ab -n 10000 -c 100 http://localhost:8080/api/clients
+
+# Results show:
+# - Requests per second
+# - Latency distribution
+# - Policy evaluation overhead
+```
+
+**Stress Testing**:
+
+```bash
+# Use wrk for advanced load testing
+wrk -t12 -c400 -d30s http://localhost:8080/api/clients
+
+# Monitor Bouncer metrics
+curl http://localhost:8080/api/v1/metrics
+```
+
+## Troubleshooting Demo App
+
+### Common Issues
+
+**Issue: Demo app won't start**
+
+```bash
+# Check port conflicts
+lsof -i :3001
+lsof -i :8000
+lsof -i :5433
+
+# Use alternative ports
+npm run dev:3002  # Frontend on 3002
+
+# Check logs
+docker-compose logs demo-api
+docker-compose logs demo-db
+```
+
+**Issue: Cannot login**
+
+```bash
+# Verify database has demo users
+docker exec demo-postgres psql -U demo_user -d demo_app -c "SELECT username, role FROM users;"
+
+# Expected output:
+#  username | role
+# ----------+--------
+#  admin    | admin
+#  manager  | manager
+#  analyst  | analyst
+#  hr       | hr
+#  finance  | finance
+
+# Reset database if needed
+python init_db.py
+```
+
+**Issue: No data showing**
+
+```bash
+# Check database has sample data
+docker exec demo-postgres psql -U demo_user -d demo_app -c "SELECT COUNT(*) FROM clients;"
+
+# Should show 50+
+
+# Reload sample data
+python init_db.py --reload-data
+```
+
+**Issue: API not responding**
+
+```bash
+# Check API health
+curl http://localhost:8000/health
+
+# Check API logs
+docker-compose logs demo-api | tail -50
+
+# Check database connection
+docker-compose logs demo-api | grep -i database
+
+# Restart API
+docker-compose restart demo-api
+```
+
+## Demo Scenarios Library
+
+### Financial Services Scenarios
+
+**Scenario 1: FINTRAC Transaction Monitoring**
+- User: `finance`
+- Feature: Payment Transactions
+- Policy: FINTRAC LCTR (>$10,000 CAD)
+- Demo: Show automatic flagging and approval workflow
+
+**Scenario 2: OSFI Segregation of Duties**
+- Users: Create user with conflicting roles
+- Feature: Transaction approval
+- Policy: OSFI segregation policy
+- Demo: Show automatic blocking of conflict
+
+**Scenario 3: AML Customer Due Diligence**
+- User: `manager`
+- Feature: Client Management
+- Policy: KYC verification required
+- Demo: Block access to un-verified customers
+
+### Healthcare Scenarios
+
+**Scenario 1: HIPAA Minimum Necessary**
+- User: `hr` (acting as nurse)
+- Feature: Medical Center
+- Policy: Minimum necessary PHI
+- Demo: Show field-level filtering
+
+**Scenario 2: Break-the-Glass Emergency Access**
+- User: `admin` (acting as emergency physician)
+- Feature: Medical records
+- Policy: Emergency access with audit
+- Demo: Show emergency override with logging
+
+### AI Security Scenarios
+
+**Scenario 1: AI Prompt Filtering**
+- User: `analyst`
+- Feature: AI Chat
+- Policy: Block prompts with PII
+- Demo: Show rejected prompts
+
+**Scenario 2: AI Response Sanitization**
+- User: `finance`
+- Feature: Financial AI
+- Policy: Mask sensitive data in responses
+- Demo: Show redacted content
+
+## Resources
+
+- **Demo App Documentation**: In-app help at `/help`
+- **API Documentation**: http://localhost:8000/docs
+- **Sample Policies**: Available in Control Core template library
+- **Training Videos**: Coming soon
+
+## Next Steps
+
+1. **[Deploy Demo App](#deployment)**: Get started with one command
+2. **[Run Demo](#using-for-internal-demos)**: 15-minute demo flow
+3. **[Test Policies](#using-for-policy-testing)**: Validate before production
+4. **[Learn Control Core](#using-for-learning)**: Hands-on exercises
+
+## Support
+
+- **Demo Setup Help**: support@controlcore.io
+- **Demo Best Practices**: Request demo training
+- **Custom Scenarios**: We can help build custom demo scenarios
+- **Troubleshooting**: [General Troubleshooting Guide](/guides/troubleshooting)
+
+---
+
+**The Demo Application is your sandbox for mastering Control Core. Experiment freely, break things, learn, and build confidence before deploying to production!**
+

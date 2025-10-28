@@ -1,0 +1,521 @@
+# Multi-Tenant API
+
+Control Core Pro provides a fully managed multi-tenant service with complete tenant isolation, custom domains, and regional deployment support.
+
+## Overview
+
+The Multi-Tenant API enables:
+
+- **Tenant Isolation** - Complete separation of tenant data and configurations
+- **Custom Domains** - Dedicated subdomains and custom domain support
+- **Regional Deployment** - Deploy to North America, Europe, or Asia Pacific
+- **Tenant Management** - Create, configure, and manage tenant accounts
+- **Billing Integration** - Stripe integration for subscription management
+- **Monitoring** - Tenant-specific metrics and monitoring
+
+## Base URL
+
+```http
+https://api.controlcore.io/api/v1
+```
+
+## Tenant Isolation
+
+### Isolation Levels
+
+1. **Database Isolation** - Each tenant has a dedicated database schema
+2. **Redis Isolation** - Tenant-specific Redis namespaces
+3. **S3 Isolation** - Isolated object storage with tenant prefixes
+4. **Network Isolation** - Tenant-specific subdomains and SSL certificates
+5. **Application Isolation** - Tenant-scoped API access and resource limits
+
+### Tenant Context
+
+All API requests are automatically scoped to the tenant context based on:
+
+- **Subdomain**: `{tenant-id}.controlcore.io`
+- **Header**: `X-Tenant-ID: tenant-123`
+- **Query Parameter**: `?tenant_id=tenant-123`
+
+## Tenant Management
+
+### Create Tenant
+
+**POST** `/tenants`
+
+```json
+{
+  "name": "Acme Corporation",
+  "domain": "acme.controlcore.io",
+  "plan_type": "pro",
+  "region": "us-east-1",
+  "custom_domain": "policies.acme.com",
+  "settings": {
+    "max_policies": 1000,
+    "max_users": 50,
+    "max_bouncers": 10
+  }
+}
+```
+
+#### Response
+
+```json
+{
+  "id": "tenant-acme-123",
+  "name": "Acme Corporation",
+  "domain": "acme.controlcore.io",
+  "custom_domain": "policies.acme.com",
+  "status": "active",
+  "region": "us-east-1",
+  "created_at": "2025-01-25T10:30:00Z",
+  "settings": {
+    "max_policies": 1000,
+    "max_users": 50,
+    "max_bouncers": 10
+  },
+  "limits": {
+    "policies_used": 0,
+    "users_used": 1,
+    "bouncers_used": 0
+  }
+}
+```
+
+### Get Tenant
+
+**GET** `/tenants/{tenant_id}`
+
+#### Response
+
+```json
+{
+  "id": "tenant-acme-123",
+  "name": "Acme Corporation",
+  "domain": "acme.controlcore.io",
+  "custom_domain": "policies.acme.com",
+  "status": "active",
+  "region": "us-east-1",
+  "plan_type": "pro",
+  "created_at": "2025-01-25T10:30:00Z",
+  "updated_at": "2025-01-25T10:30:00Z",
+  "expires_at": "2026-01-25T10:30:00Z",
+  "settings": {
+    "max_policies": 1000,
+    "max_users": 50,
+    "max_bouncers": 10
+  },
+  "limits": {
+    "policies_used": 25,
+    "users_used": 8,
+    "bouncers_used": 3
+  }
+}
+```
+
+### Update Tenant
+
+**PUT** `/tenants/{tenant_id}`
+
+```json
+{
+  "name": "Acme Corporation Inc.",
+  "settings": {
+    "max_policies": 2000,
+    "max_users": 100,
+    "max_bouncers": 20
+  }
+}
+```
+
+### Delete Tenant
+
+**DELETE** `/tenants/{tenant_id}`
+
+## Tenant-Scoped APIs
+
+All standard Control Core APIs are available with tenant isolation:
+
+### Policies
+
+**GET** `/policies` - List tenant policies
+
+**POST** `/policies` - Create tenant policy
+
+**PUT** `/policies/{id}` - Update tenant policy
+
+**DELETE** `/policies/{id}` - Delete tenant policy
+
+### Resources
+
+**GET** `/resources` - List tenant resources
+
+**POST** `/resources` - Create tenant resource
+
+**PUT** `/resources/{id}` - Update tenant resource
+
+**DELETE** `/resources/{id}` - Delete tenant resource
+
+### Bouncers
+
+**GET** `/bouncers` - List tenant bouncers
+
+**POST** `/bouncers` - Create tenant bouncer
+
+**PUT** `/bouncers/{id}` - Update tenant bouncer
+
+**DELETE** `/bouncers/{id}` - Delete tenant bouncer
+
+## Custom Domain Management
+
+### Add Custom Domain
+
+**POST** `/tenants/{tenant_id}/domains`
+
+```json
+{
+  "domain": "policies.acme.com",
+  "ssl_certificate": "-----BEGIN CERTIFICATE-----\n...",
+  "ssl_private_key": "-----BEGIN PRIVATE KEY-----\n..."
+}
+```
+
+#### Response
+
+```json
+{
+  "domain": "policies.acme.com",
+  "status": "pending",
+  "ssl_status": "pending",
+  "dns_instructions": {
+    "cname_record": "acme.controlcore.io",
+    "txt_record": "control-core-verification=abc123"
+  }
+}
+```
+
+### Verify Domain
+
+**POST** `/tenants/{tenant_id}/domains/{domain}/verify`
+
+#### Response
+
+```json
+{
+  "domain": "policies.acme.com",
+  "status": "verified",
+  "ssl_status": "active",
+  "verified_at": "2025-01-25T10:35:00Z"
+}
+```
+
+### List Domains
+
+**GET** `/tenants/{tenant_id}/domains`
+
+#### Response
+
+```json
+[
+  {
+    "domain": "policies.acme.com",
+    "status": "active",
+    "ssl_status": "active",
+    "verified_at": "2025-01-25T10:35:00Z"
+  },
+  {
+    "domain": "acme.controlcore.io",
+    "status": "active",
+    "ssl_status": "active",
+    "is_default": true
+  }
+]
+```
+
+## Regional Deployment
+
+### Available Regions
+
+- **North America**: `us-east-1`, `us-west-2`, `ca-central-1`
+- **Europe**: `eu-west-1`, `eu-central-1`, `eu-north-1`
+- **Asia Pacific**: `ap-southeast-1`, `ap-northeast-1`, `ap-south-1`
+
+### Deploy to Region
+
+**POST** `/tenants/{tenant_id}/deploy`
+
+```json
+{
+  "region": "eu-west-1",
+  "migrate_data": true,
+  "maintenance_window": "2025-01-26T02:00:00Z"
+}
+```
+
+#### Response
+
+```json
+{
+  "deployment_id": "deploy-123",
+  "status": "in_progress",
+  "region": "eu-west-1",
+  "estimated_completion": "2025-01-26T04:00:00Z",
+  "progress": {
+    "database_migration": "in_progress",
+    "dns_update": "pending",
+    "ssl_setup": "pending"
+  }
+}
+```
+
+### Get Deployment Status
+
+**GET** `/tenants/{tenant_id}/deployments/{deployment_id}`
+
+#### Response
+
+```json
+{
+  "deployment_id": "deploy-123",
+  "status": "completed",
+  "region": "eu-west-1",
+  "started_at": "2025-01-26T02:00:00Z",
+  "completed_at": "2025-01-26T03:45:00Z",
+  "new_domain": "acme.eu.controlcore.io"
+}
+```
+
+## Billing Integration
+
+### Get Billing Information
+
+**GET** `/tenants/{tenant_id}/billing`
+
+#### Response
+
+```json
+{
+  "subscription_id": "sub_123",
+  "status": "active",
+  "plan": "pro",
+  "current_period_start": "2025-01-01T00:00:00Z",
+  "current_period_end": "2025-02-01T00:00:00Z",
+  "usage": {
+    "policies": 25,
+    "users": 8,
+    "bouncers": 3,
+    "api_calls": 15000,
+    "storage_gb": 2.5
+  },
+  "billing": {
+    "base_cost": 99.00,
+    "usage_cost": 15.50,
+    "total_cost": 114.50,
+    "currency": "USD"
+  }
+}
+```
+
+### Update Billing
+
+**PUT** `/tenants/{tenant_id}/billing`
+
+```json
+{
+  "payment_method": "pm_123",
+  "billing_address": {
+    "line1": "123 Main St",
+    "city": "San Francisco",
+    "state": "CA",
+    "postal_code": "94105",
+    "country": "US"
+  }
+}
+```
+
+## Monitoring and Analytics
+
+### Get Tenant Metrics
+
+**GET** `/tenants/{tenant_id}/metrics`
+
+#### Query Parameters
+
+- `start_date` - Start date for metrics (ISO 8601)
+- `end_date` - End date for metrics (ISO 8601)
+- `granularity` - Metrics granularity (`hour`, `day`, `week`, `month`)
+
+#### Response
+
+```json
+{
+  "metrics": {
+    "api_calls": {
+      "total": 15000,
+      "by_endpoint": {
+        "/policies": 5000,
+        "/resources": 3000,
+        "/bouncers": 2000,
+        "/audit": 5000
+      }
+    },
+    "policies": {
+      "total": 25,
+      "active": 20,
+      "sandbox": 5
+    },
+    "bouncers": {
+      "total": 3,
+      "active": 3,
+      "requests_per_minute": 150
+    },
+    "users": {
+      "total": 8,
+      "active": 6
+    }
+  },
+  "period": {
+    "start": "2025-01-01T00:00:00Z",
+    "end": "2025-01-31T23:59:59Z"
+  }
+}
+```
+
+### Get Usage Alerts
+
+**GET** `/tenants/{tenant_id}/alerts`
+
+#### Response
+
+```json
+[
+  {
+    "id": "alert-123",
+    "type": "usage_limit",
+    "severity": "warning",
+    "message": "Approaching policy limit (80% of 1000)",
+    "created_at": "2025-01-25T10:30:00Z",
+    "resolved_at": null
+  }
+]
+```
+
+## Authentication
+
+### Tenant-Scoped Authentication
+
+All API requests require tenant context. Authentication can be provided via:
+
+1. **API Key** (Recommended)
+   ```http
+   Authorization: Bearer YOUR_API_KEY
+   X-Tenant-ID: tenant-acme-123
+   ```
+
+2. **JWT Token**
+   ```http
+   Authorization: Bearer JWT_TOKEN
+   X-Tenant-ID: tenant-acme-123
+   ```
+
+3. **Subdomain** (Automatic)
+   ```http
+   Host: acme.controlcore.io
+   Authorization: Bearer YOUR_API_KEY
+   ```
+
+### Generate API Key
+
+**POST** `/tenants/{tenant_id}/api-keys`
+
+```json
+{
+  "name": "Production API Key",
+  "scopes": ["policies:read", "policies:write", "resources:read"],
+  "expires_at": "2026-01-25T10:30:00Z"
+}
+```
+
+#### Response
+
+```json
+{
+  "id": "key-123",
+  "name": "Production API Key",
+  "key": "cc_live_abc123def456...",
+  "scopes": ["policies:read", "policies:write", "resources:read"],
+  "created_at": "2025-01-25T10:30:00Z",
+  "expires_at": "2026-01-25T10:30:00Z"
+}
+```
+
+## Error Handling
+
+### Tenant-Specific Errors
+
+#### 403 Forbidden - Tenant Access Denied
+
+```json
+{
+  "error": "tenant_access_denied",
+  "message": "Access denied for tenant tenant-acme-123",
+  "tenant_id": "tenant-acme-123"
+}
+```
+
+#### 404 Not Found - Tenant Not Found
+
+```json
+{
+  "error": "tenant_not_found",
+  "message": "Tenant tenant-acme-123 not found",
+  "tenant_id": "tenant-acme-123"
+}
+```
+
+#### 429 Too Many Requests - Rate Limited
+
+```json
+{
+  "error": "rate_limit_exceeded",
+  "message": "Rate limit exceeded for tenant tenant-acme-123",
+  "retry_after": 60,
+  "limit": 1000,
+  "remaining": 0
+}
+```
+
+## Best Practices
+
+### Tenant Management
+
+1. **Use Descriptive Names** for tenant identification
+2. **Configure Appropriate Limits** based on usage patterns
+3. **Monitor Usage** to avoid exceeding limits
+4. **Use Custom Domains** for professional appearance
+5. **Deploy to Appropriate Regions** for performance
+
+### Security
+
+1. **Secure API Keys** and rotate them regularly
+2. **Use HTTPS** for all communications
+3. **Implement Proper Error Handling** for tenant isolation
+4. **Monitor Access Patterns** for unusual activity
+5. **Use Least Privilege** for API key scopes
+
+### Performance
+
+1. **Choose Appropriate Regions** for your users
+2. **Monitor Metrics** to optimize usage
+3. **Use Caching** where appropriate
+4. **Implement Retry Logic** for transient failures
+5. **Monitor Rate Limits** to avoid throttling
+
+## Support
+
+For multi-tenant API support:
+
+- **Documentation**: [docs.controlcore.io/multi-tenant](https://docs.controlcore.io/multi-tenant)
+- **Support Email**: pro-support@controlcore.io
+- **Sales Contact**: sales@controlcore.io
+- **Status Page**: [status.controlcore.io](https://status.controlcore.io)

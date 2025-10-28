@@ -1,0 +1,168 @@
+{
+  "version": "1.0.0",
+  "summary": "FINTRAC Travel Rule compliance for virtual asset transfers ≥$1,000 CAD requiring originator/beneficiary information",
+  "detailed_description": "This policy template implements FINTRAC's Travel Rule requirements for Virtual Asset Service Providers (VASPs) operating in Canada. The Travel Rule mandates that VASPs must collect and transmit originator and beneficiary information for virtual asset transfers of $1,000 CAD or more, aligning Canada with FATF (Financial Action Task Force) standards for anti-money laundering in crypto transactions.\n\nThe policy enforces collection of originator information (name, address, account number), transmission of beneficiary information to receiving VASP, verification of receiving VASP legitimacy, record keeping for 5 years minimum per FINTRAC requirements, and suspicious transaction monitoring. It ensures Canadian crypto exchanges, wallet providers, and OTC desks comply with AML/ATF obligations while facilitating legitimate virtual asset transfers.",
+  "use_cases": [
+    {
+      "title": "Bitbuy: Travel Rule Implementation for Canadian Crypto Exchange",
+      "description": "Deploy fintrac-travel-rule for FINTRAC-registered MSB crypto exchange",
+      "scenario": "Bitbuy (registered MSB, 500K Canadian users, $2B annual volume) implements Travel Rule for crypto withdrawals to external wallets. FINTRAC compliance requirements: (1) Collect originator info for sends ≥$1,000 CAD, (2) Verify receiving VASP if transfer to exchange, (3) Maintain records for 5 years, (4) Monitor for suspicious patterns (structuring to avoid threshold). Policy enforces: Withdrawal blocked if user doesn't provide beneficiary name/address for amounts ≥$1,000, automated VASP verification using TRISA (Travel Rule Information Sharing Architecture) protocol, risk-based approach: transfers to verified exchanges (Coinbase, Kraken) auto-approved, transfers to unknown wallets require compliance review if >$10,000, record retention automated (transaction data + travel rule info). Implementation results: 95% of withdrawals >$1,000 completed within 5 minutes (VASP info obtained), 5% flagged for compliance review (unverified recipients), zero FINTRAC violations in 2024 examination, customer satisfaction 87% (some friction from new info requirements). FINTRAC rating: Satisfactory Travel Rule compliance framework."
+    },
+    {
+      "title": "Wealthsimple Crypto: Travel Rule for Neo-Bank Crypto Service",
+      "description": "Implement fintrac-travel-rule for integrated banking and crypto platform",
+      "scenario": "Wealthsimple offers crypto trading within banking app to 3M users. Travel Rule challenge: Consumer experience vs. compliance (users accustomed to seamless banking don't understand why crypto withdrawals require recipient info). Policy approach: Graduated friction based on amount - <$1,000: instant withdrawal (no Travel Rule), $1,000-$9,999: basic recipient info (name), ≥$10,000: enhanced info (name, address, wallet source verification). User education: In-app messaging explains FINTRAC requirements, comparison to bank wire transfers (also require recipient info), FAQ on why crypto is different than stock transfers. Implementation: Pre-filled recipient info for frequent destinations (user's Coinbase account), VASP directory integration (auto-fill for known exchanges), mobile-optimized forms (60-second completion average). Results: 92% withdrawal completion rate (was 98% pre-Travel Rule), 8% abandonment acceptable for compliance, zero customer complaints about data collection (education effective), FINTRAC examination: Strong Travel Rule implementation with good consumer experience balance."
+    },
+    {
+      "title": "NDAX: Travel Rule for OTC Crypto Trading Desk",
+      "description": "Use fintrac-travel-rule for over-the-counter large crypto transactions",
+      "scenario": "NDAX operates OTC desk for institutional and high-net-worth crypto trades ($100K - $10M per trade). Travel Rule complexity: OTC clients are businesses/trusts (not individuals), beneficial ownership verification required, international counterparties common. Policy enforces: Entity verification for all corporate clients (beneficial ownership info per FINTRAC), enhanced due diligence for trades >$100K (source of funds, business purpose), cross-border transfer validation (receiving VASP must be licensed in home jurisdiction), suspicious activity monitoring (unusual patterns, high-risk jurisdictions, PEP clients). OTC process: Pre-trade compliance approval required (15-30 minute review), KYC package for new clients (corporate docs, beneficial ownership, source of wealth), ongoing monitoring (quarterly review for active clients), automated sanctions screening. Compliance: 100% of OTC trades have complete Travel Rule documentation, 12 trades blocked in 2024 (high-risk jurisdictions, incomplete KYC), $500M OTC volume with zero FINTRAC violations. Client feedback: Professional compliance process builds trust, OTC clients expect enhanced scrutiny."
+    },
+    {
+      "title": "Shakepay: Travel Rule for P2P Crypto Payments",
+      "description": "Deploy fintrac-travel-rule for peer-to-peer crypto transfer service",
+      "scenario": "Shakepay enables P2P Bitcoin payments between 200K Canadian users (use case: splitting restaurant bills, paying friends). Travel Rule application: P2P transfers within Shakepay are internal (not subject to Travel Rule), withdrawals to external wallets ≥$1,000 CAD require Travel Rule info. Policy balances compliance with UX: Internal transfers unlimited (within Shakepay ecosystem), external withdrawals <$1,000: instant (like Interac e-Transfer), external withdrawals ≥$1,000: recipient info collection (name, wallet address, relationship). Friction reduction: Recipient can be 'verified' (one-time KYC), future sends to verified recipient are instant, common destinations (user's Ledger wallet, Coinbase account) saved for re-use. Customer behavior: 95% of P2P transfers are <$1,000 (unaffected by Travel Rule), 5% >$1,000 typically to self-custody wallets (Ledger, Trezor), users understand recipient info requirement after first experience. FINTRAC compliance: Travel Rule fully implemented with consumer-friendly design, praised for balance of AML effectiveness and customer experience."
+    },
+    {
+      "title": "Coinsquare: Travel Rule for Crypto Liquidity Provider",
+      "description": "Apply fintrac-travel-rule for institutional crypto liquidity services",
+      "scenario": "Coinsquare provides crypto liquidity to Canadian fintechs and businesses ($50M monthly volume). B2B Travel Rule complexity: Counterparties are VASPs or businesses (not consumers), batch processing common, API-based transactions. Policy enforces: API endpoints require Travel Rule data in JSON payload, batch withdrawals: each output >$1,000 must have beneficiary info, automated VASP verification using Registry of VASPs, real-time compliance validation (API returns error if Travel Rule data missing/invalid), webhooks notify counterparty of pending transfers requiring info. Technical implementation: REST API with Travel Rule fields mandatory, OpenVASP protocol support for interoperability, automated compliance checks before blockchain broadcast, comprehensive audit logs for FINTRAC examination. Results: 99.8% API transaction success rate, <0.2% rejected for incomplete Travel Rule data, API documentation includes Travel Rule fields with examples, FINTRAC examination: Robust API-first Travel Rule implementation, model for other institutional VASPs."
+    },
+    {
+      "title": "Newton Crypto: Travel Rule Compliance Monitoring",
+      "description": "Implement fintrac-travel-rule for ongoing compliance and monitoring program",
+      "scenario": "Newton (MSB license, 150K users) establishes ongoing Travel Rule monitoring beyond transaction-level enforcement. FINTRAC examination focus: (1) Are Travel Rule procedures consistently applied, (2) How is compliance quality measured, (3) What happens when recipient info is incomplete. Policy monitoring: Monthly compliance dashboard showing % of >$1,000 transfers with complete Travel Rule info (target: 99%), quarterly quality reviews (sample 200 transactions, verify Travel Rule data accuracy), annual independent audit of Travel Rule compliance, trend analysis of incomplete submissions (user education opportunities). Findings 2024: 98.7% compliance rate, 1.3% incomplete (mostly user confusion about 'beneficiary address' for self-custody), customer support trained on Travel Rule FAQs (resolved 95% of incomplete cases), compliance quality audit: 99.2% accurate data collection. Improvements: In-app tooltips explaining each Travel Rule field, address validation for known VASP domains, error messages with specific guidance. FINTRAC result: Strong Travel Rule compliance program with continuous improvement culture, zero deficiencies noted."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Crypto transfer action",
+      "required": true,
+      "example_values": [
+        "initiate_crypto_transfer",
+        "send_crypto_to_external_vasp",
+        "process_crypto_transfer"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Virtual asset resource type",
+      "required": true,
+      "example_values": [
+        "virtual_asset_transfer",
+        "crypto_withdrawal"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.transfer_amount_cad",
+      "type": "number",
+      "description": "Transfer amount in CAD",
+      "required": true,
+      "example_values": [
+        500,
+        1500,
+        50000
+      ],
+      "example_value": "1"
+    },
+    {
+      "name": "context.originator_name_collected",
+      "type": "boolean",
+      "description": "Originator name collected",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.beneficiary_name_transmitted",
+      "type": "boolean",
+      "description": "Beneficiary name transmitted",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.receiving_vasp_verified",
+      "type": "boolean",
+      "description": "Receiving VASP verified",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Crypto Wallet System",
+      "VASP Registry",
+      "AML Transaction Monitoring",
+      "Blockchain Analytics"
+    ],
+    "complexity_score": "High - Crypto-specific compliance with VASP verification"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Review FINTRAC Travel Rule guidance",
+      "Integrate VASP registry (TRISA)",
+      "Configure $1,000 CAD threshold",
+      "Implement beneficiary info collection"
+    ],
+    "sandbox_testing": [
+      "Test transfer <$1,000 → no Travel Rule data required",
+      "Test transfer >$1,000 without beneficiary info → DENY"
+    ],
+    "production_deployment": [
+      "Gradual rollout: institutional clients first (lower volume, higher touch)",
+      "Monitor completion rates",
+      "Customer education campaign"
+    ],
+    "monitoring_setup": [
+      "Track Travel Rule completion rate",
+      "Monitor transactions blocked for missing data",
+      "Alert on compliance rate <95%"
+    ]
+  },
+  "compliance_frameworks": [
+    "FINTRAC",
+    "FATF Recommendation 16",
+    "PCMLTFA",
+    "MSB Registration"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "fintrac",
+    "travel-rule",
+    "crypto",
+    "virtual-assets",
+    "aml",
+    "fatf"
+  ],
+  "related_templates": [
+    "fintrac-aml-monitoring",
+    "fintrac-beneficial-ownership",
+    "crypto-asset-custody-controls"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 8,
+    "user_attributes": 0,
+    "resource_attributes": 2,
+    "context_attributes": 6
+  },
+  "integration_guide": {
+    "overview": "Integrate with crypto wallet systems and VASP registry for Travel Rule compliance",
+    "steps_by_system": []
+  }
+}

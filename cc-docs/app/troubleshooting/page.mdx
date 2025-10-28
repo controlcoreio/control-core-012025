@@ -1,0 +1,1319 @@
+# Comprehensive Troubleshooting Guide
+
+This guide helps you diagnose and resolve common issues with Control Core deployments across all components and deployment models.
+
+## Quick Diagnostic Tools
+
+### Health Check Commands
+
+Run these commands first for quick diagnostics:
+
+```bash
+# Check all services (Docker Compose)
+docker-compose ps
+docker-compose logs --tail=50
+
+# Check all pods (Kubernetes)
+kubectl get pods -n control-core
+kubectl get svc -n control-core
+
+# Health endpoints
+curl http://localhost:3000/api/health          # Console
+curl http://localhost:8082/api/v1/health       # API
+curl http://localhost:8080/health              # Bouncer
+curl http://localhost:7000/health              # OPAL
+
+# Quick status check script
+for service in console:3000 api:8082 bouncer:8080 opal:7000; do
+    name=$(echo $service | cut -d: -f1)
+    port=$(echo $service | cut -d: -f2)
+    if curl -sf http://localhost:$port/health > /dev/null 2>&1; then
+        echo "✅ $name is healthy"
+    else
+        echo "❌ $name is down"
+    fi
+done
+```
+
+## Service-Specific Issues
+
+### Policy Administration Console Issues
+
+**Symptom: Console won't load / White screen**
+
+Solutions:
+```bash
+# Check if service is running
+docker-compose ps | grep console
+kubectl get pods -n control-core -l app=controlcore-console
+
+# Check logs for errors
+docker-compose logs console | grep -i error
+kubectl logs -n control-core -l app=controlcore-console --tail=100
+
+# Common causes:
+# 1. API connection failure - check NEXT_PUBLIC_API_URL
+# 2. Build errors - check for JavaScript errors in logs
+# 3. Port conflict - ensure port 3000 is available
+```
+
+**Symptom: Cannot log in**
+
+Solutions:
+```bash
+# Verify API is accessible
+curl http://localhost:8082/api/v1/health
+
+# Check authentication configuration
+docker-compose logs console | grep -i auth
+docker-compose logs api | grep -i auth
+
+# Reset admin password (if needed)
+docker-compose exec api python reset_admin_password.py
+
+# For Kubernetes
+kubectl exec -it -n control-core deployment/controlcore-api -- python reset_admin_password.py
+```
+
+**Symptom: Policies not saving**
+
+Solutions:
+```bash
+# Check database connection
+docker-compose logs api | grep -i database
+
+# Check database status
+docker-compose exec db psql -U controlcore -d control_core_db -c "SELECT 1"
+
+# Check disk space
+df -h
+docker system df
+
+# Check for validation errors in browser console (F12)
+```
+
+### Policy Administration API Issues
+
+**Symptom: API returns 500 errors**
+
+Solutions:
+```bash
+# Check detailed error logs
+docker-compose logs api --tail=100 | grep -A 10 "ERROR"
+
+# Check database connection pool
+docker-compose logs api | grep -i "connection pool"
+
+# Check for database migrations
+docker-compose exec api alembic current
+docker-compose exec api alembic upgrade head
+
+# Restart API service
+docker-compose restart api
+```
+
+**Symptom: Slow API responses**
+
+Solutions:
+```bash
+# Check database query performance
+docker-compose exec db psql -U controlcore -d control_core_db
+
+# Run in psql:
+SELECT 
+    query,
+    calls,
+    mean_exec_time,
+    max_exec_time
+FROM pg_stat_statements
+ORDER BY mean_exec_time DESC
+LIMIT 20;
+
+# Check for missing indexes
+SELECT 
+    schemaname,
+    tablename,
+    attname,
+    n_distinct,
+    correlation
+FROM pg_stats
+WHERE schemaname = 'public'
+ORDER BY n_distinct DESC;
+
+# Vacuum and analyze
+VACUUM ANALYZE;
+
+# Check Redis cache hit rate
+docker-compose exec redis redis-cli INFO stats | grep hit_rate
+
+# Increase API workers (in .env)
+API_WORKERS=8  # Increase from 4
+```
+
+**Symptom: Authentication failures**
+
+Solutions:
+```bash
+# Check JWT configuration
+echo $JWT_SECRET_KEY
+echo $JWT_ALGORITHM
+
+# Verify Auth0 configuration (if using Auth0)
+echo $AUTH0_DOMAIN
+echo $AUTH0_CLIENT_ID
+
+# Check token expiration settings
+grep JWT_ACCESS_TOKEN_EXPIRE_MINUTES .env
+
+# View recent authentication errors
+docker-compose logs api | grep -i "authentication failed"
+```
+
+### Policy Enforcement Point (Bouncer) Issues
+
+**Symptom: Bouncer not forwarding requests**
+
+Solutions:
+```bash
+# Check target host configuration
+echo $TARGET_HOST
+
+# Test target connectivity from bouncer
+docker-compose exec bouncer ping <target-host>
+docker-compose exec bouncer curl http://<target-host>:<port>/health
+
+# Check bouncer logs
+docker-compose logs bouncer | grep -i "target"
+
+# Verify proxy configuration
+curl -v http://localhost:8080/health
+```
+
+**Symptom: Policy not being enforced**
+
+Solutions:
+```bash
+# Check if policy is loaded
+curl http://localhost:8080/api/v1/policies
+
+# Check OPAL synchronization
+curl http://localhost:8080/api/v1/opal/status
+
+# Force policy sync
+curl -X POST http://localhost:8080/api/v1/opal/sync
+
+# Check OPA data
+curl http://localhost:8080/api/v1/opa/data | jq .
+
+# Clear policy cache
+curl -X POST http://localhost:8080/api/v1/policies/cache/clear
+```
+
+**Symptom: High latency / Slow policy evaluation**
+
+Solutions:
+```bash
+# Check cache statistics
+curl http://localhost:8080/api/v1/policies/cache
+
+# Check metrics
+curl http://localhost:8080/api/v1/metrics
+
+# Increase cache TTL (in .env)
+POLICY_CACHE_TTL=10m  # Increase from 5m
+DECISION_CACHE_TTL=5m  # Increase from 1m
+
+# Increase cache size
+CACHE_MAX_SIZE=50000  # Increase from 10000
+
+# Add more worker threads
+WORKER_THREADS=16  # Increase from 8
+
+# Check for complex policies
+# Review policy evaluation times in logs
+docker-compose logs bouncer | grep "evaluation_time"
+```
+
+**Symptom: Memory leak in Bouncer**
+
+Solutions:
+```bash
+# Monitor memory over time
+watch -n 5 'docker stats bouncer --no-stream'
+
+# Check cache size
+curl http://localhost:8080/api/v1/policies/cache | jq '.cache_size'
+
+# Enable cache eviction
+# In .env:
+CACHE_EVICTION_POLICY=lru
+CACHE_MAX_SIZE=50000
+
+# Restart bouncer
+docker-compose restart bouncer
+```
+
+### Policy Synchronization (OPAL) Issues
+
+**Symptom: Policies not syncing to Bouncer**
+
+Solutions:
+```bash
+# Check OPAL server status
+curl http://localhost:7000/health
+
+# Check OPAL client connection from bouncer
+docker-compose logs bouncer | grep -i opal
+
+# Check OPAL broadcast configuration
+docker-compose logs opal | grep -i broadcast
+
+# Check OPAL data sources
+curl http://localhost:7000/data/config
+
+# Manually trigger sync
+curl -X POST http://localhost:7000/policy/refresh
+
+# Check WebSocket connection
+docker-compose logs bouncer | grep -i websocket
+```
+
+**Symptom: OPAL server disconnecting frequently**
+
+Solutions:
+```bash
+# Check network stability
+ping -c 100 localhost
+
+# Increase reconnection settings (in OPAL config)
+OPAL_CLIENT_RECONNECT_INTERVAL=5s
+OPAL_CLIENT_MAX_RECONNECT_ATTEMPTS=10
+
+# Check for network policies blocking connections (K8s)
+kubectl get networkpolicies -n control-core
+
+# Review OPAL server logs for connection errors
+docker-compose logs opal | grep -i "connection"
+```
+
+## Health Check Failures
+
+### Control Plane API Not Responding
+
+**Symptoms:**
+- Health check shows "Cannot connect to API endpoint"
+- Control Plane dashboard is not accessible
+
+**Solutions:**
+1. **Check if the service is running:**
+   ```bash
+   # For Docker Compose
+   docker-compose ps
+   
+   # For Kubernetes
+   kubectl get pods -n control-core
+   ```
+
+2. **Check service logs:**
+   ```bash
+   # For Docker Compose
+   docker-compose logs control-plane
+   
+   # For Kubernetes
+   kubectl logs -n control-core deployment/control-plane
+   ```
+
+3. **Verify port configuration:**
+   - Ensure port 8000 is not blocked by firewall
+   - Check if another service is using port 8000
+   - Verify the service is binding to 0.0.0.0:8000
+
+4. **Check environment variables:**
+   ```bash
+   # Verify required environment variables are set
+   echo $DATABASE_URL
+   echo $REDIS_URL
+   echo $SECRET_KEY
+   ```
+
+### Database Connection Issues
+
+**Symptoms:**
+- Health check shows "Cannot connect to database"
+- API returns 500 errors for database operations
+
+**Solutions:**
+1. **Verify database is running:**
+   ```bash
+   # For Docker Compose
+   docker-compose ps postgres
+   
+   # For Kubernetes
+   kubectl get pods -n control-core -l app=postgres
+   ```
+
+2. **Check database connectivity:**
+   ```bash
+   # Test connection
+   docker exec -it control-core-postgres-1 psql -U controlcore -d controlcore
+   ```
+
+3. **Verify database URL:**
+   - Format: `postgresql://username:password@host:port/database`
+   - Ensure credentials match database configuration
+   - Check if database exists and user has permissions
+
+4. **Check database logs:**
+   ```bash
+   docker-compose logs postgres
+   ```
+
+### OPAL Connection Problems
+
+**Symptoms:**
+- Health check shows "Cannot connect to OPAL server"
+- Policies are not synchronizing
+
+**Solutions:**
+1. **Verify OPAL service:**
+   ```bash
+   # Check OPAL pod status
+   kubectl get pods -n control-core -l app=opal
+   ```
+
+2. **Check OPAL configuration:**
+   - Verify OPAL_SERVER_URL is correct
+   - Ensure OPAL can reach the Control Plane
+   - Check policy repository access
+
+3. **Test OPAL connectivity:**
+   ```bash
+   curl http://localhost:7000/health
+   ```
+
+### Bouncer Connection Issues
+
+**Symptoms:**
+- Health check shows "Cannot connect to bouncer monitoring"
+- No bouncers appear in the dashboard
+
+**Solutions:**
+1. **Verify bouncer deployment:**
+   ```bash
+   # Check bouncer pods
+   kubectl get pods -l app=control-core-bouncer
+   ```
+
+2. **Check bouncer configuration:**
+   - Verify CONTROL_PLANE_URL points to correct Control Plane
+   - Ensure bouncer can reach Control Plane on port 8000
+   - Check network policies and firewall rules
+
+3. **Test bouncer connectivity:**
+   ```bash
+   # From bouncer pod
+   curl http://control-plane:8000/health
+   ```
+
+### Redis Connection Problems
+
+**Symptoms:**
+- Health check shows "Cannot connect to Redis"
+- Session management issues
+
+**Solutions:**
+1. **Verify Redis service:**
+   ```bash
+   # Check Redis pod
+   kubectl get pods -l app=redis
+   ```
+
+2. **Test Redis connectivity:**
+   ```bash
+   # From Control Plane pod
+   redis-cli -h redis ping
+   ```
+
+3. **Check Redis configuration:**
+   - Verify REDIS_URL format: `redis://host:port`
+   - Ensure Redis is accessible from Control Plane
+
+## Common Deployment Issues
+
+### Helm Chart Installation Failures
+
+**Symptoms:**
+- `helm install` command fails
+- Pods stuck in Pending or CrashLoopBackOff
+
+**Solutions:**
+1. **Check resource requirements:**
+   ```bash
+   # Verify cluster has enough resources
+   kubectl describe nodes
+   ```
+
+2. **Check persistent volume claims:**
+   ```bash
+   # Verify storage class exists
+   kubectl get storageclass
+   ```
+
+3. **Review values.yaml:**
+   - Ensure all required values are set
+   - Check for typos in configuration
+   - Verify image tags are correct
+
+### Docker Compose Issues
+
+**Symptoms:**
+- Services fail to start
+- Port conflicts
+
+**Solutions:**
+1. **Check port availability:**
+   ```bash
+   # Check if ports are in use
+   netstat -tulpn | grep :8000
+   ```
+
+2. **Verify Docker resources:**
+   ```bash
+   # Check Docker system info
+   docker system df
+   docker system prune
+   ```
+
+3. **Check environment file:**
+   - Ensure .env file exists and is properly formatted
+   - Verify all required variables are set
+
+## Performance Issues
+
+### Slow API Responses
+
+**Symptom: API responds slowly (>1 second)**
+
+Solutions:
+```bash
+# 1. Check database performance
+docker-compose exec db psql -U controlcore -d control_core_db
+
+# Run performance analysis
+SELECT 
+    query,
+    calls,
+    mean_exec_time,
+    max_exec_time,
+    stddev_exec_time
+FROM pg_stat_statements
+WHERE mean_exec_time > 100  # Over 100ms
+ORDER BY mean_exec_time DESC
+LIMIT 20;
+
+# Check for missing indexes
+SELECT 
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan,
+    idx_tup_read,
+    idx_tup_fetch
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0  # Unused indexes
+ORDER BY schemaname, tablename;
+
+# 2. Check connection pool exhaustion
+docker-compose logs api | grep -i "connection pool"
+
+# Increase pool size in .env
+DATABASE_POOL_SIZE=100  # Increase from 50
+DATABASE_MAX_OVERFLOW=50  # Increase from 20
+
+# 3. Check Redis performance
+docker-compose exec redis redis-cli --latency
+
+# Check slow commands
+docker-compose exec redis redis-cli SLOWLOG GET 10
+
+# 4. Enable query caching
+# In API configuration
+QUERY_CACHE_ENABLED=true
+QUERY_CACHE_TTL=300
+
+# 5. Add database read replicas (for high load)
+# Update DATABASE_URL to use read replica for SELECT queries
+DATABASE_READ_REPLICA_URL=postgresql://...
+```
+
+**Symptom: Policy evaluation taking >100ms**
+
+Solutions:
+```bash
+# Check policy complexity
+curl http://localhost:8080/api/v1/policies | jq '.policies[].evaluation_avg_ms'
+
+# Optimize policies:
+# 1. Reduce nested iterations
+# 2. Use early returns
+# 3. Avoid expensive computations
+# 4. Use helper functions
+
+# Increase policy cache
+POLICY_CACHE_TTL=15m
+POLICY_CACHE_MAX_SIZE=100000
+
+# Enable decision caching
+DECISION_CACHE_ENABLED=true
+DECISION_CACHE_TTL=5m
+DECISION_CACHE_MAX_SIZE=500000
+```
+
+### High Memory Usage
+
+**Symptom: Service using excessive memory**
+
+Solutions:
+```bash
+# 1. Identify memory hog
+docker stats
+kubectl top pods -n control-core
+
+# 2. Check for memory leaks
+# Monitor over time
+watch -n 10 'docker stats --no-stream'
+
+# 3. Check cache sizes
+curl http://localhost:8080/api/v1/policies/cache | jq '.memory_usage'
+
+# 4. Reduce cache sizes (if too large)
+CACHE_MAX_SIZE=25000  # Reduce
+DECISION_CACHE_MAX_SIZE=100000  # Reduce
+
+# 5. Enable cache eviction
+CACHE_EVICTION_POLICY=lru
+CACHE_CLEANUP_INTERVAL=5m
+
+# 6. Adjust resource limits
+# Kubernetes: Update values.yaml
+resources:
+  requests:
+    memory: "2Gi"
+  limits:
+    memory: "4Gi"
+
+# 7. Check for large data structures
+docker-compose logs api | grep -i "large"
+
+# 8. Restart service to clear memory
+docker-compose restart api
+kubectl rollout restart deployment/controlcore-api -n control-core
+```
+
+### High CPU Usage
+
+**Symptom: Constant high CPU (>80%)**
+
+Solutions:
+```bash
+# 1. Check what's causing CPU load
+docker stats
+kubectl top pods -n control-core
+
+# 2. Profile the application
+# Enable profiling in .env
+PROFILING_ENABLED=true
+PROFILING_PORT=6060
+
+# Access profiling endpoint
+curl http://localhost:6060/debug/pprof/profile?seconds=30 > cpu.prof
+
+# 3. Check for infinite loops in policies
+# Review policy evaluation counts
+curl http://localhost:8080/api/v1/metrics | grep policy_eval
+
+# 4. Check database CPU
+docker-compose exec db pg_top
+
+# 5. Scale horizontally instead of vertically
+# Add more replicas
+kubectl scale deployment controlcore-api --replicas=10 -n control-core
+
+# 6. Optimize policies
+# - Avoid complex iterations
+# - Use indexed data lookups
+# - Cache intermediate results
+```
+
+## Scaling Issues
+
+### Auto-Scaling Not Triggering
+
+**Symptom: HPA not scaling pods despite high load**
+
+Solutions:
+```bash
+# 1. Check HPA status
+kubectl get hpa -n control-core
+kubectl describe hpa controlcore-api -n control-core
+
+# 2. Verify metrics server is running
+kubectl get deployment metrics-server -n kube-system
+
+# 3. Check if metrics are available
+kubectl top pods -n control-core
+
+# 4. Review HPA conditions
+kubectl describe hpa controlcore-api -n control-core | grep -A 10 Conditions
+
+# 5. Check resource requests are set
+kubectl get pods -n control-core -o=jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].resources}{"\n"}{end}'
+
+# 6. Lower scaling thresholds if needed
+kubectl patch hpa controlcore-api -n control-core -p '{"spec":{"targetCPUUtilizationPercentage":60}}'
+
+# 7. Check custom metrics (if using)
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq .
+```
+
+**Symptom: Pods stuck in Pending state**
+
+Solutions:
+```bash
+# 1. Check why pods are pending
+kubectl describe pod <pod-name> -n control-core
+
+# Common reasons:
+# - Insufficient CPU/memory
+# - No nodes match selector
+# - PVC not bound
+
+# 2. Check node resources
+kubectl top nodes
+kubectl describe nodes | grep -A 5 "Allocated resources"
+
+# 3. Check PVC status
+kubectl get pvc -n control-core
+
+# 4. Scale cluster (add nodes)
+# AWS EKS
+eksctl scale nodegroup --cluster=controlcore --name=standard-workers --nodes=10
+
+# Azure AKS
+az aks scale --resource-group controlcore --name controlcore-cluster --node-count 10
+
+# 5. Adjust resource requests (if too high)
+# Edit deployment
+kubectl edit deployment controlcore-api -n control-core
+# Reduce requests.memory and requests.cpu
+```
+
+### Load Balancer Issues
+
+**Symptom: Load balancer health checks failing**
+
+Solutions:
+```bash
+# 1. Check health endpoint
+curl -v http://pod-ip:8080/health
+
+# 2. Verify health check configuration
+kubectl get svc controlcore-bouncer -n control-core -o yaml | grep -A 10 health
+
+# 3. Check if pods are ready
+kubectl get pods -n control-core -l app=controlcore-bouncer
+
+# 4. Review pod logs for health check errors
+kubectl logs -n control-core -l app=controlcore-bouncer | grep health
+
+# 5. Adjust health check thresholds
+# For AWS ALB
+service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "3"
+service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "30"
+
+# 6. Check network policies
+kubectl get networkpolicies -n control-core
+```
+
+**Symptom: Uneven load distribution**
+
+Solutions:
+```bash
+# 1. Check pod distribution
+kubectl get pods -n control-core -l app=controlcore-bouncer -o wide
+
+# 2. Verify load balancing algorithm
+kubectl get svc controlcore-bouncer -n control-core -o yaml | grep sessionAffinity
+
+# 3. Check if using IP hash (might cause imbalance)
+# Consider changing to least_conn or round-robin
+
+# 4. Review topology spread constraints
+kubectl get deployment controlcore-bouncer -n control-core -o yaml | grep -A 10 topologySpread
+
+# 5. Check for pod scheduling anti-patterns
+kubectl describe pod -n control-core -l app=controlcore-bouncer | grep -A 5 "Topology Spread"
+```
+
+## Database Issues
+
+### Connection Pool Exhaustion
+
+**Symptom: "Too many connections" errors**
+
+Solutions:
+```bash
+# 1. Check current connections
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "SELECT count(*) FROM pg_stat_activity;"
+
+# 2. Find idle connections
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "SELECT pid, usename, state, state_change 
+   FROM pg_stat_activity 
+   WHERE state = 'idle' 
+   ORDER BY state_change;"
+
+# 3. Kill idle connections (if needed)
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "SELECT pg_terminate_backend(pid) 
+   FROM pg_stat_activity 
+   WHERE state = 'idle' 
+   AND state_change < now() - interval '1 hour';"
+
+# 4. Increase max connections (PostgreSQL)
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "ALTER SYSTEM SET max_connections = 200;"  # From 100
+
+# Restart database
+docker-compose restart db
+
+# 5. Optimize connection pool (in .env)
+DATABASE_POOL_SIZE=50  # Per API pod
+DATABASE_POOL_TIMEOUT=30
+DATABASE_POOL_RECYCLE=3600  # Recycle connections hourly
+```
+
+### Database Performance Degradation
+
+**Symptom: Queries getting slower over time**
+
+Solutions:
+```bash
+# 1. Check table bloat
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "SELECT 
+     schemaname,
+     tablename,
+     pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
+     n_dead_tup,
+     n_live_tup,
+     ROUND(n_dead_tup * 100.0 / NULLIF(n_live_tup + n_dead_tup, 0), 2) AS dead_ratio
+   FROM pg_stat_user_tables
+   ORDER BY dead_ratio DESC;"
+
+# 2. Run VACUUM ANALYZE
+docker-compose exec db psql -U controlcore -d control_core_db -c "VACUUM ANALYZE;"
+
+# 3. Enable autovacuum (if not enabled)
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "ALTER SYSTEM SET autovacuum = on;"
+
+# 4. Add missing indexes
+# Analyze query patterns first
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "SELECT query, calls, total_exec_time, mean_exec_time
+   FROM pg_stat_statements
+   WHERE mean_exec_time > 100
+   ORDER BY total_exec_time DESC
+   LIMIT 10;"
+
+# 5. Check for lock contention
+docker-compose exec db psql -U controlcore -d control_core_db -c \
+  "SELECT 
+     locktype,
+     relation::regclass,
+     mode,
+     granted
+   FROM pg_locks
+   WHERE NOT granted;"
+```
+
+## Kubernetes-Specific Issues
+
+### Pod CrashLoopBackOff
+
+**Symptom: Pods restarting repeatedly**
+
+Solutions:
+```bash
+# 1. Check pod logs
+kubectl logs -n control-core <pod-name> --previous
+
+# 2. Describe pod for events
+kubectl describe pod <pod-name> -n control-core
+
+# 3. Common causes:
+# - Missing environment variables
+# - Database connection failure
+# - Insufficient memory (OOMKilled)
+# - Failed health checks
+
+# 4. Check resource limits
+kubectl get pod <pod-name> -n control-core -o yaml | grep -A 10 resources
+
+# 5. Check liveness/readiness probes
+kubectl get pod <pod-name> -n control-core -o yaml | grep -A 10 livenessProbe
+
+# 6. Temporarily disable probes to debug
+kubectl patch deployment controlcore-api -n control-core -p '{"spec":{"template":{"spec":{"containers":[{"name":"api","livenessProbe":null}]}}}}'
+```
+
+### ImagePullBackOff
+
+**Symptom: Cannot pull container images**
+
+Solutions:
+```bash
+# 1. Check image pull errors
+kubectl describe pod <pod-name> -n control-core
+
+# 2. Verify image exists
+docker pull controlcore/api:2.0.0
+
+# 3. Check image pull secrets
+kubectl get secrets -n control-core | grep registry
+
+# 4. Create image pull secret (if missing)
+kubectl create secret docker-registry controlcore-registry \
+  --docker-server=controlcore.io \
+  --docker-username=<username> \
+  --docker-password=<password> \
+  --namespace=control-core
+
+# 5. Verify secret in deployment
+kubectl get deployment controlcore-api -n control-core -o yaml | grep imagePullSecrets
+```
+
+### PVC Not Binding
+
+**Symptom: PersistentVolumeClaim stuck in Pending**
+
+Solutions:
+```bash
+# 1. Check PVC status
+kubectl get pvc -n control-core
+kubectl describe pvc <pvc-name> -n control-core
+
+# 2. Check if StorageClass exists
+kubectl get storageclass
+
+# 3. Check available PVs
+kubectl get pv
+
+# 4. Provision storage manually (if needed)
+# Or create StorageClass
+kubectl apply -f - <<EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+volumeBindingMode: WaitForFirstConsumer
+EOF
+```
+
+## Scaling Issues
+
+### Cluster Autoscaler Not Scaling
+
+**Symptom: Nodes not being added despite pending pods**
+
+Solutions:
+```bash
+# 1. Check Cluster Autoscaler logs
+kubectl logs -n kube-system deployment/cluster-autoscaler
+
+# 2. Check autoscaler status
+kubectl describe configmap cluster-autoscaler-status -n kube-system
+
+# 3. Verify node groups are tagged correctly
+# AWS: Check ASG tags
+aws autoscaling describe-auto-scaling-groups \
+  --query 'AutoScalingGroups[?Tags[?Key==`k8s.io/cluster-autoscaler/enabled`]]'
+
+# 4. Check scaling limits
+kubectl get deployment cluster-autoscaler -n kube-system -o yaml | grep -A 5 "command"
+
+# 5. Manually scale if urgent
+# AWS
+aws autoscaling set-desired-capacity \
+  --auto-scaling-group-name controlcore-nodes \
+  --desired-capacity 10
+
+# Azure
+az aks nodepool scale \
+  --resource-group controlcore \
+  --cluster-name controlcore-cluster \
+  --name standard \
+  --node-count 10
+```
+
+### HPA Not Scaling Pods
+
+**Symptom: HPA not creating more pods**
+
+Solutions:
+```bash
+# 1. Check HPA status and conditions
+kubectl get hpa -n control-core
+kubectl describe hpa controlcore-api -n control-core
+
+# 2. Verify metrics are available
+kubectl top pods -n control-core
+
+# 3. Check if at maxReplicas
+kubectl get hpa controlcore-api -n control-core -o yaml | grep -E "maxReplicas|currentReplicas"
+
+# 4. Review scaling behavior
+kubectl get hpa controlcore-api -n control-core -o yaml | grep -A 20 behavior
+
+# 5. Check custom metrics (if configured)
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq .
+
+# 6. Temporarily adjust thresholds
+kubectl patch hpa controlcore-api -n control-core --type='json' -p='[{"op": "replace", "path": "/spec/targetCPUUtilizationPercentage", "value":50}]'
+
+# 7. Check for pod disruption budgets blocking scale down
+kubectl get pdb -n control-core
+```
+
+## Policy Issues
+
+### Policy Syntax Errors
+
+**Symptom: Policy fails validation**
+
+Solutions:
+```bash
+# 1. Check error message in Console UI
+# Look for line number and description
+
+# 2. Use OPA CLI to validate locally
+opa check policy.rego
+
+# 3. Use OPA playground
+# Copy policy to https://play.openpolicyagent.org/
+
+# 4. Common syntax errors:
+# - Missing 'import rego.v1'
+# - Incorrect indentation
+# - Missing braces
+# - Typos in keywords (if, every, some)
+# - Missing 'default' for default values
+
+# 5. Use policy linter
+opa fmt -w policy.rego  # Auto-format
+opa check -s policy.rego  # Strict checking
+```
+
+### Policy Not Applying
+
+**Symptom: Policy deployed but not enforcing**
+
+Solutions:
+```bash
+# 1. Check deployment status
+# In Console: Policies → <your-policy> → Status
+
+# 2. Verify policy is in correct environment
+# Sandbox vs Production
+
+# 3. Check Bouncer has received policy
+curl http://localhost:8080/api/v1/policies | jq '.policies[] | select(.name=="<policy-name>")'
+
+# 4. Check OPAL sync status
+curl http://localhost:8080/api/v1/opal/status
+
+# 5. Force policy sync
+curl -X POST http://localhost:7000/policy/refresh
+curl -X POST http://localhost:8080/api/v1/opal/sync
+
+# 6. Clear caches
+curl -X POST http://localhost:8080/api/v1/policies/cache/clear
+
+# 7. Check for policy conflicts (multiple policies)
+# Review policy priority and evaluation order
+```
+
+### Unexpected Policy Decisions
+
+**Symptom: Policy allowing/denying incorrectly**
+
+Solutions:
+```bash
+# 1. Check decision logs
+# In Console: Monitoring → Decisions → Filter by policy
+
+# 2. Review actual input data
+# Decision logs show the exact input used
+
+# 3. Test policy with actual data
+# In Console: Policy → Test → Use decision log input
+
+# 4. Add debugging to policy
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Debug output
+debug_info := {
+    "user_roles": input.user.roles,
+    "resource_type": input.resource.type,
+    "action": input.action.name
+}
+
+allow if {
+    # Your conditions
+}
+
+# 5. Use OPA eval for testing
+opa eval --data policy.rego --input input.json 'data.controlcore.policy.allow'
+
+# 6. Check for data availability issues
+# Ensure PIP data is synchronized
+curl http://localhost:8080/api/v1/opa/data | jq '.policy_data'
+```
+
+## Authentication & Authorization Issues
+
+### SAML SSO Not Working
+
+**Symptom: SAML login fails or redirects incorrectly**
+
+Solutions:
+```bash
+# 1. Check SAML configuration
+echo $SAML_IDP_SSO_URL
+echo $SAML_SP_ENTITY_ID
+
+# 2. Verify SAML certificates
+openssl x509 -in idp-cert.pem -text -noout
+
+# 3. Check SAML response in browser DevTools
+# Network tab → Look for SAMLResponse parameter
+
+# 4. Validate SAML metadata
+curl https://idp.yourcompany.com/metadata.xml
+
+# 5. Check attribute mapping
+docker-compose logs api | grep -i "saml attribute"
+
+# 6. Enable SAML debug logging
+SAML_DEBUG=true
+docker-compose restart api
+
+# 7. Test with SAML tracer browser extension
+# Chrome/Firefox: SAML-tracer
+
+# 8. Common issues:
+# - Clock skew (sync server time with NTP)
+# - Expired certificates
+# - Incorrect ACS URL
+# - Missing required attributes
+```
+
+### OAuth/Auth0 Issues
+
+**Symptom: OAuth login fails**
+
+Solutions:
+```bash
+# 1. Check OAuth configuration
+echo $AUTH0_DOMAIN
+echo $AUTH0_CLIENT_ID
+echo $AUTH0_CALLBACK_URL
+
+# 2. Verify callback URL is registered
+# In Auth0 Dashboard: Applications → Settings → Allowed Callback URLs
+
+# 3. Check for token expiration
+docker-compose logs api | grep -i "token expired"
+
+# 4. Test OAuth flow manually
+curl https://<auth0-domain>/authorize?client_id=<client-id>&response_type=code&redirect_uri=<callback-url>&scope=openid%20profile%20email
+
+# 5. Check network connectivity to Auth0
+curl -v https://<auth0-domain>/.well-known/openid-configuration
+
+# 6. Enable OAuth debug logging
+AUTH0_DEBUG=true
+```
+
+## Network & Connectivity Issues
+
+### DNS Resolution Failures
+
+**Symptom: Services cannot resolve hostnames**
+
+Solutions:
+```bash
+# 1. Test DNS resolution
+nslookup api.controlcore.yourcompany.com
+dig api.controlcore.yourcompany.com
+
+# 2. Check Kubernetes DNS
+kubectl run -it --rm debug --image=busybox --restart=Never -- nslookup controlcore-api.control-core.svc.cluster.local
+
+# 3. Check CoreDNS logs
+kubectl logs -n kube-system -l k8s-app=kube-dns
+
+# 4. Verify DNS configuration
+kubectl get configmap coredns -n kube-system -o yaml
+
+# 5. Restart CoreDNS
+kubectl rollout restart deployment/coredns -n kube-system
+```
+
+### Network Policy Blocking Traffic
+
+**Symptom: Services cannot communicate**
+
+Solutions:
+```bash
+# 1. Check network policies
+kubectl get networkpolicies -n control-core
+
+# 2. Describe network policy
+kubectl describe networkpolicy <policy-name> -n control-core
+
+# 3. Temporarily disable for testing
+kubectl delete networkpolicy <policy-name> -n control-core
+
+# 4. Test connectivity
+kubectl run -it --rm debug --image=nicolaka/netshoot --restart=Never -- bash
+# Inside pod:
+curl http://controlcore-api:8082/health
+nc -zv controlcore-api 8082
+
+# 5. Add necessary rules
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-db
+  namespace: control-core
+spec:
+  podSelector:
+    matchLabels:
+      app: controlcore-api
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+EOF
+```
+
+## Certificate & SSL Issues
+
+### Certificate Expired
+
+**Symptom: SSL errors, certificate validation failures**
+
+Solutions:
+```bash
+# 1. Check certificate expiration
+echo | openssl s_client -connect api.controlcore.yourcompany.com:443 2>/dev/null | \
+  openssl x509 -noout -dates
+
+# 2. Check cert-manager certificates
+kubectl get certificates -n control-core
+kubectl describe certificate controlcore-tls -n control-core
+
+# 3. Force certificate renewal
+kubectl delete certificate controlcore-tls -n control-core
+# cert-manager will automatically recreate
+
+# 4. Check Let's Encrypt rate limits
+kubectl logs -n cert-manager deployment/cert-manager | grep -i "rate limit"
+
+# 5. Use staging for testing
+kubectl patch clusterissuer letsencrypt-prod -p '{"spec":{"acme":{"server":"https://acme-staging-v02.api.letsencrypt.org/directory"}}}'
+```
+
+### mTLS Issues
+
+**Symptom: Service-to-service mTLS failing**
+
+Solutions:
+```bash
+# 1. Check if Istio/service mesh is configured correctly
+kubectl get peerauthentication -n control-core
+
+# 2. Verify certificates
+kubectl get secret -n control-core | grep tls
+
+# 3. Check Istio sidecar injection
+kubectl get pod <pod-name> -n control-core -o jsonpath='{.spec.containers[*].name}'
+# Should show both app container and istio-proxy
+
+# 4. Review mTLS mode
+kubectl get destinationrule -n control-core -o yaml
+
+# 5. Disable mTLS temporarily for debugging
+kubectl apply -f - <<EOF
+apiVersion: security.istio.io/v1beta1
+kind:PeerAuthentication
+metadata:
+  name: default
+  namespace: control-core
+spec:
+  mtls:
+    mode: PERMISSIVE  # Allow both mTLS and plain text
+EOF
+```
+
+## Getting Help
+
+### Log Collection
+
+Before contacting support, collect the following logs:
+
+```bash
+# Control Plane logs
+kubectl logs -n control-core deployment/control-plane --tail=100
+
+# Database logs
+kubectl logs -n control-core deployment/postgres --tail=100
+
+# OPAL logs
+kubectl logs -n control-core deployment/opal --tail=100
+
+# Bouncer logs
+kubectl logs -l app=control-core-bouncer --tail=100
+```
+
+### Support Resources
+
+- **Documentation:** [https://docs.controlcore.io](https://docs.controlcore.io)
+- **Community:** [GitHub Discussions](https://github.com/controlcore/control-core/discussions)
+- **Support:** [support@controlcore.io](mailto:support@controlcore.io)
+
+### Issue Reporting
+
+When reporting issues, include:
+1. Control Core version
+2. Deployment method (Helm, Docker Compose, etc.)
+3. Environment details (OS, Kubernetes version, etc.)
+4. Error messages and logs
+5. Steps to reproduce the issue

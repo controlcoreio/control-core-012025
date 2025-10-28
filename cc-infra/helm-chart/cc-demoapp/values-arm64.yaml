@@ -1,0 +1,14 @@
+# Values override for ARM64 architecture
+# This file overrides the default values.yaml to use ARM64-specific image tags
+
+api:
+  deployment:
+    image:
+      tag: latest-arm64
+  sidecar:
+    image:
+      tag: latest-arm64
+
+frontend:
+  image:
+    tag: latest-arm64

@@ -1,0 +1,212 @@
+# OPAL Integration for Control Core
+# This compose file sets up OPAL server and client for Git-based policy management
+
+version: '3.8'
+
+services:
+  # Redis for OPAL caching
+  redis:
+    image: redis:7-alpine
+    container_name: cc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - controlcore
+
+  # OPAL Server for policy synchronization
+  cc-opal-server:
+    image: permitio/opal-server:latest
+    container_name: cc-opal-server
+    ports:
+      - "7000:7000"
+      - "8080:8080"  # Bundle server
+    environment:
+      # Policy Source Configuration
+      - OPAL_POLICY_SOURCE_TYPE=GIT
+      - OPAL_POLICY_REPO_URL=https://${GITHUB_TOKEN}@github.com/controlcoreio/staging-policies-repo.git
+      - OPAL_POLICY_REPO_CLONE_PATH=/tmp/staging-policies-repo
+      - OPAL_POLICY_REPO_MAIN_BRANCH=main
+      - OPAL_POLICY_REPO_POLLING_INTERVAL=30
+      
+      # Data Sources Configuration
+      - OPAL_DATA_CONFIG_SOURCES={"config":{"entries":[{"url":"http://cc-pap:8082/api/v1/policies/data","topics":["policy_data"],"dst_path":"/static"},{"url":"http://cc-pap:8082/api/v1/users/data","topics":["user_data"],"dst_path":"/static"},{"url":"http://cc-pap:8082/api/v1/resources/data","topics":["resource_data"],"dst_path":"/static"}]}}
+      
+      # Authentication
+      - OPAL_AUTH_TYPE=NONE
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      
+      # Logging
+      - OPAL_LOG_FORMAT_INCLUDE_PID=true
+      - OPAL_LOG_LEVEL=INFO
+      
+      # Health Check
+      - OPAL_HEALTH_CHECK_POLICY_PATH=/health
+      - OPAL_HEALTH_CHECK_POLICY_INTERVAL=30
+      
+      # Security
+      - OPAL_SECURITY_ENABLED=false
+      - OPAL_CORS_ENABLED=true
+      - OPAL_CORS_ORIGINS=*
+      
+      # Performance
+      - OPAL_WORKER_COUNT=4
+      - OPAL_MAX_WORKERS=8
+      - OPAL_TIMEOUT=30
+      
+      # Bundle Server
+      - OPAL_BUNDLE_SERVER_ENABLED=true
+      - OPAL_BUNDLE_SERVER_PORT=8080
+      - OPAL_BUNDLE_SERVER_PATH=/bundle
+      
+      # Webhook
+      - OPAL_WEBHOOK_ENABLED=true
+      - OPAL_WEBHOOK_SECRET=control-core-webhook-secret
+      - OPAL_WEBHOOK_PATH=/webhook
+      
+      # Redis
+      - OPAL_REDIS_URL=redis://redis:6379
+      - OPAL_REDIS_ENABLED=true
+    volumes:
+      - opal_data:/tmp/staging-policies-repo
+      - ./opal-server-config.yaml:/app/config.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - controlcore
+
+  # OPAL Client for Bouncer
+  cc-opal-client:
+    image: permitio/opal-client:latest
+    container_name: cc-opal-client
+    ports:
+      - "8083:8083"
+      - "8181:8181"  # OPA server
+    environment:
+      # OPAL Client Configuration
+      - OPAL_CLIENT_API_SERVER_PORT=8083
+      - OPAL_CLIENT_API_SERVER_HOST=0.0.0.0
+      
+      # OPAL Server Connection
+      - OPAL_SERVER_URL=http://cc-opal-server:7000
+      - OPAL_SERVER_TOKEN=
+      
+      # Policy Store
+      - OPAL_POLICY_STORE_TYPE=OPA
+      - OPAL_POLICY_STORE_OPA_URL=http://localhost:8181
+      - OPAL_POLICY_STORE_OPA_AUTH_TOKEN=
+      
+      # Data Store
+      - OPAL_DATA_STORE_TYPE=OPA
+      - OPAL_DATA_STORE_OPA_URL=http://localhost:8181
+      - OPAL_DATA_STORE_OPA_AUTH_TOKEN=
+      
+      # Synchronization
+      - OPAL_SYNC_ENABLED=true
+      - OPAL_SYNC_INTERVAL=30
+      - OPAL_SYNC_TIMEOUT=60
+      
+      # Logging
+      - OPAL_LOG_FORMAT_INCLUDE_PID=true
+      - OPAL_LOG_LEVEL=INFO
+      - OPAL_INLINE_OPA_LOG_FORMAT=http
+      
+      # Health Check
+      - OPAL_HEALTH_CHECK_ENABLED=true
+      - OPAL_HEALTH_CHECK_INTERVAL=30
+      - OPAL_HEALTH_CHECK_TIMEOUT=10
+      
+      # Performance
+      - OPAL_WORKER_COUNT=2
+      - OPAL_MAX_WORKERS=4
+      - OPAL_TIMEOUT=30
+      
+      # Cache
+      - OPAL_CACHE_ENABLED=true
+      - OPAL_CACHE_TTL=300
+      - OPAL_CACHE_MAX_SIZE=1000
+      
+      # Security
+      - OPAL_SECURITY_ENABLED=false
+      - OPAL_CORS_ENABLED=true
+      - OPAL_CORS_ORIGINS=*
+      
+      # Webhook
+      - OPAL_WEBHOOK_ENABLED=true
+      - OPAL_WEBHOOK_SECRET=control-core-webhook-secret
+      - OPAL_WEBHOOK_PATH=/webhook
+      
+      # Redis
+      - OPAL_REDIS_URL=redis://redis:6379
+      - OPAL_REDIS_ENABLED=true
+      
+      # Metrics
+      - OPAL_METRICS_ENABLED=true
+      - OPAL_METRICS_PORT=9090
+      - OPAL_METRICS_PATH=/metrics
+    volumes:
+      - opal_client_data:/app/data
+      - ./opal-client-config.yaml:/app/config.yaml:ro
+    depends_on:
+      cc-opal-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - controlcore
+
+  # OPA Server (embedded in OPAL client)
+  cc-opa-server:
+    image: openpolicyagent/opa:1.9.0
+    container_name: cc-opa-server
+    ports:
+      - "8181:8181"
+    command: >
+      run
+      --server
+      --addr=0.0.0.0:8181
+      --log-level=info
+      --log-format=json
+    volumes:
+      - opa_data:/data
+    depends_on:
+      cc-opal-client:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - controlcore
+
+volumes:
+  redis_data:
+    driver: local
+  opal_data:
+    driver: local
+  opal_client_data:
+    driver: local
+  opa_data:
+    driver: local
+
+networks:
+  controlcore:
+    driver: bridge

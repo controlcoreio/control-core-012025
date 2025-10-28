@@ -1,0 +1,322 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: ca-central-1
+  ECR_REPOSITORY: controlcoreio/cc-pap-api
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+#      - name: Run golangci-lint
+#        uses: golangci/golangci-lint-action@v3
+#        with:
+#          version: latest
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./... -coverprofile=coverage.txt
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.txt
+          fail_ci_if_error: false
+
+  check-release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      release_exists: ${{ steps.check_release.outputs.release_exists }}
+      version: ${{ steps.extract_version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Extract version from .version file
+        id: extract_version
+        run: |
+          VERSION=$(cat .version)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Check if release exists
+        id: check_release_v
+        uses: cardinalby/git-get-release-action@v1
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tag: v${{ steps.extract_version.outputs.version }}
+
+      - name: Set release exists flag
+        id: check_release
+        run: |
+          if [[ -n "${{ steps.check_release_v.outputs.id }}" ]]; then
+            echo "release_exists=true" >> $GITHUB_OUTPUT
+            echo "Release with version ${{ steps.extract_version.outputs.version }} already exists"
+            echo "Skipping build and push because release with version ${{ steps.extract_version.outputs.version }} already exists"
+          else
+            echo "release_exists=false" >> $GITHUB_OUTPUT
+            echo "Release with version ${{ steps.extract_version.outputs.version }} does not exist"
+          fi
+
+  build-and-push:
+    needs: check-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # This permission is needed to push tags
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-release.outputs.release_exists != 'true'
+    outputs:
+      repository: ${{ env.ECR_REPOSITORY }}
+      amd64_digest: ${{ steps.get-digests.outputs.amd64_digest }}
+      arm64_digest: ${{ steps.get-digests.outputs.arm64_digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set version from check-release job
+        run: |
+          echo "VERSION=${{ needs.check-release.outputs.version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.check-release.outputs.version }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/amd64,linux/arm64
+
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata for Docker (AMD64)
+        id: meta-amd64
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ env.VERSION }},enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Extract metadata for Docker (ARM64)
+        id: meta-arm64
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=raw,value=latest-arm64,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ env.VERSION }}-arm64,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Docker image (AMD64)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta-amd64.outputs.tags }}
+          labels: ${{ steps.meta-amd64.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new-amd64
+          provenance: false
+          build-args: |
+            GOARCH=amd64
+
+      - name: Build and push Docker image (ARM64)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64
+          tags: ${{ steps.meta-arm64.outputs.tags }}
+          labels: ${{ steps.meta-arm64.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new-arm64
+          provenance: false
+          build-args: |
+            GOARCH=arm64
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mkdir -p /tmp/.buildx-cache
+          # Merge both architecture caches
+          [ -d "/tmp/.buildx-cache-new-amd64" ] && cp -r /tmp/.buildx-cache-new-amd64/* /tmp/.buildx-cache/ || true
+          [ -d "/tmp/.buildx-cache-new-arm64" ] && cp -r /tmp/.buildx-cache-new-arm64/* /tmp/.buildx-cache/ || true
+          rm -rf /tmp/.buildx-cache-new-amd64 /tmp/.buildx-cache-new-arm64
+
+      - name: Get platform-specific digests
+        id: get-digests
+        run: |
+          # Set image reference
+          IMAGE_REF="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION }}"
+
+          # Get raw manifest data
+          MANIFEST_DATA=$(docker buildx imagetools inspect --raw ${IMAGE_REF} 2>/dev/null || echo '{}')
+
+          # Check if manifest data contains manifests array
+          if echo "$MANIFEST_DATA" | jq -e '.manifests' >/dev/null 2>&1; then
+            # Get AMD64 digest
+            AMD64_DIGEST=$(echo "$MANIFEST_DATA" | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest // empty')
+            # Get ARM64 digest
+            ARM64_DIGEST=$(echo "$MANIFEST_DATA" | jq -r '.manifests[] | select(.platform.architecture == "arm64") | .digest // empty')
+          else
+            echo "Manifest does not contain expected structure. Trying alternative method..."
+
+            # Alternative method for AMD64
+            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION }} 2>/dev/null || true
+            AMD64_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION }} 2>/dev/null | cut -d'@' -f2 || echo "")
+
+            # Alternative method for ARM64
+            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION }}-arm64 2>/dev/null || true
+            ARM64_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.VERSION }}-arm64 2>/dev/null | cut -d'@' -f2 || echo "")
+          fi
+
+          # Set default value if digest is empty
+          if [ -z "$AMD64_DIGEST" ]; then
+            echo "Could not determine AMD64 digest, using placeholder"
+            AMD64_DIGEST="sha256:unknown"
+          fi
+
+          if [ -z "$ARM64_DIGEST" ]; then
+            echo "Could not determine ARM64 digest, using placeholder"
+            ARM64_DIGEST="sha256:unknown"
+          fi
+
+          # Output the digests
+          echo "amd64_digest=${AMD64_DIGEST}" >> $GITHUB_OUTPUT
+          echo "AMD64 Digest: ${AMD64_DIGEST}"
+          echo "arm64_digest=${ARM64_DIGEST}" >> $GITHUB_OUTPUT
+          echo "ARM64 Digest: ${ARM64_DIGEST}"
+
+
+      - name: Create Git Tag
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          # Use the same tag format that was found in the release check
+          # For consistency with existing releases, we'll use v${{ env.VERSION }} format
+          git tag -a v${{ env.VERSION }} -m "Release v${{ env.VERSION }}"
+          git push origin v${{ env.VERSION }}
+
+  create-release:
+    needs: [check-release, build-and-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-release.outputs.release_exists != 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set version from check-release job
+        run: |
+          echo "VERSION=${{ needs.check-release.outputs.version }}" >> $GITHUB_ENV
+          echo "Using version: ${{ needs.check-release.outputs.version }}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS account ID
+        id: get-aws-account
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+          echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> $GITHUB_ENV
+          echo "AWS Account ID: $AWS_ACCOUNT_ID"
+
+      - name: Set image URL
+        run: |
+          # Construct ECR registry URL using AWS account ID and region
+          ECR_REGISTRY="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          IMAGE_URL="${ECR_REGISTRY}/${{ needs.build-and-push.outputs.repository }}:${{ env.VERSION }}"
+          echo "IMAGE_URL=$IMAGE_URL" >> $GITHUB_ENV
+          echo "Image URL: $IMAGE_URL"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          generate_release_notes: true
+          body: |
+            ## Docker Images
+            ### AMD64/x86
+            ```
+            ${{ env.IMAGE_URL }}
+            ```
+            or using the latest tag:
+            ```
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION}}.amazonaws.com/${{ needs.build-and-push.outputs.repository }}:latest
+            ```
+            or with digest:
+            ```
+            ${{ env.IMAGE_URL }}@${{ needs.build-and-push.outputs.amd64_digest }}
+            ```
+
+            ### ARM64
+            ```
+            ${{ env.IMAGE_URL }}-arm64
+            ```
+            or using the latest-arm64 tag:
+            ```
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION}}.amazonaws.com/${{ needs.build-and-push.outputs.repository }}:latest-arm64
+            ```
+            or with digest:
+            ```
+            ${{ env.IMAGE_URL }}@${{ needs.build-and-push.outputs.arm64_digest }}
+            ```
+          draft: false
+          prerelease: false

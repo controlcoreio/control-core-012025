@@ -1,0 +1,309 @@
+{
+  "version": "1.0.0",
+  "summary": "AI governance aligned with Treasury Board guidelines",
+  "detailed_description": "AI governance aligned with Treasury Board guidelines. This policy provides comprehensive controls and enforcement mechanisms aligned with industry standards and best practices.",
+  "use_cases": [
+    {
+      "title": "Financial Services: AI-Powered Fraud Detection System",
+      "description": "Deploy treasury-board-ai-governance.meta for a production fraud detection AI model",
+      "scenario": "Global Bank deploys an AI fraud detection model processing 10M daily transactions. Auditor requirement: demonstrate model approval process, training data governance, and bias testing before production deployment. Policy enforces: (1) Risk assessment by Chief AI Officer, (2) Validation by independent team showing <2% false positive rate, (3) Monthly bias audits on protected classes, (4) Automated rollback if accuracy drops below 95%. Compliance: Federal Reserve SR 11-7 (Model Risk Management)."
+    },
+    {
+      "title": "Healthcare: Clinical Decision Support AI with HIPAA Requirements",
+      "description": "Apply treasury-board-ai-governance.meta to protect patient data in AI diagnostic systems",
+      "scenario": "Hospital network implements AI radiology assistant analyzing 5,000 X-rays daily. Auditor verification needed: (1) All 47 radiologists have signed AI use agreements, (2) System logs every AI recommendation with radiologist override capability, (3) PHI access restricted to treating physicians only, (4) AI outputs reviewed by second physician for high-stakes diagnoses. Policy blocks: AI access outside treating relationship, automated AI decisions without physician review. HIPAA audit trail maintained for 6 years."
+    },
+    {
+      "title": "Retail: Customer Service AI with PII Protection",
+      "description": "Implement treasury-board-ai-governance.meta for AI chatbot handling customer data",
+      "scenario": "E-commerce platform's AI chatbot handles 50,000 daily customer interactions across EU and California. Compliance requirement: Demonstrate GDPR Article 22 (right to object to automated decisions) and CCPA compliance. Policy enforces: (1) Customer PII (SSN, payment details) masked in AI training data, (2) Chatbot unable to make purchase decisions >$500 without human, (3) EU customers can request human agent immediately, (4) All AI interactions logged with 'automated decision' flag. Reduced compliance violations from 12/month to zero."
+    },
+    {
+      "title": "Insurance: Automated Underwriting with Fairness Requirements",
+      "description": "Use treasury-board-ai-governance.meta to ensure fair AI-driven insurance decisions",
+      "scenario": "Insurance carrier uses AI to evaluate 15,000 policy applications monthly. State regulator audit focuses on: (1) Proving AI doesn't discriminate on race, gender (protected classes), (2) Demonstrating explainability for all denials, (3) Human review for borderline cases. Policy requires: Bias testing quarterly across 50+ demographic segments, explainability scores >0.7, senior underwriter review when AI confidence <85%. Result: Zero discrimination findings in regulatory exam, 23% faster application processing."
+    },
+    {
+      "title": "Manufacturing: Predictive Maintenance AI with Safety Controls",
+      "description": "Deploy treasury-board-ai-governance.meta for safety-critical industrial AI systems",
+      "scenario": "Auto manufacturer uses AI to predict equipment failures affecting 1,200 assembly robots. Safety audit requirements: (1) Prove AI trained only on verified sensor data, (2) Human override always available, (3) False negatives (missed failures) tracked and investigated, (4) AI recommendations reviewed by maintenance engineers before critical shutdowns. Policy enforces: 2-person approval for shutdowns affecting >50 workers, AI confidence thresholds before automated actions, incident tracking for all prediction failures."
+    },
+    {
+      "title": "Government: AI in Public Services with Transparency Requirements",
+      "description": "Apply treasury-board-ai-governance.meta for government AI systems requiring public accountability",
+      "scenario": "City government deploys AI for permit application processing (5,000/month). Public accountability requirements: (1) AI decision criteria published publicly, (2) Citizens can request human review within 5 business days, (3) Bias audits by independent third party annually, (4) Algorithmic Impact Assessment published. Policy ensures: All denials include explanation in plain language, applicant notification of AI use, appeals tracked with resolution times, bias metrics published quarterly."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "user.authenticated",
+      "type": "boolean",
+      "description": "User authentication status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'user.authenticated' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'user.authenticated':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'user.authenticated' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "user.authorized",
+      "type": "boolean",
+      "description": "User authorization status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'user.authorized' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'user.authorized':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'user.authorized' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.compliant",
+      "type": "boolean",
+      "description": "Compliance status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'context.compliant' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.compliant':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.compliant' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "identity_and_access": [
+        {
+          "condition": "input.user.authenticated",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "user.authenticated",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.user.authorized",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "user.authorized",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "Application Code",
+          "api_endpoint": "Application sends action in request",
+          "field_mapping": "action",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.action",
+          "system": "API Gateway",
+          "api_endpoint": "Map HTTP method to action",
+          "field_mapping": "GET→read, POST→create, DELETE→delete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.compliant",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.compliant",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "monitoring_and_logging": [
+        {
+          "condition": "input.context.risk_assessed",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.risk_assessed",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ]
+    },
+    "systems_needed": [
+      "API Gateway",
+      "Application Code",
+      "Custom data source"
+    ],
+    "complexity_score": "Medium - Moderate complexity requiring multiple integrations"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Configure integration with IAM system",
+      "2. Set up audit logging",
+      "3. Test in sandbox environment",
+      "4. Deploy to production"
+    ],
+    "configuration_tips": [
+      "Adjust thresholds based on risk appetite",
+      "Configure notifications for policy violations"
+    ],
+    "testing_scenarios": [
+      "Authorized user access - should allow",
+      "Unauthorized user access - should deny"
+    ],
+    "prerequisites": [
+      "✅ Inventory all systems needed for 5 conditions in this policy",
+      "✅ Verify API access and credentials for each system",
+      "✅ Test API endpoints return expected data format",
+      "✅ Document field mappings between your systems and policy conditions",
+      "✅ Ensure network connectivity from Control Core to all data sources"
+    ],
+    "data_source_configuration": [
+      "\n📦 Identity And Access:",
+      "   • Configure Custom data source integration for 'input.user.authenticated'",
+      "     - API: REST API endpoint",
+      "     - Field: user.authenticated",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.user.authorized'",
+      "     - API: REST API endpoint",
+      "     - Field: user.authorized",
+      "     - Method: REST API",
+      "\n📦 Data Sources:",
+      "   • Configure Application Code integration for 'input.action'",
+      "     - API: Application sends action in request",
+      "     - Field: action",
+      "     - Method: REST API",
+      "   • Configure API Gateway integration for 'input.action'",
+      "     - API: Map HTTP method to action",
+      "     - Field: GET→read, POST→create, DELETE→delete",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.context.compliant'",
+      "     - API: REST API endpoint",
+      "     - Field: context.compliant",
+      "     - Method: REST API",
+      "\n📦 Monitoring And Logging:",
+      "   • Configure Custom data source integration for 'input.context.risk_assessed'",
+      "     - API: REST API endpoint",
+      "     - Field: context.risk_assessed",
+      "     - Method: REST API"
+    ],
+    "policy_customization": [
+      "🔧 Review and customize the following conditions for your environment:",
+      "   • User conditions (2): user.authenticated, user.authorized",
+      "   • Context conditions (2): context.compliant, context.risk_assessed",
+      "",
+      "📝 Modification guidelines:",
+      "   • Update attribute names to match your system's field names",
+      "   • Adjust threshold values (e.g., risk scores, time windows)",
+      "   • Add/remove conditions based on your requirements",
+      "   • Test each condition individually before combining",
+      "",
+      "💾 Save modified policy with version tag for tracking"
+    ],
+    "sandbox_testing": [
+      "🧪 Deploy to Sandbox environment first:",
+      "   1. Create test users with various attribute combinations",
+      "   2. Set up test resources with different classifications",
+      "   3. Run test scenarios:",
+      "      • User with all required attributes → ALLOW",
+      "      • User missing required attribute → DENY",
+      "      • User with insufficient privileges → DENY",
+      "   4. Verify audit logs capture all evaluations",
+      "   5. Check performance (policy evaluation < 100ms)",
+      "   6. Test error handling (missing attributes, null values)"
+    ],
+    "production_deployment": [
+      "🚀 Production deployment checklist:",
+      "   1. ✅ All sandbox tests passing",
+      "   2. ✅ Stakeholder approval documented",
+      "   3. ✅ Rollback plan prepared",
+      "   4. ✅ Deploy in shadow mode (log only, don't enforce) for 24-48 hours",
+      "   5. ✅ Review shadow mode logs for unexpected denials",
+      "   6. ✅ Adjust policy based on real traffic patterns",
+      "   7. ✅ Enable enforcement mode with gradual rollout (10% → 50% → 100%)",
+      "   8. ✅ Monitor error rates and user feedback",
+      "   9. ✅ Document deployment for compliance audit trail"
+    ],
+    "monitoring_setup": [
+      "📊 Set up monitoring and alerts:",
+      "   • Policy evaluation count (baseline: track for 1 week)",
+      "   • Denial rate (alert if > 5% of requests)",
+      "   • Evaluation latency (alert if > 200ms p95)",
+      "   • Missing attribute errors (alert on any occurrence)",
+      "   • Condition-specific metrics:",
+      "     1. Monitor 'input.action' - track null/missing values",
+      "     2. Monitor 'input.context.compliant' - track null/missing values",
+      "     3. Monitor 'input.context.risk_assessed' - track null/missing values",
+      "     4. Monitor 'input.user.authenticated' - track null/missing values",
+      "     5. Monitor 'input.user.authorized' - track null/missing values"
+    ]
+  },
+  "compliance_frameworks": [
+    "Canadian AI Governance"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "canadian-ai-governance",
+    "canadian-ai-governance"
+  ],
+  "related_templates": [],
+  "conditions_analysis": {
+    "total_conditions": 5,
+    "user_attributes": 2,
+    "resource_attributes": 0,
+    "context_attributes": 2
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technical stack to fetch the required attributes.",
+    "steps_by_system": [
+      {
+        "system": "Custom data source",
+        "attributes_needed": [
+          "input.user.authenticated",
+          "input.user.authorized",
+          "input.context.compliant",
+          "input.context.risk_assessed"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Custom data source",
+          "2. Test API access: REST API endpoint",
+          "3. In Control Core: Settings → Integrations → Add Custom data source",
+          "4. Configure field mappings for 4 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: user.authenticated, user.authorized, context.compliant"
+      },
+      {
+        "system": "Application Code",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Application Code",
+          "2. Test API access: Application sends action in request",
+          "3. In Control Core: Settings → Integrations → Add Application Code",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: action"
+      },
+      {
+        "system": "API Gateway",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for API Gateway",
+          "2. Test API access: Map HTTP method to action",
+          "3. In Control Core: Settings → Integrations → Add API Gateway",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: GET→read, POST→create, DELETE→delete"
+      }
+    ]
+  }
+}

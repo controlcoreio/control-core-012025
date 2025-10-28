@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.pdp.name }}
+  labels:
+    app: {{ .Values.pdp.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.pdp.service.type }}
+  ports:
+    - port: {{ .Values.pdp.service.port }}
+      targetPort: {{ .Values.pdp.service.port }}
+      protocol: TCP
+  selector:
+    app: {{ .Values.pdp.name }}
+    stack: {{ .Values.global.stack }}
+    env: {{ .Values.global.environment }}

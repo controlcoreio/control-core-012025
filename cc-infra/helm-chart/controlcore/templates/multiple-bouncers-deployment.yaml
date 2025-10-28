@@ -1,0 +1,80 @@
+{{- range $name, $config := .Values.bouncers }}
+{{- if $config.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $config.name }}
+  labels:
+    app: {{ $config.name }}
+    resource-type: {{ $config.resourceType }}
+    {{- include "controlcore.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $config.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $config.name }}
+      stack: {{ $.Values.global.stack }}
+      env: {{ $.Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ $config.name }}
+        resource-type: {{ $config.resourceType }}
+        stack: {{ $.Values.global.stack }}
+        env: {{ $.Values.global.environment }}
+      annotations:
+        # Force pod restart when config changes
+        kubectl.kubernetes.io/restartedAt: "{{ now | date "2006-01-02T15:04:05Z07:00" }}"
+    spec:
+      containers:
+        - name: {{ $config.name }}
+          image: "{{ $.Values.bouncer.image.repository }}:{{ $.Values.bouncer.image.tag }}"
+          imagePullPolicy: {{ $.Values.bouncer.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $config.port }}
+          env:
+            - name: BOUNCER_PORT
+              value: "{{ $config.port }}"
+            - name: TARGET_HOST
+              value: "{{ $config.targetHost }}"
+            - name: PAP_API_URL
+              value: "http://cc-pap:8082"
+            - name: OPAL_SERVER_URL
+              value: "http://cc-opal:7000"
+            - name: TENANT_ID
+              value: "{{ $.Values.global.tenantId }}"
+            - name: API_KEY
+              value: "{{ $.Values.global.apiKey }}"
+            - name: RESOURCE_TYPE
+              value: "{{ $config.resourceType }}"
+            - name: BOUNCER_NAME
+              value: "{{ $config.name }}"
+            - name: LOG_ENABLED
+              value: "true"
+            - name: CACHE_ENABLED
+              value: "true"
+            - name: METRICS_ENABLED
+              value: "true"
+            - name: METRICS_PORT
+              value: "9090"
+          resources:
+            {{- toYaml $.Values.bouncer.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ $config.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $config.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+{{- end }}
+{{- end }}

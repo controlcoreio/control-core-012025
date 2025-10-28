@@ -1,0 +1,460 @@
+{
+  "version": "1.0.0",
+  "summary": "NIST AI RMF compliant bias detection and mitigation policy for AI/ML models",
+  "detailed_description": "This policy implements comprehensive bias detection and mitigation controls aligned with the NIST AI Risk Management Framework. It evaluates AI models for fairness across protected attributes including race, gender, age, disability, and other legally protected characteristics. The policy enforces fairness metrics such as demographic parity (80% rule), equal opportunity, disparate impact, and statistical parity.\n\nKey capabilities:\n- Automated bias assessment validation (90-day refresh requirement)\n- Multi-metric fairness evaluation against industry thresholds\n- Protected attribute bias scoring and monitoring\n- Mandatory pre-processing and post-processing mitigation strategies\n- Continuous monitoring with configurable alert thresholds\n- Risk-based scoring (0-100) with five severity levels\n- Automated remediation workflow triggers",
+  "use_cases": [
+    {
+      "title": "Financial Services: AI-Powered Fraud Detection System",
+      "description": "Deploy ai-bias-detection-mitigation.meta for a production fraud detection AI model",
+      "scenario": "Global Bank deploys an AI fraud detection model processing 10M daily transactions. Auditor requirement: demonstrate model approval process, training data governance, and bias testing before production deployment. Policy enforces: (1) Risk assessment by Chief AI Officer, (2) Validation by independent team showing <2% false positive rate, (3) Monthly bias audits on protected classes, (4) Automated rollback if accuracy drops below 95%. Compliance: Federal Reserve SR 11-7 (Model Risk Management)."
+    },
+    {
+      "title": "Healthcare: Clinical Decision Support AI with HIPAA Requirements",
+      "description": "Apply ai-bias-detection-mitigation.meta to protect patient data in AI diagnostic systems",
+      "scenario": "Hospital network implements AI radiology assistant analyzing 5,000 X-rays daily. Auditor verification needed: (1) All 47 radiologists have signed AI use agreements, (2) System logs every AI recommendation with radiologist override capability, (3) PHI access restricted to treating physicians only, (4) AI outputs reviewed by second physician for high-stakes diagnoses. Policy blocks: AI access outside treating relationship, automated AI decisions without physician review. HIPAA audit trail maintained for 6 years."
+    },
+    {
+      "title": "Retail: Customer Service AI with PII Protection",
+      "description": "Implement ai-bias-detection-mitigation.meta for AI chatbot handling customer data",
+      "scenario": "E-commerce platform's AI chatbot handles 50,000 daily customer interactions across EU and California. Compliance requirement: Demonstrate GDPR Article 22 (right to object to automated decisions) and CCPA compliance. Policy enforces: (1) Customer PII (SSN, payment details) masked in AI training data, (2) Chatbot unable to make purchase decisions >$500 without human, (3) EU customers can request human agent immediately, (4) All AI interactions logged with 'automated decision' flag. Reduced compliance violations from 12/month to zero."
+    },
+    {
+      "title": "Insurance: Automated Underwriting with Fairness Requirements",
+      "description": "Use ai-bias-detection-mitigation.meta to ensure fair AI-driven insurance decisions",
+      "scenario": "Insurance carrier uses AI to evaluate 15,000 policy applications monthly. State regulator audit focuses on: (1) Proving AI doesn't discriminate on race, gender (protected classes), (2) Demonstrating explainability for all denials, (3) Human review for borderline cases. Policy requires: Bias testing quarterly across 50+ demographic segments, explainability scores >0.7, senior underwriter review when AI confidence <85%. Result: Zero discrimination findings in regulatory exam, 23% faster application processing."
+    },
+    {
+      "title": "Manufacturing: Predictive Maintenance AI with Safety Controls",
+      "description": "Deploy ai-bias-detection-mitigation.meta for safety-critical industrial AI systems",
+      "scenario": "Auto manufacturer uses AI to predict equipment failures affecting 1,200 assembly robots. Safety audit requirements: (1) Prove AI trained only on verified sensor data, (2) Human override always available, (3) False negatives (missed failures) tracked and investigated, (4) AI recommendations reviewed by maintenance engineers before critical shutdowns. Policy enforces: 2-person approval for shutdowns affecting >50 workers, AI confidence thresholds before automated actions, incident tracking for all prediction failures."
+    },
+    {
+      "title": "Government: AI in Public Services with Transparency Requirements",
+      "description": "Apply ai-bias-detection-mitigation.meta for government AI systems requiring public accountability",
+      "scenario": "City government deploys AI for permit application processing (5,000/month). Public accountability requirements: (1) AI decision criteria published publicly, (2) Citizens can request human review within 5 business days, (3) Bias audits by independent third party annually, (4) Algorithmic Impact Assessment published. Policy ensures: All denials include explanation in plain language, applicant notification of AI use, appeals tracked with resolution times, bias metrics published quarterly."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "ai_model.bias_assessment",
+      "type": "object",
+      "description": "Bias assessment status and timing",
+      "required": true,
+      "fields": [
+        "completed",
+        "date",
+        "assessor",
+        "methodology"
+      ],
+      "plain_english": "Runtime evaluation of 'ai_model.bias_assessment' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'ai_model.bias_assessment':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'ai_model.bias_assessment' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"key\": \"value\"}"
+    },
+    {
+      "name": "ai_model.fairness_metrics",
+      "type": "object",
+      "description": "Calculated fairness metrics",
+      "required": true,
+      "metrics": {
+        "demographic_parity": "Ratio of positive outcomes across groups (threshold: 0.8)",
+        "equal_opportunity": "True positive rate parity (threshold: 0.85)",
+        "disparate_impact": "Adverse impact ratio (threshold: 0.8)",
+        "statistical_parity": "Selection rate parity (threshold: 0.85)"
+      },
+      "plain_english": "Runtime evaluation of 'ai_model.fairness_metrics' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'ai_model.fairness_metrics':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'ai_model.fairness_metrics' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"key\": \"value\"}"
+    },
+    {
+      "name": "ai_model.bias_metrics",
+      "type": "object",
+      "description": "Bias scores for protected attributes",
+      "required": true,
+      "attributes": [
+        "race",
+        "ethnicity",
+        "gender",
+        "age",
+        "disability",
+        "religion",
+        "sexual_orientation",
+        "national_origin"
+      ],
+      "plain_english": "Runtime evaluation of 'ai_model.bias_metrics' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'ai_model.bias_metrics':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'ai_model.bias_metrics' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"key\": \"value\"}"
+    },
+    {
+      "name": "ai_model.bias_threshold",
+      "type": "float",
+      "description": "Maximum acceptable bias score",
+      "required": true,
+      "default": 0.1,
+      "range": "0.0-1.0",
+      "plain_english": "Runtime evaluation of 'ai_model.bias_threshold' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'ai_model.bias_threshold':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'ai_model.bias_threshold' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "example_value"
+    },
+    {
+      "name": "ai_model.mitigation_strategies",
+      "type": "array",
+      "description": "Implemented bias mitigation strategies",
+      "required": true,
+      "strategy_types": [
+        "preprocessing",
+        "inprocessing",
+        "postprocessing"
+      ],
+      "plain_english": "Runtime evaluation of 'ai_model.mitigation_strategies' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'ai_model.mitigation_strategies':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'ai_model.mitigation_strategies' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "[\"value1\", \"value2\"]"
+    },
+    {
+      "name": "ai_model.monitoring",
+      "type": "object",
+      "description": "Continuous bias monitoring configuration",
+      "required": true,
+      "fields": [
+        "bias_detection_enabled",
+        "alert_thresholds_configured",
+        "frequency_hours"
+      ],
+      "plain_english": "Runtime evaluation of 'ai_model.monitoring' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'ai_model.monitoring':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'ai_model.monitoring' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "{\"key\": \"value\"}"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "Application Code",
+          "api_endpoint": "Application sends action in request",
+          "field_mapping": "action",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.action",
+          "system": "API Gateway",
+          "api_endpoint": "Map HTTP method to action",
+          "field_mapping": "GET→read, POST→create, DELETE→delete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.environment",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "environment",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "ai_ml_platforms": [
+        {
+          "condition": "input.ai_model.bias_assessment.completed",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.bias_assessment.completed",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.bias_assessment.date",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.bias_assessment.date",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.bias_metrics",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.bias_metrics",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.bias_review_scheduled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.bias_review_scheduled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.bias_threshold",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.bias_threshold",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.fairness_metrics",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.fairness_metrics",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.mitigation_strategies",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.mitigation_strategies",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.monitoring.alert_thresholds_configured",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.monitoring.alert_thresholds_configured",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.monitoring.bias_detection_enabled",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.monitoring.bias_detection_enabled",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.ai_model.monitoring.frequency_hours",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "ai_model.monitoring.frequency_hours",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ]
+    },
+    "systems_needed": [
+      "API Gateway",
+      "Application Code",
+      "Custom data source"
+    ],
+    "complexity_score": "Medium - Moderate complexity requiring multiple integrations"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Integrate with AI/ML platform and model registry",
+      "2. Configure fairness metrics calculation pipeline",
+      "3. Set up protected attribute data collection (with privacy controls)",
+      "4. Define bias thresholds aligned with organizational risk appetite",
+      "5. Implement bias mitigation strategy library",
+      "6. Configure continuous monitoring and alerting",
+      "7. Deploy to sandbox with test models",
+      "8. Validate with historical bias assessment data",
+      "9. Train data science and compliance teams on policy",
+      "10. Promote to production with full audit logging"
+    ],
+    "configuration_tips": [
+      "Adjust fairness metric thresholds based on industry standards and legal requirements",
+      "Configure bias assessment refresh intervals (default: 90 days)",
+      "Set appropriate bias score thresholds for protected attributes",
+      "Customize required mitigation strategies for your use cases",
+      "Enable stricter controls for high-risk AI applications"
+    ],
+    "testing_scenarios": [
+      "Model with no bias detected - should allow deployment",
+      "Model with minor bias in single attribute - should allow with mitigation",
+      "Model with significant bias - should deny deployment",
+      "Outdated bias assessment - should require refresh",
+      "Missing mitigation strategies - should require implementation"
+    ],
+    "prerequisites": [
+      "✅ Inventory all systems needed for 12 conditions in this policy",
+      "✅ Verify API access and credentials for each system",
+      "✅ Test API endpoints return expected data format",
+      "✅ Document field mappings between your systems and policy conditions",
+      "✅ Ensure network connectivity from Control Core to all data sources"
+    ],
+    "data_source_configuration": [
+      "\n📦 Data Sources:",
+      "   • Configure Application Code integration for 'input.action'",
+      "     - API: Application sends action in request",
+      "     - Field: action",
+      "     - Method: REST API",
+      "   • Configure API Gateway integration for 'input.action'",
+      "     - API: Map HTTP method to action",
+      "     - Field: GET→read, POST→create, DELETE→delete",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.environment'",
+      "     - API: REST API endpoint",
+      "     - Field: environment",
+      "     - Method: REST API",
+      "\n📦 Ai Ml Platforms:",
+      "   • Configure Custom data source integration for 'input.ai_model.bias_assessment.completed'",
+      "     - API: REST API endpoint",
+      "     - Field: ai_model.bias_assessment.completed",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.ai_model.bias_assessment.date'",
+      "     - API: REST API endpoint",
+      "     - Field: ai_model.bias_assessment.date",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.ai_model.bias_metrics'",
+      "     - API: REST API endpoint",
+      "     - Field: ai_model.bias_metrics",
+      "     - Method: REST API"
+    ],
+    "policy_customization": [
+      "🔧 Review and customize the following conditions for your environment:",
+      "",
+      "📝 Modification guidelines:",
+      "   • Update attribute names to match your system's field names",
+      "   • Adjust threshold values (e.g., risk scores, time windows)",
+      "   • Add/remove conditions based on your requirements",
+      "   • Test each condition individually before combining",
+      "",
+      "💾 Save modified policy with version tag for tracking"
+    ],
+    "sandbox_testing": [
+      "🧪 Deploy to Sandbox environment first:",
+      "   1. Create test users with various attribute combinations",
+      "   2. Set up test resources with different classifications",
+      "   3. Run test scenarios:",
+      "   4. Verify audit logs capture all evaluations",
+      "   5. Check performance (policy evaluation < 100ms)",
+      "   6. Test error handling (missing attributes, null values)"
+    ],
+    "production_deployment": [
+      "🚀 Production deployment checklist:",
+      "   1. ✅ All sandbox tests passing",
+      "   2. ✅ Stakeholder approval documented",
+      "   3. ✅ Rollback plan prepared",
+      "   4. ✅ Deploy in shadow mode (log only, don't enforce) for 24-48 hours",
+      "   5. ✅ Review shadow mode logs for unexpected denials",
+      "   6. ✅ Adjust policy based on real traffic patterns",
+      "   7. ✅ Enable enforcement mode with gradual rollout (10% → 50% → 100%)",
+      "   8. ✅ Monitor error rates and user feedback",
+      "   9. ✅ Document deployment for compliance audit trail"
+    ],
+    "monitoring_setup": [
+      "📊 Set up monitoring and alerts:",
+      "   • Policy evaluation count (baseline: track for 1 week)",
+      "   • Denial rate (alert if > 5% of requests)",
+      "   • Evaluation latency (alert if > 200ms p95)",
+      "   • Missing attribute errors (alert on any occurrence)",
+      "   • Condition-specific metrics:",
+      "     1. Monitor 'input.action' - track null/missing values",
+      "     2. Monitor 'input.ai_model.bias_assessment.completed' - track null/missing values",
+      "     3. Monitor 'input.ai_model.bias_assessment.date' - track null/missing values",
+      "     4. Monitor 'input.ai_model.bias_metrics' - track null/missing values",
+      "     5. Monitor 'input.ai_model.bias_review_scheduled' - track null/missing values"
+    ]
+  },
+  "compliance_frameworks": [
+    "NIST AI RMF",
+    "NIST AI 100-1",
+    "Equal Employment Opportunity Commission (EEOC) Guidelines",
+    "Fair Credit Reporting Act (FCRA)",
+    "Equal Credit Opportunity Act (ECOA)",
+    "ISO/IEC 23894",
+    "EU AI Act"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "nist-ai-rmf",
+    "bias-detection",
+    "fairness",
+    "ai-ethics",
+    "discrimination-prevention"
+  ],
+  "related_templates": [
+    "ai-risk-assessment-classification",
+    "ai-transparency-explainability",
+    "ai-accountability-framework"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 12,
+    "user_attributes": 0,
+    "resource_attributes": 0,
+    "context_attributes": 0
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technical stack to fetch the required attributes.",
+    "steps_by_system": [
+      {
+        "system": "Application Code",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Application Code",
+          "2. Test API access: Application sends action in request",
+          "3. In Control Core: Settings → Integrations → Add Application Code",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: action"
+      },
+      {
+        "system": "API Gateway",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for API Gateway",
+          "2. Test API access: Map HTTP method to action",
+          "3. In Control Core: Settings → Integrations → Add API Gateway",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: GET→read, POST→create, DELETE→delete"
+      },
+      {
+        "system": "Custom data source",
+        "attributes_needed": [
+          "input.environment",
+          "input.ai_model.bias_assessment.completed",
+          "input.ai_model.bias_assessment.date",
+          "input.ai_model.bias_metrics",
+          "input.ai_model.bias_review_scheduled",
+          "input.ai_model.bias_threshold",
+          "input.ai_model.fairness_metrics",
+          "input.ai_model.mitigation_strategies",
+          "input.ai_model.monitoring.alert_thresholds_configured",
+          "input.ai_model.monitoring.bias_detection_enabled",
+          "input.ai_model.monitoring.frequency_hours"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Custom data source",
+          "2. Test API access: REST API endpoint",
+          "3. In Control Core: Settings → Integrations → Add Custom data source",
+          "4. Configure field mappings for 11 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: environment, ai_model.bias_assessment.completed, ai_model.bias_assessment.date"
+      }
+    ]
+  }
+}

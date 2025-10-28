@@ -1,0 +1,334 @@
+{
+  "version": "1.0.0",
+  "summary": "PIPEDA consent principles for collection, use, and disclosure of personal information in Canada",
+  "detailed_description": "This policy template enforces PIPEDA (Personal Information Protection and Electronic Documents Act) consent requirements for Canadian organizations collecting, using, or disclosing personal information. PIPEDA Principle 3 (Consent) requires that individuals must be informed about purposes for collection/use/disclosure and must consent, except where inappropriate. The policy enforces meaningful consent (individuals understand what they're consenting to), purpose specification (limited to identified purposes), opt-in for sensitive information, withdrawal rights (individuals can withdraw consent with reasonable notice), implied vs express consent appropriateness, and consent validity verification. Applies to private sector organizations across Canada (federal jurisdiction) and British Columbia, Alberta (provincial substantially similar acts). Supports banks, retailers, telecoms, tech companies, health services, and any organization handling Canadian consumer data in compliance with Canada's federal privacy law.",
+  "use_cases": [
+    {
+      "title": "Rogers: Telecom Customer Consent for Marketing Communications",
+      "description": "Deploy pipeda-consent-principles for lawful marketing under PIPEDA and CASL",
+      "scenario": "Rogers (12M subscribers) must obtain valid consent before marketing emails/SMS. PIPEDA + CASL requirements: Express opt-in (no pre-checked boxes), clear purpose ('offers for Rogers products'), easy withdrawal. Policy enforces: Marketing blocked without customer consent, consent <3 years old, withdrawal processed within 10 days, consent records maintained for audit. Results: 7M subscribers consented (58% rate), 1.2M withdrawals processed average 2 days, zero Privacy Commissioner complaints. Outcome: CASL compliance maintained, $10M penalties avoided, customer trust enhanced."
+    },
+    {
+      "title": "Shopify: E-Commerce Checkout Consent Management",
+      "description": "Implement pipeda-consent-principles for merchant platform compliance",
+      "scenario": "Shopify (500K Canadian merchants) balances checkout friction with consent. Approach: Transaction data (name, shipping, payment) = implied consent (completing purchase), Marketing = express opt-in required. Policy enforces: Transaction data for order fulfillment only, marketing checkbox separate, analytics opt-out available, cookie consent for non-essential. Results: Streamlined checkout, 40% marketing opt-in (vs. 30% industry avg), Privacy Commissioner approved implied consent use. Merchant benefit: Built-in compliance platform."
+    },
+    {
+      "title": "TD Bank: Financial Services Marketing Consent",
+      "description": "Use pipeda-consent-principles for bank product cross-sell compliance",
+      "scenario": "TD wants to market credit cards to existing chequing account customers. PIPEDA question: Can bank use existing customer relationship for marketing? Answer: Implied consent for related products with clear opt-out. Policy enforces: Marketing to existing customers allowed (relationship exists), clear opt-out in every communication, separate consent for third-party offers, customer preferences tracked in CRM. Results: 65% of chequing customers receive credit card marketing (35% opted out), conversion rate 8%, opt-out respected 100%, Privacy Commissioner: Appropriate use of implied consent with good opt-out mechanisms."
+    },
+    {
+      "title": "Wealthsimple: Fintech Product Consent and Data Sharing",
+      "description": "Deploy pipeda-consent-principles for multi-product consent management",
+      "scenario": "Wealthsimple offers banking + investing + crypto + tax products, each requiring different data. Consent challenge: Granular consent per product vs. friction. Solution: Initial consent for core features (banking account), separate opt-ins for additional products (crypto trading, tax filing), clear purpose for each ('Tax filing requires access to investment transactions'). Policy enforces: Product access blocked without specific consent, consent withdrawal disables product, data minimization (only collect what's needed per product). Results: 3M customers, 60% use multiple products, granular consent increases trust (NPS +15), Privacy Commissioner audit: Exemplary consent management with customer control."
+    },
+    {
+      "title": "Loblaws: Retail Loyalty Program Consent for PC Optimum",
+      "description": "Apply pipeda-consent-principles for customer data collection in loyalty programs",
+      "scenario": "Loblaws PC Optimum program (18M members) collects purchase history for personalized offers. PIPEDA requirements: Consent for data collection, purpose limitation (cannot use for unrelated purposes), opt-out available. Policy enforces: Program enrollment requires consent (explained: 'We collect your purchases to provide points and personalized offers'), purchase data used only for loyalty program (cannot be sold to third parties), members can opt-out of personalized offers (still earn points - data collection continues for points calculation only), annual privacy notice with consent refresh. Results: 18M members enrolled (high consent rate - value proposition clear), 3% opted out of personalized offers (respect privacy preference), zero complaints about inappropriate data use. Privacy Commissioner: Strong loyalty program consent with good customer understanding of data use."
+    },
+    {
+      "title": "RBC: Sensitive Information Consent for Credit Applications",
+      "description": "Implement pipeda-consent-principles for sensitive financial data handling",
+      "scenario": "RBC mortgage applications require sensitive information (income, employment, SIN, credit history). PIPEDA heightened consent for sensitive info: More explicit consent, clear purpose, cannot use for other purposes without new consent. Policy enforces: Mortgage application consent separate from account opening consent (different purposes), SIN collection consent explicit ('RBC collects your SIN for credit reporting purposes only - this is mandatory for credit products'), credit bureau inquiry consent (customer authorizes credit check), consent withdrawal implications explained (cannot process mortgage without required info). Customer understanding: Clear explanation that mortgage requires sensitive info (reasonable expectation), purpose specific (credit assessment only, not for marketing), limited retention (credit application documents destroyed if declined - no ongoing storage). Results: 100K mortgage applications annually, 100% consent compliance, customer complaints <0.01% (consent process clear), Privacy Commissioner audit: Appropriate consent for sensitive information with good customer education."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "user.authenticated",
+      "type": "boolean",
+      "description": "User authentication status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'user.authenticated' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'user.authenticated':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'user.authenticated' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "user.authorized",
+      "type": "boolean",
+      "description": "User authorization status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'user.authorized' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'user.authorized':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'user.authorized' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.compliant",
+      "type": "boolean",
+      "description": "Compliance status of the request",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'context.compliant' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.compliant':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.compliant' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.risk_assessed",
+      "type": "boolean",
+      "description": "Whether risk assessment has been performed",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'context.risk_assessed' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.risk_assessed':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.risk_assessed' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "identity_and_access": [
+        {
+          "condition": "input.user.authenticated",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "user.authenticated",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.user.authorized",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "user.authorized",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "Application Code",
+          "api_endpoint": "Application sends action in request",
+          "field_mapping": "action",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.action",
+          "system": "API Gateway",
+          "api_endpoint": "Map HTTP method to action",
+          "field_mapping": "GET→read, POST→create, DELETE→delete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.compliant",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.compliant",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "monitoring_and_logging": [
+        {
+          "condition": "input.context.risk_assessed",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.risk_assessed",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ]
+    },
+    "systems_needed": [
+      "API Gateway",
+      "Application Code",
+      "Custom data source"
+    ],
+    "complexity_score": "Medium - Moderate complexity requiring multiple integrations"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Review policy requirements and customize for your organization",
+      "2. Configure integration with IAM and data sources",
+      "3. Set up audit logging and monitoring",
+      "4. Test in sandbox environment with sample scenarios",
+      "5. Validate policy behavior and adjust thresholds",
+      "6. Train stakeholders on policy requirements",
+      "7. Deploy to production with full audit logging enabled",
+      "8. Monitor policy effectiveness and tune as needed"
+    ],
+    "configuration_tips": [
+      "Adjust thresholds and conditions based on organizational risk appetite",
+      "Configure automated notifications for policy violations",
+      "Set up dashboards for policy compliance monitoring",
+      "Customize approval workflows based on governance structure",
+      "Enable gradual rollout for critical policies"
+    ],
+    "testing_scenarios": [
+      "Authorized user with compliant request - should allow",
+      "Unauthorized user attempting access - should deny",
+      "Non-compliant request - should deny with explanation",
+      "Edge cases and boundary conditions"
+    ],
+    "prerequisites": [
+      "✅ Inventory all systems needed for 5 conditions in this policy",
+      "✅ Verify API access and credentials for each system",
+      "✅ Test API endpoints return expected data format",
+      "✅ Document field mappings between your systems and policy conditions",
+      "✅ Ensure network connectivity from Control Core to all data sources"
+    ],
+    "data_source_configuration": [
+      "\n📦 Identity And Access:",
+      "   • Configure Custom data source integration for 'input.user.authenticated'",
+      "     - API: REST API endpoint",
+      "     - Field: user.authenticated",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.user.authorized'",
+      "     - API: REST API endpoint",
+      "     - Field: user.authorized",
+      "     - Method: REST API",
+      "\n📦 Data Sources:",
+      "   • Configure Application Code integration for 'input.action'",
+      "     - API: Application sends action in request",
+      "     - Field: action",
+      "     - Method: REST API",
+      "   • Configure API Gateway integration for 'input.action'",
+      "     - API: Map HTTP method to action",
+      "     - Field: GET→read, POST→create, DELETE→delete",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.context.compliant'",
+      "     - API: REST API endpoint",
+      "     - Field: context.compliant",
+      "     - Method: REST API",
+      "\n📦 Monitoring And Logging:",
+      "   • Configure Custom data source integration for 'input.context.risk_assessed'",
+      "     - API: REST API endpoint",
+      "     - Field: context.risk_assessed",
+      "     - Method: REST API"
+    ],
+    "policy_customization": [
+      "🔧 Review and customize the following conditions for your environment:",
+      "   • User conditions (2): user.authenticated, user.authorized",
+      "   • Context conditions (2): context.compliant, context.risk_assessed",
+      "",
+      "📝 Modification guidelines:",
+      "   • Update attribute names to match your system's field names",
+      "   • Adjust threshold values (e.g., risk scores, time windows)",
+      "   • Add/remove conditions based on your requirements",
+      "   • Test each condition individually before combining",
+      "",
+      "💾 Save modified policy with version tag for tracking"
+    ],
+    "sandbox_testing": [
+      "🧪 Deploy to Sandbox environment first:",
+      "   1. Create test users with various attribute combinations",
+      "   2. Set up test resources with different classifications",
+      "   3. Run test scenarios:",
+      "      • User with all required attributes → ALLOW",
+      "      • User missing required attribute → DENY",
+      "      • User with insufficient privileges → DENY",
+      "   4. Verify audit logs capture all evaluations",
+      "   5. Check performance (policy evaluation < 100ms)",
+      "   6. Test error handling (missing attributes, null values)"
+    ],
+    "production_deployment": [
+      "🚀 Production deployment checklist:",
+      "   1. ✅ All sandbox tests passing",
+      "   2. ✅ Stakeholder approval documented",
+      "   3. ✅ Rollback plan prepared",
+      "   4. ✅ Deploy in shadow mode (log only, don't enforce) for 24-48 hours",
+      "   5. ✅ Review shadow mode logs for unexpected denials",
+      "   6. ✅ Adjust policy based on real traffic patterns",
+      "   7. ✅ Enable enforcement mode with gradual rollout (10% → 50% → 100%)",
+      "   8. ✅ Monitor error rates and user feedback",
+      "   9. ✅ Document deployment for compliance audit trail"
+    ],
+    "monitoring_setup": [
+      "📊 Set up monitoring and alerts:",
+      "   • Policy evaluation count (baseline: track for 1 week)",
+      "   • Denial rate (alert if > 5% of requests)",
+      "   • Evaluation latency (alert if > 200ms p95)",
+      "   • Missing attribute errors (alert on any occurrence)",
+      "   • Condition-specific metrics:",
+      "     1. Monitor 'input.action' - track null/missing values",
+      "     2. Monitor 'input.context.compliant' - track null/missing values",
+      "     3. Monitor 'input.context.risk_assessed' - track null/missing values",
+      "     4. Monitor 'input.user.authenticated' - track null/missing values",
+      "     5. Monitor 'input.user.authorized' - track null/missing values"
+    ]
+  },
+  "compliance_frameworks": [
+    "PIPEDA",
+    "CASL (Canada's Anti-Spam Legislation)",
+    "Alberta PIPA",
+    "BC PIPA",
+    "Quebec Law 25"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "pipeda",
+    "privacy-compliance",
+    "compliance",
+    "security"
+  ],
+  "related_templates": [],
+  "conditions_analysis": {
+    "total_conditions": 5,
+    "user_attributes": 2,
+    "resource_attributes": 0,
+    "context_attributes": 2
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technical stack to fetch the required attributes.",
+    "steps_by_system": [
+      {
+        "system": "Custom data source",
+        "attributes_needed": [
+          "input.user.authenticated",
+          "input.user.authorized",
+          "input.context.compliant",
+          "input.context.risk_assessed"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Custom data source",
+          "2. Test API access: REST API endpoint",
+          "3. In Control Core: Settings → Integrations → Add Custom data source",
+          "4. Configure field mappings for 4 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: user.authenticated, user.authorized, context.compliant"
+      },
+      {
+        "system": "Application Code",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Application Code",
+          "2. Test API access: Application sends action in request",
+          "3. In Control Core: Settings → Integrations → Add Application Code",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: action"
+      },
+      {
+        "system": "API Gateway",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for API Gateway",
+          "2. Test API access: Map HTTP method to action",
+          "3. In Control Core: Settings → Integrations → Add API Gateway",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: GET→read, POST→create, DELETE→delete"
+      }
+    ]
+  }
+}

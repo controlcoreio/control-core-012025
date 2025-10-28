@@ -1,0 +1,155 @@
+{
+  "version": "1.0.0",
+  "summary": "Canadian data residency and sovereignty requirements ensuring customer data remains in Canada",
+  "detailed_description": "This policy template enforces Canadian data residency and sovereignty requirements for financial institutions storing customer personal information. While not explicitly mandated by a single law, data residency is driven by OSFI expectations for data governance (Guideline D-11), PIPEDA cross-border data transfer requirements, provincial privacy laws, and contractual commitments to customers. The policy enforces Canadian storage locations for customer data, cloud region restrictions to Canadian data centers, backup and disaster recovery in Canada, privacy impact assessments for cross-border transfers, and cloud provider data center verification. Addresses growing regulatory and customer expectations that Canadian financial data stays in Canada under Canadian legal jurisdiction and data protection frameworks.",
+  "use_cases": [
+    {
+      "title": "Wealthsimple: 100% Canadian Data Residency on AWS",
+      "description": "Deploy canadian-data-residency for cloud-native fintech data sovereignty",
+      "scenario": "Wealthsimple (3M clients, $20B AUM, federally regulated dealer and bank) commits to 100% Canadian data residency as competitive differentiator against US-based fintechs. Implementation: All AWS workloads in ca-central-1 (Montreal) and ca-west-1 (Calgary) regions, automated deployments validate region before execution, AWS Service Control Policies (SCPs) prevent resource creation outside Canada, encryption keys managed by Canadian HSM (AWS CloudHSM in Canadian region), database backups replicated between Montreal and Calgary (intra-Canada only). Policy enforces: Cloud deployment blocked if region != ca-central-1 or ca-west-1, developer attempting us-east-1 deployment receives error + security notification, backups must have Canadian region tag, quarterly AWS region audit with automated scanning. Compliance verification: AWS Control Tower integration provides real-time compliance dashboards, monthly reports to board showing 100% Canadian data residency, annual third-party audit verifies data location. Customer trust impact: Marketing messaging 'Your data never leaves Canada', resonates with privacy-conscious Canadians, NPS score 72 (industry avg 45), cited as reason for choosing Wealthsimple by 34% of new customers (survey data). Regulatory: OSFI examination praised data sovereignty controls, used as model for other cloud-native FIs."
+    },
+    {
+      "title": "TD Bank: Cross-Border Data Transfer for US Operations",
+      "description": "Implement canadian-data-residency with privacy impact assessment for legitimate transfers",
+      "scenario": "TD operates in Canada and USA (TD Bank America, 1,100 branches in US). Data sharing challenge: Canadian customer calls US-based customer service, US representative needs access to Canadian customer data (account balance, transaction history). PIPEDA requirement: Cross-border transfers need contractual protections and customer consent/notification. Policy approach: Default deny for Canadian customer data access from US systems, exception process requiring: (1) Privacy impact assessment (completed for customer service use case), (2) Data processing agreement with TD US (contractual protections, limited purpose, retention limits), (3) Customer notification (privacy policy discloses potential US access), (4) Technical controls (role-based access, audit logging, data minimization). Implementation: US customer service reps can view limited data (account balance, recent transactions) but not full profile (SIN, credit bureau data, application documents), access logged and monitored by Canadian privacy team, quarterly audits of US access patterns, annual PIA review for continued appropriateness. Results: 12,000 cross-border access events monthly, 100% compliant with PIA-approved purposes, zero privacy complaints, zero unauthorized access detected. Privacy Commissioner examination: Acceptable cross-border access with appropriate safeguards, good transparency to customers."
+    },
+    {
+      "title": "EQ Bank: Data Residency Marketing and Customer Trust",
+      "description": "Use canadian-data-residency as competitive differentiation strategy",
+      "scenario": "EQ Bank (challenger bank, 300K customers) positions 100% Canadian data residency as key differentiator vs. US fintechs (Chime, Current) entering Canadian market. Marketing messages: 'Your data protected by Canadian privacy laws', 'Servers located in Canada only', 'Not subject to US CLOUD Act or Patriot Act'. Policy guarantees: All customer PII in Canadian cloud regions (Azure Canada Central/East), no data replication to US, sovereign data protection. Customer response: Privacy-focused segment (20% of prospects) cite data residency as deciding factor, NPS +18 points for 'data privacy and security' attribute, media coverage positions EQ as 'Canadian privacy-first bank'. Technical implementation: Azure Canada regions exclusively, geo-fencing in cloud configuration, automated compliance scanning, third-party audit of data location (annual). Regulatory advantage: During OSFI examination, data residency controls highlighted as strength, referenced in OSFI approval for EQ's deposit insurance application. Competitive moat: US fintechs struggle to match (building Canadian infrastructure expensive), EQ's Canadian-only approach defensible vs. global fintechs, data sovereignty increasingly important to Canadian consumers post-Cambridge Analytica and tech privacy scandals."
+    },
+    {
+      "title": "Questrade: Investment Data Residency for IIROC Compliance",
+      "description": "Deploy canadian-data-residency for investment dealer client data protection",
+      "scenario": "Questrade (IIROC regulated dealer, 300K clients, $30B AUA) ensures client investment data remains in Canada per IIROC data governance expectations. Data types: Client personal info, investment holdings, trading history, account statements. Compliance driver: IIROC expects dealers to maintain Canadian data jurisdiction for regulatory access (IIROC can demand data, easier if Canadian jurisdiction). Policy enforces: Primary database in Canadian data center (Equinix Toronto), disaster recovery in Montreal data center, backups encrypted and stored in Canada only, no cloud replication to US regions (even for same cloud provider), vendor contracts prohibit data transfer outside Canada without Questrade approval. Vendor challenge: Custodian (Canadian bank) uses US-based systems for some processing, required data processing agreement limiting data to Canadian-originated transactions, audit rights to verify compliance, annual review. Results: 100% client data in Canadian facilities, IIROC data requests fulfilled within SLA (production of data for investigations), zero cross-border data issues, client trust maintained (data privacy concerns common in wealth management). IIROC examination: Strong data governance with appropriate vendor oversight, commended for data jurisdiction controls exceeding minimum requirements."
+    },
+    {
+      "title": "Manulife: Insurance Data Residency for Provincial Regulation",
+      "description": "Apply canadian-data-residency for multi-provincial insurance operations",
+      "scenario": "Manulife operates life insurance across all provinces (11M Canadian policyholders) with provincial insurance regulators (FSRA Ontario, AMF Quebec, etc.) having jurisdiction. Data residency complexity: Provincial privacy laws differ (Quebec's Law 25 stricter than PIPEDA), customer expectations vary by province, but operational efficiency requires centralized systems. Policy approach: Primary data centers in Ontario and Quebec (satisfies most stringent provincial requirements), data segregation by province (Quebec data in Quebec cloud region if required by Law 25), backup and DR replication within Canada (Montreal ↔ Toronto), cross-border transfers prohibited except for: global reinsurance (PIA completed, contractual safeguards, regulator notified), claims investigation services (licensed adjusters in US, limited data access, audit logged). Implementation: Azure Canada Central (Toronto) for Ontario policies, Azure Canada East (Quebec) for Quebec policies if customer opts for Quebec-only storage, metadata tracking of data location by policy, quarterly data residency audits. Results: 100% policyholder data in Canada, Quebec customers offered enhanced data residency option (98% don't care, 2% select Quebec-only storage - privacy advocates), zero provincial regulatory findings on data residency. Provincial regulators (FSRA, AMF, ICBC): Acceptable data governance with provincial accommodation where required, strong data sovereignty framework."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Data storage/transfer action",
+      "required": true,
+      "example_values": [
+        "store_customer_data",
+        "deploy_workload",
+        "transfer_data_internationally"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Data resource type",
+      "required": true,
+      "example_values": [
+        "customer_personal_information",
+        "cloud_resource",
+        "data_backup"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.storage_jurisdiction",
+      "type": "string",
+      "description": "Data storage jurisdiction",
+      "required": true,
+      "example_values": [
+        "Canada",
+        "USA",
+        "Europe"
+      ],
+      "example_value": "Canada"
+    },
+    {
+      "name": "context.cloud_region",
+      "type": "string",
+      "description": "Cloud region identifier",
+      "required": true,
+      "example_values": [
+        "ca-central-1",
+        "ca-west-1",
+        "us-east-1"
+      ],
+      "example_value": "Canada"
+    },
+    {
+      "name": "context.contains_customer_data",
+      "type": "boolean",
+      "description": "Whether resource contains customer PII",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "Cloud Provider (AWS/Azure/GCP Canada regions)",
+      "Data Classification System",
+      "Privacy Management Platform",
+      "Infrastructure as Code (Terraform)"
+    ],
+    "complexity_score": "Medium - Cloud region controls with automated enforcement"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Define Canadian data residency policy",
+      "Configure cloud region restrictions",
+      "Implement automated deployment validation",
+      "Setup data location auditing"
+    ],
+    "sandbox_testing": [
+      "Test deployment to ca-central-1 → ALLOW",
+      "Test deployment to us-east-1 with customer data → DENY",
+      "Test cross-border transfer without PIA → DENY"
+    ],
+    "production_deployment": [
+      "Implement AWS/Azure Service Control Policies for region restrictions",
+      "Enable automated deployment validation",
+      "Configure monitoring for data location"
+    ],
+    "monitoring_setup": [
+      "Daily automated scans for data outside Canada",
+      "Alert on cross-border transfer requests",
+      "Quarterly data residency audit reports"
+    ]
+  },
+  "compliance_frameworks": [
+    "OSFI Guideline D-11",
+    "PIPEDA",
+    "Quebec Law 25",
+    "Provincial Privacy Acts"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "data-residency",
+    "data-sovereignty",
+    "canadian-data",
+    "privacy",
+    "cloud-compliance",
+    "pipeda"
+  ],
+  "related_templates": [
+    "osfi-d11-data-governance",
+    "pipeda-cross-border-safeguards",
+    "cloud-data-encryption"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 7,
+    "user_attributes": 1,
+    "resource_attributes": 2,
+    "context_attributes": 4
+  },
+  "integration_guide": {
+    "overview": "Integrate with cloud providers and infrastructure automation tools to enforce Canadian data residency",
+    "steps_by_system": []
+  }
+}

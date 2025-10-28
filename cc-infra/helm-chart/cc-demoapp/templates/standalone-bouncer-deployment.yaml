@@ -1,0 +1,49 @@
+{{- if .Values.standaloneBouncer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.standaloneBouncer.name }}-{{ .Values.global.environment }}
+  labels:
+    app: {{ .Values.standaloneBouncer.name }}
+    env: {{ .Values.global.environment }}
+    {{- include "acme-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.standaloneBouncer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.standaloneBouncer.name }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.standaloneBouncer.name }}
+        env: {{ .Values.global.environment }}
+    spec:
+      containers:
+        - name: {{ .Values.standaloneBouncer.name }}
+          image: "{{ .Values.standaloneBouncer.image.repository }}:{{ .Values.standaloneBouncer.image.tag }}"
+          imagePullPolicy: {{ .Values.standaloneBouncer.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.standaloneBouncer.service.port }}
+          env:
+            {{- range .Values.standaloneBouncer.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.standaloneBouncer.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.standaloneBouncer.probes.readiness.path }}
+              port: {{ .Values.standaloneBouncer.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.standaloneBouncer.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.standaloneBouncer.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.standaloneBouncer.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.standaloneBouncer.probes.liveness.path }}
+              port: {{ .Values.standaloneBouncer.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.standaloneBouncer.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.standaloneBouncer.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.standaloneBouncer.probes.liveness.timeoutSeconds }}
+{{- end }}

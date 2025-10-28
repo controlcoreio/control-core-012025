@@ -1,0 +1,64 @@
+# OPAL Client Configuration for Control Core Bouncer
+# This configuration sets up OPAL client for policy synchronization
+
+# OPAL Client Configuration
+OPAL_CLIENT_API_SERVER_PORT: 8083
+OPAL_CLIENT_API_SERVER_HOST: 0.0.0.0
+
+# OPAL Server Connection
+OPAL_SERVER_URL: "http://cc-opal:7000"
+OPAL_SERVER_TOKEN: ""
+
+# Policy Store Configuration
+OPAL_POLICY_STORE_TYPE: "OPA"
+OPAL_POLICY_STORE_OPA_URL: "http://localhost:8181"
+OPAL_POLICY_STORE_OPA_AUTH_TOKEN: ""
+
+# Data Store Configuration
+OPAL_DATA_STORE_TYPE: "OPA"
+OPAL_DATA_STORE_OPA_URL: "http://localhost:8181"
+OPAL_DATA_STORE_OPA_AUTH_TOKEN: ""
+
+# Synchronization Configuration
+OPAL_SYNC_ENABLED: "true"
+OPAL_SYNC_INTERVAL: 30
+OPAL_SYNC_TIMEOUT: 60
+
+# Logging Configuration
+OPAL_LOG_FORMAT_INCLUDE_PID: "true"
+OPAL_LOG_LEVEL: "INFO"
+OPAL_INLINE_OPA_LOG_FORMAT: "http"
+
+# Health Check Configuration
+OPAL_HEALTH_CHECK_ENABLED: "true"
+OPAL_HEALTH_CHECK_INTERVAL: 30
+OPAL_HEALTH_CHECK_TIMEOUT: 10
+
+# Performance Configuration
+OPAL_WORKER_COUNT: 2
+OPAL_MAX_WORKERS: 4
+OPAL_TIMEOUT: 30
+
+# Cache Configuration
+OPAL_CACHE_ENABLED: "true"
+OPAL_CACHE_TTL: 300
+OPAL_CACHE_MAX_SIZE: 1000
+
+# Security Configuration
+OPAL_SECURITY_ENABLED: "false"  # For internal network
+OPAL_CORS_ENABLED: "true"
+OPAL_CORS_ORIGINS: "*"
+
+# Webhook Configuration
+OPAL_WEBHOOK_ENABLED: "true"
+OPAL_WEBHOOK_SECRET: "control-core-webhook-secret"
+OPAL_WEBHOOK_PATH: "/webhook"
+
+# Redis Configuration (for caching)
+OPAL_REDIS_URL: "redis://redis:6379"
+OPAL_REDIS_ENABLED: "true"
+
+# Metrics Configuration
+OPAL_METRICS_ENABLED: "true"
+OPAL_METRICS_PORT: 9090
+OPAL_METRICS_PATH: "/metrics"

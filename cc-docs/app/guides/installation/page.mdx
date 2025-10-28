@@ -1,0 +1,635 @@
+# Installation Guide
+
+**Deploy Control Core in under 30 minutes** - Complete Control Plane and Bouncer setup with automated dependency management.
+
+## Post-Signup Deployment Flow
+
+After signing up for Control Core, you'll be guided through the deployment process based on your chosen plan:
+
+### 1. **Kickstart Plan** (90-day Pilot)
+- **Control Plane**: Hosted by Control Core
+- **Bouncer**: Download and deploy on your infrastructure
+- **Perfect for**: Getting started with policy management
+
+### 2. **Pro Plan** (Hybrid deployment)
+- **Control Plane**: Hosted by Control Core with tenant isolation
+- **Bouncer**: Download and deploy on your infrastructure
+- **Perfect for**: Production workloads with managed Control Plane
+
+### 3. **Custom Plan** (Self-hosted)
+- **Control Plane**: Download and deploy on your infrastructure
+- **Bouncer**: Download and deploy on your infrastructure
+- **Perfect for**: Complete control and data sovereignty
+
+## Quick Start (30 Minutes or Less)
+
+### Prerequisites
+
+- **Docker & Docker Compose** (for local deployment)
+- **Kubernetes cluster** (for production deployment)
+- **Internet connection** (for initial setup)
+- **5GB free disk space**
+
+### Deployment Options
+
+#### Option 1: Docker Compose (Recommended for Development)
+
+After signing up and selecting your plan, download the deployment package:
+
+```bash
+# Download the deployment package (provided in your Control Core dashboard)
+# Extract the package
+tar -xzf control-core-deployment.tar.gz
+cd control-core-deployment
+
+# Deploy with one command
+cd cc-infra
+./scripts/deploy.sh
+```
+
+**What gets deployed automatically:**
+- ✅ Complete Control Plane with web interface
+- ✅ Bouncer for policy enforcement (sidecar/proxy modes)
+- ✅ Sandbox and Production environments
+- ✅ PostgreSQL database with automated setup
+- ✅ Redis caching layer
+- ✅ SSL certificates and security
+- ✅ Monitoring and health checks
+- ✅ Default admin account
+
+#### Option 2: Kubernetes Helm Chart (Recommended for Production)
+
+```bash
+# Add Control Core Helm repository
+helm repo add controlcore https://helm.controlcore.io
+helm repo update
+
+# Install Control Core
+helm install controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --create-namespace \
+  --values values-production.yaml
+```
+
+#### Option 2: Hybrid Deployment (Pro Plan - Control Plane Hosted)
+
+In this mode, the Control Plane is hosted and managed by Control Core, while you deploy and manage the Bouncer on your infrastructure.
+
+```bash
+# Download the deployment package (provided in your Control Core dashboard)
+# Extract the package
+tar -xzf control-core-deployment.tar.gz
+cd control-core-deployment
+
+# Deploy the Bouncer with one command
+cd cc-infra
+./scripts/deploy.sh --mode hybrid --domain yourbouncer.yourcompany.com
+```
+
+This command will:
+- Deploy only the Control Core Bouncer locally or on your specified infrastructure.
+- Configure the Bouncer to connect to your hosted Control Plane at `https://app.controlcore.io`.
+- Automatically set up SSL for your Bouncer domain.
+- Provide production-grade monitoring for your Bouncer.
+
+**Access your deployment:**
+- **Control Plane**: `https://app.controlcore.io` (Hosted by Control Core)
+- **Bouncer Health**: `https://yourbouncer.yourcompany.com/health` (Your local deployment)
+- **Default Login**: Use your Control Core account credentials.
+
+## Plan-Specific Deployment
+
+### Kickstart Plan Deployment (Self-hosted)
+
+1. **Sign up** at controlcore.io
+2. **Choose Kickstart plan** (90-day Pilot)
+3. **Download deployment package** from your dashboard
+4. **Deploy complete Control Core stack** on your infrastructure:
+
+```bash
+# Extract and deploy complete Control Core
+tar -xzf control-core-deployment.tar.gz
+cd control-core-deployment
+cd cc-infra
+./scripts/deploy.sh --mode custom --plan kickstart --domain yourdomain.com
+```
+
+5. **Access Control Plane** at https://yourdomain.com
+6. **Configure policies and resources** in your Control Plane
+
+### Pro Plan Deployment (Hybrid - Control Plane Hosted)
+
+1. **Sign up** at controlcore.io
+2. **Choose Pro plan** with tenant isolation
+3. **Download Bouncer package** from your dashboard
+4. **Deploy Bouncer** with tenant configuration:
+
+```bash
+# Extract and deploy Bouncer
+tar -xzf control-core-bouncer-pro.tar.gz
+cd control-core-bouncer-pro
+./deploy-bouncer.sh --tenant-id YOUR_TENANT_ID \
+  --control-plane-url https://YOUR_TENANT.controlcore.io
+```
+
+5. **Access your tenant** at https://YOUR_TENANT.controlcore.io
+6. **Configure Bouncer** connection in your tenant
+
+### Custom Plan Deployment (Fully Self-hosted)
+
+1. **Sign up** at controlcore.io
+2. **Choose Custom plan** for fully self-hosted deployment
+3. **Download complete deployment package** from your dashboard
+4. **Deploy Control Plane and Bouncer**:
+
+```bash
+# Extract complete package
+tar -xzf control-core-custom.tar.gz
+cd control-core-custom
+
+# Deploy with Helm
+helm install controlcore ./helm-chart \
+  --namespace controlcore \
+  --create-namespace \
+  --values values-custom.yaml
+```
+
+5. **Access Control Plane** at your configured domain
+6. **Configure Bouncer** connection in Control Plane
+
+## Environment Management
+
+Control Core automatically creates **two identical environments** for every deployment:
+
+### Sandbox Environment (Default)
+- **Purpose**: Development, testing, and experimentation
+- **Bouncer Mode**: Sidecar or proxy to non-production resources
+- **Policy Deployment**: Safe testing without affecting live systems
+- **Data Isolation**: Separate database and cache
+- **Monitoring**: Development-focused metrics
+
+### Production Environment
+- **Purpose**: Live policy enforcement
+- **Bouncer Mode**: Sidecar or proxy to production resources
+- **Policy Deployment**: Live policy enforcement
+- **Data Isolation**: Separate production database and cache
+- **Monitoring**: Production-grade metrics and alerting
+
+### Environment Switching
+
+The Control Plane UI provides visual environment switching through the existing environment toggle in the top navigation.
+
+## Helm Chart Deployment
+
+### Basic Installation
+
+```bash
+# Add Control Core Helm repository
+helm repo add controlcore https://helm.controlcore.io
+helm repo update
+
+# Install Control Core
+helm install controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --create-namespace
+```
+
+### Custom Configuration
+
+```bash
+# Install with custom values
+helm install controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --create-namespace \
+  --values custom-values.yaml
+```
+
+### Production Deployment
+
+```bash
+# Production deployment with high availability
+helm install controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --create-namespace \
+  --values values-production.yaml \
+  --set ingress.enabled=true \
+  --set ingress.host=controlcore.yourcompany.com \
+  --set ssl.enabled=true
+```
+
+### Upgrade Deployment
+
+```bash
+# Upgrade to new version
+helm upgrade controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --values values-production.yaml
+```
+
+## Docker Compose Deployment
+
+### Basic Deployment
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  controlcore:
+    image: controlcore/controlcore:latest
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/controlcore
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: controlcore
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+```bash
+# Deploy with Docker Compose
+docker-compose up -d
+```
+
+## Bouncer Deployment
+
+### Sidecar Mode (Recommended)
+
+Deploy Bouncer as a sidecar container alongside your applications:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  your-app:
+    image: your-app:latest
+    depends_on:
+      - bouncer-sidecar
+  
+  bouncer-sidecar:
+    image: controlcore/bouncer:latest
+    environment:
+      - CONTROL_PLANE_URL=https://app.controlcore.io
+      - MODE=sidecar
+      - ENVIRONMENT=sandbox
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+### Proxy Mode
+
+Deploy Bouncer as a reverse proxy:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  bouncer-proxy:
+    image: controlcore/bouncer:latest
+    environment:
+      - CONTROL_PLANE_URL=https://app.controlcore.io
+      - MODE=proxy
+      - ENVIRONMENT=sandbox
+    ports:
+      - "80:8080"
+      - "443:8443"
+    depends_on:
+      - your-backend
+  
+  your-backend:
+    image: your-backend:latest
+```
+
+### Kubernetes Bouncer Deployment
+
+```yaml
+# bouncer-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bouncer
+  namespace: controlcore
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bouncer
+  template:
+    metadata:
+      labels:
+        app: bouncer
+    spec:
+      containers:
+      - name: bouncer
+        image: controlcore/bouncer:latest
+        env:
+        - name: CONTROL_PLANE_URL
+          value: "https://app.controlcore.io"
+        - name: MODE
+          value: "sidecar"
+        - name: ENVIRONMENT
+          value: "sandbox"
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bouncer-service
+  namespace: controlcore
+spec:
+  selector:
+    app: bouncer
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+```
+
+## Access and Configuration
+
+### Access URLs
+
+After deployment, access your Control Core instance:
+
+#### Kickstart/Pro Plans (Hybrid)
+- **Control Plane**: https://app.controlcore.io (or your tenant URL)
+- **Bouncer Health**: https://localhost:8080/health
+
+#### Custom Plan (Self-hosted)
+- **Control Plane**: https://your-domain.com (or https://localhost:3000)
+- **API Documentation**: https://your-domain.com/docs (or https://localhost:8000/docs)
+- **Bouncer Health**: https://localhost:8080/health
+
+### Default Credentials
+
+- **Email**: admin@controlcore.io
+- **Password**: admin123
+
+**⚠️ Important**: Change the default password immediately after login.
+
+### Post-Deployment Configuration
+
+#### 1. Change Default Password (2 minutes)
+
+```bash
+# Via API
+curl -X POST "https://your-domain.com/api/v1/auth/change-password" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"old_password": "admin123", "new_password": "your-secure-password"}'
+```
+
+#### 2. Configure External Integrations (Optional - 10 minutes)
+
+##### Auth0 Integration
+```bash
+# Set environment variables
+export AUTH0_DOMAIN="your-domain.auth0.com"
+export AUTH0_CLIENT_ID="your-client-id"
+export AUTH0_CLIENT_SECRET="your-client-secret"
+
+# Restart services
+helm upgrade controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --set auth0.enabled=true \
+  --set auth0.domain="your-domain.auth0.com" \
+  --set auth0.clientId="your-client-id" \
+  --set auth0.clientSecret="your-client-secret"
+```
+
+##### Stripe Integration
+```bash
+# Set Stripe keys
+export STRIPE_SECRET_KEY="sk_live_..."
+export STRIPE_PUBLISHABLE_KEY="pk_live_..."
+
+# Restart services
+helm upgrade controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --set stripe.enabled=true \
+  --set stripe.secretKey="sk_live_..." \
+  --set stripe.publishableKey="pk_live_..."
+```
+
+#### 3. Deploy Your First Policy (5 minutes)
+
+1. **Login to Control Plane**
+2. **Navigate to Policies → Create Policy**
+3. **Use the Policy Builder** or **Code Editor**
+4. **Deploy to Sandbox**
+5. **Test your policy**
+6. **Promote to Production**
+
+## Monitoring and Health Checks
+
+### Health Check Endpoints
+
+```bash
+# Control Plane health
+curl https://your-domain.com/health
+
+# Bouncer health
+curl https://localhost:8080/health
+
+# Database health
+curl https://your-domain.com/health/db
+
+# Cache health
+curl https://your-domain.com/health/cache
+```
+
+### Kubernetes Health Checks
+
+```bash
+# Check pod status
+kubectl get pods -n controlcore
+
+# Check service status
+kubectl get services -n controlcore
+
+# Check ingress status
+kubectl get ingress -n controlcore
+
+# View logs
+kubectl logs -n controlcore -l app=controlcore
+```
+
+## Troubleshooting
+
+### Common Issues and Quick Fixes
+
+#### 1. Port Conflicts
+```bash
+# Check port usage
+netstat -tulpn | grep :3000
+
+# Use different ports in Helm values
+helm upgrade controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --set service.port=3001
+```
+
+#### 2. Docker Issues
+```bash
+# Restart Docker
+sudo systemctl restart docker
+
+# Clean up containers
+docker system prune -a
+```
+
+#### 3. SSL Certificate Issues
+```bash
+# Regenerate certificates
+helm upgrade controlcore controlcore/controlcore \
+  --namespace controlcore \
+  --set ssl.regenerate=true
+```
+
+#### 4. Kubernetes Issues
+```bash
+# Check cluster status
+kubectl cluster-info
+
+# Check node status
+kubectl get nodes
+
+# Check resource usage
+kubectl top nodes
+kubectl top pods -n controlcore
+```
+
+### Log Analysis
+
+#### Docker Compose
+```bash
+# View all logs
+docker-compose logs
+
+# View specific service logs
+docker-compose logs controlcore
+docker-compose logs bouncer
+docker-compose logs postgres
+```
+
+#### Kubernetes
+```bash
+# View all logs
+kubectl logs -n controlcore -l app=controlcore
+
+# View specific pod logs
+kubectl logs -n controlcore deployment/controlcore
+
+# Follow logs
+kubectl logs -n controlcore -f deployment/controlcore
+```
+
+## Performance Optimization
+
+### Kubernetes Resource Optimization
+
+```yaml
+# values-production.yaml
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "1Gi"
+    cpu: "1000m"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+```
+
+### Database Optimization
+
+```yaml
+# values-production.yaml
+database:
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  persistence:
+    size: "50Gi"
+    storageClass: "fast-ssd"
+```
+
+## Security
+
+### Production Security Configuration
+
+```yaml
+# values-production.yaml
+security:
+  ssl:
+    enabled: true
+    certificate: "letsencrypt"
+  network:
+    ingress:
+      enabled: true
+      host: "controlcore.yourcompany.com"
+      tls:
+        enabled: true
+  secrets:
+    management: "external" # Use external secret management
+```
+
+### Network Security
+
+```bash
+# Create network policies
+kubectl apply -f network-policies.yaml
+
+# Enable Pod Security Standards
+kubectl label namespace controlcore pod-security.kubernetes.io/enforce=restricted
+```
+
+## Support
+
+### Getting Help
+
+- **Documentation**: [docs.controlcore.io](https://docs.controlcore.io)
+- **Community Forum**: [community.controlcore.io](https://community.controlcore.io)
+- **Support Email**: support@controlcore.io
+- **Emergency Support**: emergency@controlcore.io
+
+### Deployment Support
+
+- **Installation Issues**: installation@controlcore.io
+- **Configuration Help**: config@controlcore.io
+- **Performance Issues**: performance@controlcore.io
+
+### Contact Information
+
+- **General Inquiries**: info@controlcore.io
+- **Technical Support**: support@controlcore.io
+- **Sales Contact**: sales@controlcore.io

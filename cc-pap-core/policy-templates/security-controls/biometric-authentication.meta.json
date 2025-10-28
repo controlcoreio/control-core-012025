@@ -1,0 +1,325 @@
+{
+  "version": "1.0.0",
+  "summary": "Control biometric authentication usage",
+  "detailed_description": "Control biometric authentication usage. This policy provides comprehensive controls and enforcement mechanisms aligned with industry standards and best practices. It enables organizations to maintain compliance, reduce security risks, and automate policy enforcement.",
+  "use_cases": [
+    {
+      "title": "Zero Trust Implementation: Contractor Access to Production",
+      "description": "Deploy biometric-authentication.meta as part of zero trust architecture for external access",
+      "scenario": "Financial services firm with 200 external contractors needs zero trust controls for production access. Security team requirements: (1) Contractors never have standing access - must request each time, (2) Access limited to specific IP ranges and time windows, (3) All contractor actions logged and reviewed, (4) Sensitive data masked for contractors. Policy enforces: Time-bound access (max 4 hours), geofencing (only from contractor office IPs), session recording for all production access, automatic data masking for PII/financial data, manager approval required with business justification. Result: Prevented 3 potential data exfiltration attempts, reduced contractor access from permanent to just-in-time."
+    },
+    {
+      "title": "Insider Threat Prevention: Privileged User Monitoring",
+      "description": "Use biometric-authentication.meta to detect and prevent insider threats",
+      "scenario": "Tech company with 50 database administrators having access to customer data (10M records). Security operations needs: (1) Detect unusual database queries (volume, timing, content), (2) Prevent bulk data downloads, (3) Alert on access to sensitive tables outside business hours, (4) Block access to personal connections. Policy implementation: Baseline normal behavior per DBA (avg 500 queries/day), alert on >2,000 queries or >100MB downloads in 1 hour, block queries with >10,000 rows after hours, require SOC approval for production access on weekends, automatic temporary suspension on 3 suspicious activities. Detection: Identified compromised DBA account downloading customer list, prevented $2M data breach."
+    },
+    {
+      "title": "API Security: Third-Party Integration Rate Limiting",
+      "description": "Apply biometric-authentication.meta to protect APIs from abuse and attacks",
+      "scenario": "E-commerce platform with 500 third-party integrations via APIs, handling 100K API calls/minute. Security requirements: (1) Prevent credential stuffing attacks, (2) Stop data scraping bots, (3) Enforce fair use policies, (4) Protect against DDoS. Policy enforces: Rate limits by partner tier (Tier 1: 1000 req/min, Tier 2: 100 req/min), adaptive throttling during attacks, block suspicious patterns (same User-Agent with 1000+ IPs), circuit breaker after 3 authentication failures, cost attribution for over-limit partners. Results: Blocked 50M bot requests/month, prevented 2 DDoS attempts, reduced API abuse from 12% to <1% of traffic."
+    },
+    {
+      "title": "Incident Response: Automated Containment During Breach",
+      "description": "Leverage biometric-authentication.meta for rapid incident containment",
+      "scenario": "Healthcare provider detects ransomware on file server at 2 AM. Incident response plan requires: (1) Isolate affected systems within 15 minutes, (2) Prevent lateral movement, (3) Preserve forensic evidence, (4) Maintain audit trail of all actions. Policy enables: Automated isolation of compromised server (disable all network ACLs), block user account associated with initial compromise, alert on any authentication attempts from that account, log all command execution on affected systems, notify CISO and IR team via SMS/email. Containment achieved in 8 minutes, ransomware limited to 1 server instead of spreading to 200+ systems, total damage: $50K vs estimated $5M."
+    },
+    {
+      "title": "Cloud Security: Multi-Cloud Access Control",
+      "description": "Implement biometric-authentication.meta across AWS, Azure, and GCP environments",
+      "scenario": "Global enterprise with resources in AWS (500 accounts), Azure (200 subscriptions), and GCP (100 projects). CISO requirements: (1) Consistent access policies across all clouds, (2) Prevent public S3 buckets, (3) Enforce MFA for all cloud console access, (4) Track privileged access across clouds. Policy implementation: Centralized policy management integrated with AWS IAM, Azure RBAC, GCP IAM, automated scanning for public storage (S3/Blob/GCS) with auto-remediation, MFA required for console access (enforced via SAML), cross-cloud access reports for audit. Results: Eliminated 150 public buckets, standardized access across clouds, reduced IAM policy inconsistencies from 40% to 5%."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "user.authenticated",
+      "type": "boolean",
+      "description": "User authentication status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'user.authenticated' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'user.authenticated':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'user.authenticated' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "user.authorized",
+      "type": "boolean",
+      "description": "User authorization status",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'user.authorized' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'user.authorized':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'user.authorized' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.compliant",
+      "type": "boolean",
+      "description": "Compliance status of the request",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'context.compliant' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.compliant':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.compliant' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    },
+    {
+      "name": "context.risk_assessed",
+      "type": "boolean",
+      "description": "Whether risk assessment has been performed",
+      "required": true,
+      "plain_english": "Runtime evaluation of 'context.risk_assessed' to make access control decisions based on current request context.",
+      "how_to_fetch": "Configure Control Core to fetch 'context.risk_assessed':\n1. In Control Core Admin UI, go to Settings > Attribute Sources\n2. Click 'Add Attribute Source' and select your identity/data provider\n3. Map 'context.risk_assessed' to the corresponding field in your source system\n4. Configure refresh interval (e.g., cache for 5 minutes, fetch on each request for sensitive data)\n5. Test the mapping with sample users to verify correct values are retrieved\n6. Enable the attribute for use in policies",
+      "example_values": [],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "detailed_requirements": {
+      "identity_and_access": [
+        {
+          "condition": "input.user.authenticated",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "user.authenticated",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.user.authorized",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "user.authorized",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "data_sources": [
+        {
+          "condition": "input.action",
+          "system": "Application Code",
+          "api_endpoint": "Application sends action in request",
+          "field_mapping": "action",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.action",
+          "system": "API Gateway",
+          "api_endpoint": "Map HTTP method to action",
+          "field_mapping": "GET→read, POST→create, DELETE→delete",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        },
+        {
+          "condition": "input.context.compliant",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.compliant",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ],
+      "monitoring_and_logging": [
+        {
+          "condition": "input.context.risk_assessed",
+          "system": "Custom data source",
+          "api_endpoint": "REST API endpoint",
+          "field_mapping": "context.risk_assessed",
+          "integration_method": "REST API",
+          "setup_notes": "Configure in system admin",
+          "documentation": ""
+        }
+      ]
+    },
+    "systems_needed": [
+      "API Gateway",
+      "Application Code",
+      "Custom data source"
+    ],
+    "complexity_score": "Medium - Moderate complexity requiring multiple integrations"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "1. Review policy requirements and customize for your organization",
+      "2. Configure integration with IAM and data sources",
+      "3. Set up audit logging and monitoring",
+      "4. Test in sandbox environment with sample scenarios",
+      "5. Validate policy behavior and adjust thresholds",
+      "6. Train stakeholders on policy requirements",
+      "7. Deploy to production with full audit logging enabled",
+      "8. Monitor policy effectiveness and tune as needed"
+    ],
+    "configuration_tips": [
+      "Adjust thresholds and conditions based on organizational risk appetite",
+      "Configure automated notifications for policy violations",
+      "Set up dashboards for policy compliance monitoring",
+      "Customize approval workflows based on governance structure",
+      "Enable gradual rollout for critical policies"
+    ],
+    "testing_scenarios": [
+      "Authorized user with compliant request - should allow",
+      "Unauthorized user attempting access - should deny",
+      "Non-compliant request - should deny with explanation",
+      "Edge cases and boundary conditions"
+    ],
+    "prerequisites": [
+      "✅ Inventory all systems needed for 5 conditions in this policy",
+      "✅ Verify API access and credentials for each system",
+      "✅ Test API endpoints return expected data format",
+      "✅ Document field mappings between your systems and policy conditions",
+      "✅ Ensure network connectivity from Control Core to all data sources"
+    ],
+    "data_source_configuration": [
+      "\n📦 Identity And Access:",
+      "   • Configure Custom data source integration for 'input.user.authenticated'",
+      "     - API: REST API endpoint",
+      "     - Field: user.authenticated",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.user.authorized'",
+      "     - API: REST API endpoint",
+      "     - Field: user.authorized",
+      "     - Method: REST API",
+      "\n📦 Data Sources:",
+      "   • Configure Application Code integration for 'input.action'",
+      "     - API: Application sends action in request",
+      "     - Field: action",
+      "     - Method: REST API",
+      "   • Configure API Gateway integration for 'input.action'",
+      "     - API: Map HTTP method to action",
+      "     - Field: GET→read, POST→create, DELETE→delete",
+      "     - Method: REST API",
+      "   • Configure Custom data source integration for 'input.context.compliant'",
+      "     - API: REST API endpoint",
+      "     - Field: context.compliant",
+      "     - Method: REST API",
+      "\n📦 Monitoring And Logging:",
+      "   • Configure Custom data source integration for 'input.context.risk_assessed'",
+      "     - API: REST API endpoint",
+      "     - Field: context.risk_assessed",
+      "     - Method: REST API"
+    ],
+    "policy_customization": [
+      "🔧 Review and customize the following conditions for your environment:",
+      "   • User conditions (2): user.authenticated, user.authorized",
+      "   • Context conditions (2): context.compliant, context.risk_assessed",
+      "",
+      "📝 Modification guidelines:",
+      "   • Update attribute names to match your system's field names",
+      "   • Adjust threshold values (e.g., risk scores, time windows)",
+      "   • Add/remove conditions based on your requirements",
+      "   • Test each condition individually before combining",
+      "",
+      "💾 Save modified policy with version tag for tracking"
+    ],
+    "sandbox_testing": [
+      "🧪 Deploy to Sandbox environment first:",
+      "   1. Create test users with various attribute combinations",
+      "   2. Set up test resources with different classifications",
+      "   3. Run test scenarios:",
+      "      • User with all required attributes → ALLOW",
+      "      • User missing required attribute → DENY",
+      "      • User with insufficient privileges → DENY",
+      "   4. Verify audit logs capture all evaluations",
+      "   5. Check performance (policy evaluation < 100ms)",
+      "   6. Test error handling (missing attributes, null values)"
+    ],
+    "production_deployment": [
+      "🚀 Production deployment checklist:",
+      "   1. ✅ All sandbox tests passing",
+      "   2. ✅ Stakeholder approval documented",
+      "   3. ✅ Rollback plan prepared",
+      "   4. ✅ Deploy in shadow mode (log only, don't enforce) for 24-48 hours",
+      "   5. ✅ Review shadow mode logs for unexpected denials",
+      "   6. ✅ Adjust policy based on real traffic patterns",
+      "   7. ✅ Enable enforcement mode with gradual rollout (10% → 50% → 100%)",
+      "   8. ✅ Monitor error rates and user feedback",
+      "   9. ✅ Document deployment for compliance audit trail"
+    ],
+    "monitoring_setup": [
+      "📊 Set up monitoring and alerts:",
+      "   • Policy evaluation count (baseline: track for 1 week)",
+      "   • Denial rate (alert if > 5% of requests)",
+      "   • Evaluation latency (alert if > 200ms p95)",
+      "   • Missing attribute errors (alert on any occurrence)",
+      "   • Condition-specific metrics:",
+      "     1. Monitor 'input.action' - track null/missing values",
+      "     2. Monitor 'input.context.compliant' - track null/missing values",
+      "     3. Monitor 'input.context.risk_assessed' - track null/missing values",
+      "     4. Monitor 'input.user.authenticated' - track null/missing values",
+      "     5. Monitor 'input.user.authorized' - track null/missing values"
+    ]
+  },
+  "compliance_frameworks": [
+    "Security Controls"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "authentication",
+    "security-controls",
+    "compliance",
+    "security"
+  ],
+  "related_templates": [],
+  "conditions_analysis": {
+    "total_conditions": 5,
+    "user_attributes": 2,
+    "resource_attributes": 0,
+    "context_attributes": 2
+  },
+  "integration_guide": {
+    "overview": "This guide helps you integrate Control Core with your technical stack to fetch the required attributes.",
+    "steps_by_system": [
+      {
+        "system": "Custom data source",
+        "attributes_needed": [
+          "input.user.authenticated",
+          "input.user.authorized",
+          "input.context.compliant",
+          "input.context.risk_assessed"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Custom data source",
+          "2. Test API access: REST API endpoint",
+          "3. In Control Core: Settings → Integrations → Add Custom data source",
+          "4. Configure field mappings for 4 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: user.authenticated, user.authorized, context.compliant"
+      },
+      {
+        "system": "Application Code",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for Application Code",
+          "2. Test API access: Application sends action in request",
+          "3. In Control Core: Settings → Integrations → Add Application Code",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: action"
+      },
+      {
+        "system": "API Gateway",
+        "attributes_needed": [
+          "input.action"
+        ],
+        "integration_steps": [
+          "1. Obtain API credentials for API Gateway",
+          "2. Test API access: Map HTTP method to action",
+          "3. In Control Core: Settings → Integrations → Add API Gateway",
+          "4. Configure field mappings for 1 attributes",
+          "5. Test attribute retrieval with sample user/resource",
+          "6. Enable caching (recommended: 5-15 minutes for user attributes)"
+        ],
+        "example_response": "Example API response will contain: GET→read, POST→create, DELETE→delete"
+      }
+    ]
+  }
+}

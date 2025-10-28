@@ -1,0 +1,176 @@
+{
+  "version": "1.0.0",
+  "summary": "AMF Quebec financial institution oversight and Bill 96 French language compliance requirements",
+  "detailed_description": "This policy template enforces Autorité des marchés financiers (AMF) regulatory requirements for financial institutions operating in Quebec. AMF regulates insurance companies, securities dealers, mortgage brokers, and Desjardins (Quebec's unique cooperative financial institution). The policy enforces AMF licensing validation, French language requirements per Bill 96, Quebec consumer protection under Bill 141, and AMF-specific disclosure and reporting obligations. Ensures compliance with Quebec's distinct financial services regulatory framework and cultural/linguistic requirements.",
+  "use_cases": [
+    {
+      "title": "Desjardins: French-First Financial Services Under Bill 96",
+      "description": "Deploy amf-quebec-financial-oversight for Quebec language law compliance",
+      "scenario": "Desjardins (Quebec's largest FI, 7M members) must comply with Bill 96 strengthening French language requirements. AMF + OQLF (language regulator) requirements: (1) French versions of all contracts and communications available first (English can be offered but not mandatory), (2) Customer service in French by default, (3) French-language training for all employees, (4) Public-facing materials primarily in French. Policy enforces: Customer communication language defaults to French (unless customer explicitly requests English), contracts generated in French first (English version available on request), mobile app interface French by default (language switcher available), marketing materials must be French or bilingual (English-only prohibited). Implementation: CRM language preference (99% of Quebec customers prefer French, 1% request English - Montreal anglophones, immigrants), 95% of employees bilingual (English-only employees restricted to back-office roles not interacting with members), vendor contracts require French-language support (software, customer service, training materials). Results: 100% compliance with Bill 96, zero OQLF complaints (Office québécois de la langue française), strengthened Quebec cultural identity (marketing positioning as 'truly Quebec financial institution'), competitive advantage vs. anglophone banks. AMF examination: Exemplary French-language compliance, cultural alignment with Quebec values."
+    },
+    {
+      "title": "iA Financial Group: AMF Licensing for Investment Advisors",
+      "description": "Implement amf-quebec-financial-oversight for securities dealer compliance",
+      "scenario": "iA Financial (insurance and wealth management, Quebec-headquartered) maintains AMF registrations for 2,500 investment advisors across Quebec. AMF requirement: Each advisor individually licensed, continuing education requirements (15 hours/year), compliance monitoring. Policy enforces: Advisor license status verified before allowing client interactions (AMF registry API lookup), license expiry notifications 90/60/30 days before renewal, trading blocked for expired/suspended licenses, continuing education tracking (blocking if <15 hours in calendar year), automated AMF annual registration renewal workflow. Compliance tracking: 2,500 advisors, 99.2% license compliance (20 advisors with expired licenses immediately suspended - resolved within 48 hours), 100% continuing education compliance (automated system tracks courses, blocks trading in December if requirement not met), zero AMF violations in 2024 annual inspection. Results: Automated licensing compliance (vs. manual tracking previously), eliminated risk of unlicensed advisors serving clients, strong culture of professional development. AMF feedback: Robust licensing compliance program, effective use of technology for regulatory oversight."
+    },
+    {
+      "title": "National Bank: Dual Regulatory Compliance - AMF and OSFI",
+      "description": "Use amf-quebec-financial-oversight for harmonized federal/provincial compliance",
+      "scenario": "National Bank (federally regulated by OSFI, Quebec operations subject to AMF oversight) manages dual regulatory framework. Regulatory complexity: OSFI for banking activities, AMF for securities/insurance subsidiaries, harmonization needed to avoid conflicts. Policy approach: Federal activities (deposits, loans) → OSFI requirements, Securities activities in Quebec → AMF requirements, Insurance activities → AMF for Quebec, FSRA for Ontario, hybrid situations (investment loan) → apply strictest requirement. Implementation: Product catalog tags regulatory jurisdiction, transaction routing system applies appropriate ruleset, compliance reporting dual-tracked (OSFI quarterly, AMF quarterly), examination coordination (AMF and OSFI share findings - cooperation agreement). Example: Quebec customer applies for investment loan (secured by securities in trading account) - policy enforces both OSFI lending requirements (creditworthiness, loan-to-value, stress testing) AND AMF suitability requirements (investment knowledge, risk tolerance, leverage appropriateness). Complexity managed through technology (automated dual compliance checking), cultural awareness (Quebec customer expectations), regulatory cooperation (AMF and OSFI coordinate rather than duplicate examinations). Outcome: Zero regulatory conflicts, efficient operations despite dual oversight, strong relationships with both AMF and OSFI. Regulatory feedback: Model for other institutions operating in Quebec with federal/provincial split."
+    },
+    {
+      "title": "Fiera Capital: AMF Investment Fund Manager Oversight",
+      "description": "Deploy amf-quebec-financial-oversight for Quebec fund management compliance",
+      "scenario": "Fiera Capital (Quebec-based investment manager, $170B AUM) operates Quebec-registered investment funds under AMF oversight. AMF requirements for fund managers: (1) Portfolio manager registration, (2) Fund prospectus approval, (3) Quarterly fund reporting, (4) Marketing materials review, (5) Complaint handling. Policy enforces: Portfolio manager license verification before fund assignments, prospectus amendments require AMF pre-approval (45-day review period), marketing materials cannot be published without compliance approval (AMF advertising rules), quarterly fund reports auto-generated from portfolio accounting system (filed via AMF portal), unitholder complaints logged and tracked (30-day resolution requirement). Quebec-specific: Fund documentation in French (primary language for 95% of Quebec unitholders), AMF prospectus format differs from OSC (Ontario), fee disclosure requirements more stringent. Results: 45 Quebec-registered funds, 100% prospectus compliance, zero AMF marketing violations (improved from 3 violations in 2022 before automated compliance), complaint resolution 96% within 30 days. AMF inspection: Satisfactory fund governance, strong compliance controls for Quebec market."
+    },
+    {
+      "title": "Laurentian Bank: AMF Examination Preparedness",
+      "description": "Apply amf-quebec-financial-oversight for regulatory examination evidence",
+      "scenario": "Laurentian Bank prepares for AMF triennial full-scope examination (2024). AMF examination scope: Governance, risk management, consumer protection, AML compliance, financial condition. Consumer protection focus areas: Complaint handling, product disclosures, fair treatment, vulnerable customers. Evidence preparation: Policy evaluation logs showing consumer protection controls (automated denial of unfair practices, complaint tracking, disclosure requirements), compliance metrics dashboard (complaint resolution times, disclosure completion rates, vulnerable customer identification), incident reports (3 consumer protection violations self-identified and remediated before examination), training records (all customer-facing staff trained on fair treatment principles). Examination findings: Satisfactory consumer protection framework, 2 observations (not deficiencies): (1) Enhance vulnerable customer identification (currently age-based, recommended adding financial hardship triggers), (2) Improve complaint root cause analysis (track themes for systemic issue identification). Policy enhancements post-examination: Added financial hardship flag (customer indicates difficulty affording payments), configured complaint categorization for trend analysis. AMF follow-up: Both observations addressed within 90 days, closed with no ongoing monitoring. Regulatory relationship: Proactive compliance approach builds AMF confidence, examination findings less severe than peers."
+    },
+    {
+      "title": "Quebec Blue Cross: Health Insurance Consumer Protection",
+      "description": "Implement amf-quebec-financial-oversight for group health insurance regulation",
+      "scenario": "Quebec Blue Cross provides group health/dental insurance for 500K Quebecers through 5,000 employer groups. AMF consumer protection for group insurance: (1) Transparent renewal pricing (no surprise increases), (2) Clear explanation of coverage changes, (3) Timely claims processing, (4) Appeal rights for claim denials. Policy enforces: Renewal pricing letters mailed 60 days before renewal (AMF requirement: 45 days minimum - exceed requirement), pricing increase >10% requires detailed explanation with comparison to market, coverage changes highlighted in renewal notice (cannot be buried in fine print), claim processing SLA 15 business days (AMF standard: 30 days - exceed to build trust), claim denial letters include appeal instructions with AMF contact info. Customer experience: Renewal transparency improved member satisfaction from 72% to 84%, claims processing faster than competitors (competitive advantage), appeal rights reduced AMF complaints (2024: 15 complaints, down from 45 in 2023 before policy improvements). AMF examination: Strong consumer protection practices exceeding minimum requirements, low complaint volume indicates effective policyholder communication and fair treatment."
+    },
+    {
+      "title": "SSQ Insurance: AMF Innovation Sandbox for Insurtech Products",
+      "description": "Use amf-quebec-financial-oversight for regulatory sandbox participation",
+      "scenario": "SSQ Insurance (Quebec-based insurer) participates in AMF Innovation Hub testing usage-based auto insurance (UBI) with telematics. Regulatory challenge: UBI is new product category, AMF rules written for traditional insurance. AMF sandbox approach: Temporary exemptions from certain rules while testing (limited customer volume, enhanced monitoring, quarterly AMF reporting). Policy enforces within sandbox: Maximum 5,000 UBI policies (sandbox limit), customer consent for telematics data collection (explicit opt-in), pricing algorithm transparency (customers can see how driving behavior affects premium), AMF quarterly reporting (customer outcomes, complaints, pricing fairness, data privacy), exit strategy if product fails (how will customers be transitioned). Sandbox results (12 months): 4,800 policies sold, customer satisfaction 88% (higher than traditional auto), claims frequency 22% lower than traditional (better drivers select UBI), 8 privacy complaints investigated (all found data handling compliant, customers didn't understand telematics consent), pricing fairness: Correlation analysis showed premium tied to driving behavior (miles, speed, braking) not prohibited factors. AMF decision: Graduated from sandbox to full approval, UBI pricing methodology approved for province-wide rollout, SSQ can now scale beyond 5,000 policy limit. Regulatory innovation: AMF Innovation Hub enabled responsible innovation with consumer protection maintained."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Financial service action",
+      "required": true,
+      "example_values": [
+        "provide_financial_service",
+        "communicate_with_customer",
+        "market_financial_product"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Service resource type",
+      "required": true,
+      "example_values": [
+        "financial_service",
+        "customer_communication",
+        "investment_product"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.service_jurisdiction",
+      "type": "string",
+      "description": "Service jurisdiction",
+      "required": true,
+      "example_values": [
+        "Quebec",
+        "Ontario",
+        "Canada"
+      ],
+      "example_value": "Canada"
+    },
+    {
+      "name": "context.amf_license_current",
+      "type": "boolean",
+      "description": "AMF license status",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.customer_language_preference",
+      "type": "string",
+      "description": "Customer language preference",
+      "required": true,
+      "example_values": [
+        "French",
+        "English"
+      ],
+      "example_value": "example_value"
+    },
+    {
+      "name": "context.communication_language",
+      "type": "string",
+      "description": "Communication language used",
+      "required": true,
+      "example_values": [
+        "French",
+        "English"
+      ],
+      "example_value": "example_value"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "AMF Registry Integration",
+      "CRM with Language Preferences",
+      "Licensing Management System",
+      "Product Approval Tracking"
+    ],
+    "complexity_score": "Medium - Provincial regulatory compliance with language requirements"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Review AMF requirements",
+      "Configure French language defaults",
+      "Integrate AMF registry for license validation",
+      "Setup complaint handling workflow"
+    ],
+    "sandbox_testing": [
+      "Test Quebec service without AMF license → DENY",
+      "Test French customer communication in English → FLAG",
+      "Test product marketing without Quebec disclosure → DENY"
+    ],
+    "production_deployment": [
+      "Deploy for Quebec operations first",
+      "Monitor language compliance",
+      "Enable license validation"
+    ],
+    "monitoring_setup": [
+      "Track AMF license expiries",
+      "Monitor French language compliance rate",
+      "Alert on Quebec disclosure violations"
+    ]
+  },
+  "compliance_frameworks": [
+    "AMF Quebec",
+    "Bill 96 (Language)",
+    "Bill 141 (Consumer Protection)",
+    "Quebec Civil Code",
+    "PIPEDA"
+  ],
+  "risk_level": "high",
+  "tags": [
+    "amf",
+    "quebec",
+    "french-language",
+    "bill-96",
+    "consumer-protection",
+    "provincial-regulation"
+  ],
+  "related_templates": [
+    "fsra-ontario-consumer-protection",
+    "pipeda-consent-principles",
+    "fintrac-aml-monitoring"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 5,
+    "user_attributes": 0,
+    "resource_attributes": 2,
+    "context_attributes": 3
+  },
+  "integration_guide": {
+    "overview": "Integrate with AMF registry and Quebec-specific systems for provincial compliance",
+    "steps_by_system": []
+  }
+}

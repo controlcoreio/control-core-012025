@@ -1,0 +1,86 @@
+[
+  {
+    "attrs": {
+      "confidenceScore": {
+        "__extn": {
+          "arg": "33.57",
+          "fn": "decimal"
+        }
+      },
+      "department": "HardwareEngineering",
+      "homeIp": {
+        "__extn": {
+          "arg": "222.222.222.7",
+          "fn": "ip"
+        }
+      },
+      "jobLevel": 5
+    },
+    "parents": [
+      {
+        "id": "Editor",
+        "type": "Role"
+      }
+    ],
+    "uid": {
+      "id": "someone@permit.io",
+      "type": "User"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "document:delete",
+      "type": "Action"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "document:create",
+      "type": "Action"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "document",
+      "type": "ResourceType"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "document:update",
+      "type": "Action"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "document:list",
+      "type": "Action"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "document:get",
+      "type": "Action"
+    }
+  },
+  {
+    "attrs": {},
+    "parents": [],
+    "uid": {
+      "id": "Editor",
+      "type": "Role"
+    }
+  }
+]

@@ -1,0 +1,157 @@
+{
+  "version": "1.0.0",
+  "summary": "FINTRAC Beneficial Ownership identification and verification for corporate and trust accounts",
+  "detailed_description": "This policy template enforces FINTRAC beneficial ownership requirements mandating identification of individuals who own or control 25% or more of a corporation or entity. Beneficial ownership transparency is critical for preventing money laundering through shell companies and understanding the ultimate parties behind financial transactions. The policy enforces beneficial ownership identification for all corporate accounts, 25% ownership threshold verification, control person determination for entities, documentation of reasonable measures when beneficial owners cannot be identified, and enhanced verification for complex multi-layered ownership structures. Supports compliance with PCMLTFA amendments requiring beneficial ownership registry integration.",
+  "use_cases": [
+    {
+      "title": "TD: Corporate Account Opening Beneficial Ownership Verification",
+      "description": "Deploy fintrac-beneficial-ownership for business banking KYC",
+      "scenario": "TD business banking onboards 500 corporate accounts monthly (small businesses, mid-market companies, subsidiaries of foreign corporations). FINTRAC requirement: Identify all beneficial owners (25%+ ownership), verify identity with government-issued ID, determine control persons even if <25% ownership. Policy enforces: Corporate account application blocked until beneficial ownership section complete, automated validation: number of owners + ownership % must total ≥75% to proceed, identity verification required for each beneficial owner (passport/driver's license scan + facial recognition), control person identified (CEO, board chairman, or individual directing company). Complex cases: 10-layer holding company structure (required ownership chart submission + compliance review), beneficial owners in multiple jurisdictions (verified via international KYC network), trusts as shareholders (required trust deed + trustee/beneficiary identification). Results: 95% of corporate accounts have complete beneficial ownership within 48 hours, 5% require compliance investigation (complex structures, uncooperative clients), zero accounts opened without beneficial ownership, FINTRAC examination: Strong beneficial ownership verification procedures."
+    },
+    {
+      "title": "BMO: Beneficial Ownership Registry Integration",
+      "description": "Implement fintrac-beneficial-ownership with federal registry lookup",
+      "scenario": "Canada implements beneficial ownership registry for federal corporations (2024 requirement). BMO integrates registry lookup into KYC workflow to automate beneficial ownership verification. Policy enhancement: For federal corporations, query Corporations Canada beneficial ownership registry, compare customer-provided beneficial ownership vs. registry data, flag discrepancies for investigation, use registry data as verification source (reduces customer friction). Implementation: API integration with Corporations Canada registry (beta access as major bank), automated lookup during corporate account opening, discrepancy rate: 12% (customers unaware of reporting requirement, outdated registry info, genuine ownership changes), resolution: Request updated info from customer, file with registry if confirmed. Benefits: Reduced KYC completion time from 5 days to 2 days (registry lookup instant vs. manual verification), improved accuracy (registry is authoritative source), enhanced AML effectiveness (cross-reference with other banks' data). Future: Provincial registries coming online (BC, Ontario pilots), plan to integrate all provincial registries. FINTRAC feedback: Innovative use of beneficial ownership registry, encouraged other FIs to integrate."
+    },
+    {
+      "title": "Scotiabank: Complex Ownership Structure - Real Estate Developer",
+      "description": "Use fintrac-beneficial-ownership for multi-layered entity investigation",
+      "scenario": "Scotiabank evaluates corporate account application from real estate development company with complex structure: Company A (applicant) owned by Company B (Ontario), owned by Company C (Delaware), owned by Trust (Cayman Islands), beneficiaries include individuals in Canada, USA, China. FINTRAC challenge: Identify ultimate beneficial owners through multiple layers. Investigation process: Request full ownership chart, review Company B/C corporate documents, review trust deed for beneficiaries, verify individuals' identity in each jurisdiction, determine if anyone has ≥25% beneficial ownership after aggregating through all layers. Findings: 3 beneficial owners identified (22%, 18%, 15% - total 55%), 2 control persons (CEO of Company C, trust protector), required documentation for each, complex case review took 3 weeks (vs. 2 days for simple structures). Risk assessment: Legitimate real estate business, no adverse media, source of wealth verified (successful development track record), approved with enhanced monitoring (quarterly review of transaction patterns). FINTRAC examination: Thorough investigation of complex structure, appropriate risk-based approach, adequate documentation for approval decision."
+    },
+    {
+      "title": "National Bank: Reasonable Measures Documentation",
+      "description": "Deploy fintrac-beneficial-ownership for unavailable beneficial ownership scenarios",
+      "scenario": "National Bank encounters situation: Private company refuses to disclose beneficial owners citing 'competitive sensitivity'. FINTRAC position: Reasonable measures must be taken to obtain beneficial ownership, but if genuinely unavailable, document measures taken and consider account opening on risk basis. Reasonable measures documented: (1) Explained FINTRAC legal requirement to client (3 conversations with CEO), (2) Reviewed public records (no beneficial ownership in corporate registry, Google searches inconclusive), (3) Requested shareholder list (refused), (4) Elevated to senior credit officer for decision. Decision: Decline account application (unable to obtain required information, client unwilling to cooperate). Alternative offered: If client provides beneficial ownership, account can be reopened (2 months later, client provided info, account approved). Learning: Document all steps taken, escalate refusals to senior management, declining business is appropriate response to non-compliance. FINTRAC examination: Correct application of 'reasonable measures' standard, appropriate decision to decline account, documentation sufficient."
+    },
+    {
+      "title": "Vancity Credit Union: Beneficial Ownership for Non-Profits",
+      "description": "Apply fintrac-beneficial-ownership for non-profit and charity accounts",
+      "scenario": "Vancity serves 500 non-profit organizations in BC (charities, community groups, NGOs). Beneficial ownership challenge: Non-profits don't have 'owners' (no shareholders). FINTRAC guidance: Identify control persons (executive director, board chair, individuals directing activities). Policy approach: For non-profits, collect board of directors list, identify executive leadership (Executive Director, Board Chair), verify identity of control persons, document governance structure (bylaws, board minutes). Unique non-profit risks: International charities sending funds to developing countries (potential terrorist financing), activist organizations receiving foreign funding (foreign influence concerns), religious organizations with overseas affiliations. Enhanced verification: Review CRA charity registration, assess source of funds (donations, grants), evaluate foreign transaction patterns, apply risk rating (low for local community groups, high for international relief). Results: 95% of non-profits are low-risk (smooth onboarding), 5% require enhanced review (international operations, large foreign donations), zero false negatives (no terrorist financing cases), efficient process with appropriate risk management. FINTRAC: Good adaptation of beneficial ownership to non-profit context."
+    },
+    {
+      "title": "EQ Bank: Beneficial Ownership for Fintechs and Startups",
+      "description": "Implement fintrac-beneficial-ownership for technology company accounts",
+      "scenario": "EQ Bank targets fintech and tech startups (500 accounts) with unique beneficial ownership challenges: complex cap tables (10+ investors from venture capital rounds), employee stock options (potential future beneficial ownership), foreign investors (offshore VCs). Policy approach: Require detailed cap table (Carta integration), identify all investors with ≥25% on fully diluted basis (includes options), verify VC firm ownership and their LP beneficial owners if ≥25%, document option holders who could become ≥25% owners. Example: Startup with $10M Series A from US VC (30% ownership), founders (40% combined), angel investors (30% combined). Beneficial ownership: US VC identified (verified VC firm + reviewed limited partnership agreement for LPs with ≥25% of VC fund), 2 founders (verified with passport), 1 angel investor with 26%. Complexity: Startup plans Series B ($50M from Tiger Global 40% ownership) - requires updated beneficial ownership before transaction close. Process: Beneficial ownership updated in real-time as cap table changes, automated flagging if ownership change creates new ≥25% owner, smooth onboarding for fast-growing fintechs. Fintech customer feedback: Comprehensive but reasonable process, appreciated EQ's understanding of startup cap tables."
+    }
+  ],
+  "conditions": [
+    {
+      "name": "action",
+      "type": "string",
+      "description": "Account opening action",
+      "required": true,
+      "example_values": [
+        "onboard_corporate_customer",
+        "verify_beneficial_owner",
+        "complete_kyc_entity"
+      ],
+      "example_value": "read"
+    },
+    {
+      "name": "resource.type",
+      "type": "string",
+      "description": "Account resource type",
+      "required": true,
+      "example_values": [
+        "business_account",
+        "entity_ownership",
+        "corporate_client"
+      ],
+      "example_value": "document"
+    },
+    {
+      "name": "context.beneficial_owners_identified",
+      "type": "boolean",
+      "description": "Beneficial owners identified",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    },
+    {
+      "name": "context.ownership_percentage",
+      "type": "number",
+      "description": "Ownership percentage",
+      "required": true,
+      "example_values": [
+        25,
+        50,
+        100
+      ],
+      "example_value": "18"
+    },
+    {
+      "name": "context.control_person_identified",
+      "type": "boolean",
+      "description": "Control person identified",
+      "required": true,
+      "example_values": [
+        true,
+        false
+      ],
+      "example_value": "true"
+    }
+  ],
+  "requirements": {
+    "systems_needed": [
+      "CRM with Corporate KYC",
+      "Beneficial Ownership Registry API",
+      "Identity Verification Platform",
+      "Corporate Registry Databases"
+    ],
+    "complexity_score": "High - Complex entity verification with multi-jurisdictional ownership"
+  },
+  "deployment_notes": {
+    "setup_steps": [
+      "Review FINTRAC beneficial ownership requirements",
+      "Configure 25% ownership threshold",
+      "Integrate federal registry",
+      "Setup complex structure workflows"
+    ],
+    "sandbox_testing": [
+      "Test simple corporation (2 owners at 50% each) → Both must be verified",
+      "Test complex holding company → Ownership chart required"
+    ],
+    "production_deployment": [
+      "Deploy for new corporate accounts first",
+      "Gradual remediation of existing accounts without beneficial ownership"
+    ],
+    "monitoring_setup": [
+      "Track beneficial ownership completion rate (target: 100%)",
+      "Monitor complex structure review times",
+      "Alert on reasonable measures cases"
+    ]
+  },
+  "compliance_frameworks": [
+    "FINTRAC",
+    "PCMLTFA",
+    "FATF Recommendation 24 & 25",
+    "OSFI E-21"
+  ],
+  "risk_level": "critical",
+  "tags": [
+    "fintrac",
+    "beneficial-ownership",
+    "kyc",
+    "aml",
+    "corporate-accounts",
+    "transparency"
+  ],
+  "related_templates": [
+    "fintrac-aml-monitoring",
+    "kyc-verification",
+    "fintrac-high-risk-jurisdiction"
+  ],
+  "conditions_analysis": {
+    "total_conditions": 8,
+    "user_attributes": 0,
+    "resource_attributes": 2,
+    "context_attributes": 6
+  },
+  "integration_guide": {
+    "overview": "Integrate with beneficial ownership registry, corporate databases, and identity verification platforms",
+    "steps_by_system": []
+  }
+}

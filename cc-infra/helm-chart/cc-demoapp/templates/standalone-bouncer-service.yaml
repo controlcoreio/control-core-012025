@@ -1,0 +1,20 @@
+{{- if .Values.standaloneBouncer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.standaloneBouncer.name }}-{{ .Values.global.environment }}
+  labels:
+    app: {{ .Values.standaloneBouncer.name }}
+    env: {{ .Values.global.environment }}
+    {{- include "acme-stack.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.standaloneBouncer.service.type }}
+  ports:
+    - port: {{ .Values.standaloneBouncer.service.port }}
+      targetPort: {{ .Values.standaloneBouncer.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.standaloneBouncer.name }}
+    env: {{ .Values.global.environment }}
+{{- end }}

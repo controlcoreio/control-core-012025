@@ -1,0 +1,27 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+pydantic
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+email-validator
+stripe
+authlib
+requests
+cryptography
+aiohttp
+redis
+httpx
+# PIP Data Sources Dependencies
+ldap3
+pymongo
+pyyaml
+openapi-spec-validator
+asyncpg
+aiomysql
+motor
+apscheduler
+PyGithub==2.1.1

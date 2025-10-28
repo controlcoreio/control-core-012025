@@ -1,0 +1,761 @@
+# Control Core Architecture
+
+This guide provides a comprehensive overview of Control Core's architecture, component interactions, data flows, and deployment patterns.
+
+## Dual Environment Architecture (Default Model)
+
+**Control Core exclusively uses a dual environment deployment model** similar to Stripe's test/live mode. This is the foundational design, not an optional feature.
+
+### Default Deployment: 1 Control Plane + Sandbox Bouncer Pairs
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  CONTROL PLANE (Single Instance)                 │
+│                  Manages Both Environments                       │
+│                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │ Admin UI    │  │   PAP API   │  │    OPAL     │             │
+│  │ (Frontend)  │  │  (Backend)  │  │   Server    │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                  │
+│  • All policies managed here                                    │
+│  • Tracks bouncer pairs                                         │
+│  • Sandbox & Production separation                              │
+└──────────────────────────────┬───────────────────────────────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │ (REQUIRED)       │ (OPTIONAL)       │
+            ▼                  ▼                  ▼
+   ┌──────────────────┐    ┌──────────────────┐
+   │ Sandbox Bouncer  │◄───│Production Bouncer│ 
+   │  (START HERE)    │PAIR│   (Add Later)    │
+   │                  │────│                  │
+   │ ENVIRONMENT=     │    │  ENVIRONMENT=    │
+   │   sandbox        │    │   production     │
+   │                  │    │                  │
+   │ RESOURCE_NAME=   │    │  RESOURCE_NAME=  │
+   │ "Payment API"    │    │  "Payment API"   │ ◄ SAME (Paired)
+   │                  │    │                  │
+   │  Test Resources  │    │  Live Resources  │
+   └──────────────────┘    └──────────────────┘
+      CREATE POLICIES       ENFORCE PROMOTED
+       TEST HERE            POLICIES HERE
+```
+
+### Key Concepts
+
+1. **One Control Plane for Both Environments**: Single instance manages sandbox and production
+2. **Bouncers Come in Pairs**: Each resource (e.g., "Payment API") has sandbox + production bouncers
+3. **Sandbox is Required**: All policy development happens in sandbox first
+4. **Production is Optional**: Deploy production bouncers only when ready
+5. **Policy Promotion**: Policies created in sandbox, promoted to production
+6. **API Key Separation**: `sk_test_` for sandbox, `sk_live_` for production
+
+## High-Level Architecture
+
+Control Core uses a distributed architecture designed for scalability, performance, and reliability across any cloud provider or on-premises infrastructure.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CLIENT APPLICATIONS                          │
+│         (Web Apps, Mobile Apps, APIs, AI Agents)                │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ HTTPS/API Calls
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              POLICY ENFORCEMENT POINT (BOUNCER)                 │
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    │
+│  │   Reverse    │ →  │   Policy     │ →  │   Forward    │    │
+│  │   Proxy      │    │   Decision   │    │   to Target  │    │
+│  └──────────────┘    │   Point      │    └──────────────┘    │
+│                      └──────┬───────┘                         │
+│                             │                                  │
+│                      ┌──────▼───────┐                         │
+│                      │ Policy Cache │                         │
+│                      │Decision Cache│                         │
+│                      └──────────────┘                         │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             │ Policy Sync (WebSocket)
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│          POLICY SYNCHRONIZATION SERVER (OPAL)                   │
+│                                                                 │
+│  - Monitors policy repositories (Git)                           │
+│  - Distributes policies to all Bouncers                         │
+│  - Publishes data from integrations                             │
+│  - Real-time updates via WebSocket                              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+        ▼                    ▼                    ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   Policy     │    │ External     │    │  Protected   │
+│ Repository   │    │ Data Sources │    │   Target     │
+│ (Git/GitHub) │    │ (PIP)        │    │ Application  │
+└──────────────┘    └──────────────┘    └──────────────┘
+                             ▲
+                             │
+                             │ API Calls
+                             │
+┌─────────────────────────────────────────────────────────────────┐
+│         POLICY ADMINISTRATION POINT (CONTROL PLANE)             │
+│                                                                 │
+│  ┌──────────────────────┐    ┌──────────────────────┐         │
+│  │  Administration      │    │  Administration      │         │
+│  │  Console (UI)        │    │  API (Backend)       │         │
+│  │                      │    │                      │         │
+│  │ - Policy Management  │    │ - Policy CRUD        │         │
+│  │ - User Management    │    │ - Authentication     │         │
+│  │ - Resource Config    │    │ - Decision Logging   │         │
+│  │ - Monitoring         │    │ - Integration Mgmt   │         │
+│  └──────────────────────┘    └──────────┬───────────┘         │
+│                                          │                      │
+│              ┌───────────────────────────┼──────────┐          │
+│              ▼                           ▼          ▼          │
+│      ┌──────────────┐         ┌──────────────┐  ┌────────┐   │
+│      │  PostgreSQL  │         │    Redis     │  │Language│   │
+│      │   Database   │         │    Cache     │  │ Server │   │
+│      └──────────────┘         └──────────────┘  └────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Core Components
+
+### Policy Administration Console
+
+**Purpose**: Web-based user interface for managing policies, users, and resources
+
+**Key Features**:
+- Visual policy builder (no-code)
+- Monaco code editor with Rego IntelliSense
+- Policy testing framework
+- User and resource management
+- Real-time monitoring dashboards
+- Audit log viewer
+
+**Technology**: Modern web application (React-based)
+**Access**: HTTPS on port 3000 (configurable)
+**Deployment**: Stateless, horizontally scalable
+
+### Policy Administration API
+
+**Purpose**: Backend service powering the Control Plane
+
+**Key Features**:
+- RESTful API for policy operations
+- User authentication and authorization
+- Decision logging and analytics
+- Integration management (PIP)
+- Webhook support
+
+**Access**: HTTPS on port 8082 (configurable)
+**Deployment**: Stateless, horizontally scalable
+**Database**: PostgreSQL for persistence
+**Cache**: Redis for performance
+
+### Policy Enforcement Point (Bouncer)
+
+**Purpose**: Enforces policies on incoming requests
+
+**Key Features**:
+- Reverse proxy functionality
+- Sub-100ms policy evaluation
+- Decision caching
+- Content injection (for AI agents)
+- Comprehensive audit logging
+- Target application protection
+
+**Access**: HTTPS on port 8080 (configurable)
+**Deployment**: Stateless, highly scalable (10+ instances common)
+**Integration**: Connects to OPAL for policy sync
+
+### Policy Synchronization Server (OPAL)
+
+**Purpose**: Distributes policies and data to all Bouncers in real-time
+
+**Key Features**:
+- Monitors Git repositories for policy changes
+- Publishes data from PIP integrations
+- WebSocket-based pub/sub distribution
+- Handles thousands of connected clients
+- Leader election for high availability
+
+**Access**: WebSocket/HTTP on port 7000
+**Deployment**: 2-3 replicas with leader election
+**Broadcast**: PostgreSQL-based pub/sub
+
+### Policy Language Server
+
+**Purpose**: Provides IDE support for policy development
+
+**Key Features**:
+- Syntax highlighting
+- IntelliSense and auto-completion
+- Real-time validation
+- Error detection
+- Go-to-definition
+
+**Integration**: VS Code, JetBrains, Monaco Editor
+**Deployment**: Optional (enhances developer experience)
+
+## Data Flow
+
+### Policy Creation and Deployment Flow
+
+```
+1. Policy Developer writes policy in Console
+   ↓
+2. Policy validated (syntax, semantics)
+   ↓
+3. Policy tested with test cases
+   ↓
+4. Policy saved to database
+   ↓
+5. Policy committed to Git repository (optional)
+   ↓
+6. OPAL Server detects policy change
+   ↓
+7. OPAL distributes to all Bouncers via WebSocket
+   ↓
+8. Bouncers receive and compile policy
+   ↓
+9. Policy active (typically < 30 seconds)
+   ↓
+10. Requests evaluated against new policy
+```
+
+### Authorization Request Flow
+
+```
+1. Client sends request to protected application
+   ↓
+2. Bouncer intercepts request
+   ↓
+3. Bouncer extracts context (user, resource, action)
+   ↓
+4. Check decision cache
+   ├─ If cached → Return cached decision (5-10ms)
+   └─ If not cached ↓
+5. Evaluate policy with OPA
+   ├─ Load policy from cache
+   ├─ Load PIP data (if needed)
+   ├─ Evaluate Rego policy
+   └─ Generate decision (20-50ms)
+   ↓
+6. Cache decision (if cacheable)
+   ↓
+7. Log decision for audit
+   ↓
+8. If PERMIT: Forward request to target application
+   If DENY: Return 403 Forbidden
+   ↓
+9. Return response to client
+```
+
+### PIP Integration Data Flow
+
+```
+1. Admin configures data source in Console
+   ↓
+2. Control Plane tests connection
+   ↓
+3. Attributes mapped to policy schema
+   ↓
+4. Sync scheduled (hourly, daily, real-time)
+   ↓
+5. At sync time: Fetch data from source
+   ↓
+6. Transform data to standard format
+   ↓
+7. Publish to OPAL Server
+   ↓
+8. OPAL distributes to all Bouncers
+   ↓
+9. Bouncers update local OPA data
+   ↓
+10. Data available in policies immediately
+    (data.policy_data.source.type.*)
+```
+
+## Deployment Architecture Patterns
+
+### Pattern 1: Self-Hosted (Kickstart / Enterprise)
+
+```
+Your Infrastructure (Cloud or On-Premises)
+┌───────────────────────────────────────────────┐
+│  ┌─────────────┐                              │
+│  │   Console   │ ← Users manage policies      │
+│  └──────┬──────┘                              │
+│         │                                      │
+│         ▼                                      │
+│  ┌─────────────┐    ┌──────────┐             │
+│  │     API     │ ←→ │ Database │             │
+│  └──────┬──────┘    └──────────┘             │
+│         │                                      │
+│         ▼                                      │
+│  ┌─────────────┐                              │
+│  │    OPAL     │                              │
+│  └──────┬──────┘                              │
+│         │                                      │
+│         ▼                                      │
+│  ┌─────────────┐    ┌──────────────┐         │
+│  │ Bouncer(s)  │ →  │ Your Apps    │         │
+│  └─────────────┘    └──────────────┘         │
+└───────────────────────────────────────────────┘
+```
+
+**Use Case**: Complete control, data sovereignty, on-premises
+**Benefits**: Full control, no external dependencies
+**Deployment**: Docker Compose or Kubernetes
+
+### Pattern 2: Hybrid (Pro Plan)
+
+```
+Control Core Hosted               Your Infrastructure
+┌─────────────────────┐          ┌──────────────────┐
+│  ┌──────────┐       │          │                  │
+│  │ Console  │       │          │  ┌────────────┐  │
+│  └────┬─────┘       │          │  │ Bouncer(s) │  │
+│       │             │          │  └─────┬──────┘  │
+│       ▼             │          │        │         │
+│  ┌──────────┐       │  HTTPS/  │        ▼         │
+│  │   API    │←──────┼─ WSS ───→│  ┌──────────┐   │
+│  └────┬─────┘       │          │  │Your Apps │   │
+│       │             │          │  └──────────┘   │
+│  ┌────▼────┐        │          │                  │
+│  │  OPAL   │────────┼─────────→│                  │
+│  └─────────┘        │          │                  │
+└─────────────────────┘          └──────────────────┘
+```
+
+**Use Case**: Managed Control Plane, self-hosted enforcement
+**Benefits**: Reduced infrastructure, Control Core manages updates
+**Deployment**: Bouncer only (Docker or Kubernetes)
+
+### Pattern 3: Multi-Region Enterprise
+
+```
+Region 1 (Primary)        Region 2 (Replica)       Region 3 (Replica)
+┌──────────────────┐      ┌──────────────────┐     ┌──────────────────┐
+│ Control Plane    │      │ Control Plane    │     │ Control Plane    │
+│ - Console x3     │      │ - Console x3     │     │ - Console x3     │
+│ - API x5         │◄────►│ - API x5         │◄───►│ - API x5         │
+│ - OPAL x3        │ Sync │ - OPAL x3        │Sync │ - OPAL x3        │
+│ - DB Primary     │      │ - DB Replica     │     │ - DB Replica     │
+│ - Bouncer x10    │      │ - Bouncer x10    │     │ - Bouncer x10    │
+└──────────────────┘      └──────────────────┘     └──────────────────┘
+```
+
+**Use Case**: Global deployment, low latency, disaster recovery
+**Benefits**: Geographic distribution, fault tolerance
+**Deployment**: Kubernetes multi-cluster
+
+## Security Architecture
+
+### Defense in Depth
+
+```
+Layer 1: Network Security
+├─ Firewall rules
+├─ VPC/VNET isolation
+├─ Security groups
+└─ DDoS protection
+
+Layer 2: Transport Security
+├─ TLS 1.3 encryption
+├─ Certificate management
+├─ mTLS (optional)
+└─ Perfect forward secrecy
+
+Layer 3: Authentication
+├─ SAML/SSO
+├─ OAuth 2.0
+├─ MFA
+└─ Session management
+
+Layer 4: Authorization
+├─ Policy-based access control
+├─ Context-aware decisions
+├─ Real-time enforcement
+└─ Audit logging
+
+Layer 5: Data Security
+├─ Encryption at rest
+├─ Encryption in transit
+├─ Secrets management
+└─ Data minimization
+
+Layer 6: Application Security
+├─ Input validation
+├─ SQL injection prevention
+├─ XSS protection
+└─ CSRF protection
+
+Layer 7: Monitoring
+├─ Security event detection
+├─ Anomaly detection
+├─ Audit logging
+└─ Incident response
+```
+
+### Network Architecture
+
+**Cloud-Agnostic Network Design**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Public Zone                             │
+│                                                             │
+│  ┌────────────────┐        ┌────────────────┐              │
+│  │ Load Balancer  │        │ Load Balancer  │              │
+│  │ (Console/API)  │        │ (Bouncer)      │              │
+│  └───────┬────────┘        └───────┬────────┘              │
+└──────────┼─────────────────────────┼─────────────────────────┘
+           │                         │
+┌──────────┼─────────────────────────┼─────────────────────────┐
+│          │    Application Zone     │                         │
+│          ▼                         ▼                         │
+│  ┌──────────────┐         ┌──────────────┐                  │
+│  │   Console    │         │  Bouncer(s)  │                  │
+│  │   API        │         │              │                  │
+│  │   OPAL       │         │              │                  │
+│  └──────┬───────┘         └──────┬───────┘                  │
+└─────────┼──────────────────────────┼──────────────────────────┘
+          │                          │
+┌─────────┼──────────────────────────┼──────────────────────────┐
+│         │      Data Zone           │                          │
+│         ▼                          ▼                          │
+│  ┌──────────────┐         ┌──────────────┐                   │
+│  │  Database    │         │  Target      │                   │
+│  │  (PostgreSQL)│         │  Application │                   │
+│  │              │         │              │                   │
+│  │  Cache       │         │              │                   │
+│  │  (Redis)     │         │              │                   │
+│  └──────────────┘         └──────────────┘                   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+## Component Interaction
+
+### Component Communication
+
+**Control Plane (Console ↔ API)**:
+- Protocol: HTTPS
+- Auth: JWT tokens
+- Pattern: REST API
+- Latency: < 100ms
+
+**API ↔ Database**:
+- Protocol: PostgreSQL wire protocol (TLS)
+- Auth: Username/password
+- Connection pool: 20-50 per API instance
+- Latency: < 10ms
+
+**API ↔ Redis**:
+- Protocol: Redis protocol (TLS optional)
+- Auth: Password
+- Connection pool: 10-20 per API instance
+- Latency: < 5ms
+
+**OPAL ↔ Bouncers**:
+- Protocol: WebSocket (WSS)
+- Auth: Client tokens
+- Pattern: Pub/Sub
+- Latency: < 100ms for updates
+
+**Bouncer ↔ Target App**:
+- Protocol: HTTP/HTTPS
+- Auth: Preserves original auth
+- Pattern: Reverse proxy
+- Latency: Minimal overhead (< 10ms)
+
+## Scalability Architecture
+
+### Horizontal Scaling
+
+**Stateless Components** (scale easily):
+- Policy Administration Console: 3-10 replicas
+- Policy Administration API: 5-20 replicas
+- Bouncer/PEP: 10-100+ replicas
+- OPAL Server: 2-3 replicas (leader election)
+
+**Stateful Components** (scale with replication):
+- PostgreSQL: Primary + 1-2 read replicas
+- Redis: Cluster mode (6+ nodes) or Sentinel (3+ nodes)
+
+### Vertical Scaling
+
+**Resource Recommendations**:
+
+| Component | Small | Medium | Large | Enterprise |
+|-----------|-------|--------|-------|------------|
+| Console | 512MB/0.5CPU | 1GB/1CPU | 2GB/2CPU | 4GB/4CPU |
+| API | 1GB/1CPU | 2GB/2CPU | 4GB/4CPU | 8GB/8CPU |
+| Bouncer | 512MB/1CPU | 1GB/2CPU | 2GB/4CPU | 4GB/8CPU |
+| OPAL | 512MB/0.5CPU | 1GB/1CPU | 2GB/2CPU | 4GB/4CPU |
+| Database | 2GB/2CPU | 4GB/4CPU | 8GB/8CPU | 16GB/8CPU |
+| Redis | 512MB/1CPU | 1GB/2CPU | 2GB/4CPU | 4GB/8CPU |
+
+## Cloud-Agnostic Design
+
+Control Core is designed to run on any infrastructure:
+
+### Supported Platforms
+
+**Public Cloud**:
+- AWS (EKS, ECS, EC2)
+- Google Cloud (GKE, Cloud Run, GCE)
+- Microsoft Azure (AKS, Container Instances, VMs)
+- DigitalOcean (Kubernetes, Droplets)
+- Linode (LKE, Compute Instances)
+- Oracle Cloud
+- IBM Cloud
+- Alibaba Cloud
+
+**Private Cloud**:
+- VMware vSphere
+- OpenStack
+- Proxmox
+
+**On-Premises**:
+- Bare metal servers
+- Virtual machines
+- Private Kubernetes clusters
+
+**Hybrid**:
+- Mix of cloud and on-premises
+- Multi-cloud deployments
+- Edge computing
+
+### Cloud Provider Services
+
+**Equivalent Services Across Clouds**:
+
+| Service Type | AWS | GCP | Azure | Generic |
+|--------------|-----|-----|-------|---------|
+| Kubernetes | EKS | GKE | AKS | Any K8s |
+| Database | RDS PostgreSQL | Cloud SQL | Azure Database | PostgreSQL |
+| Cache | ElastiCache | Memorystore | Azure Cache | Redis |
+| Load Balancer | ALB/NLB | Cloud LB | Azure LB | NGINX |
+| DNS | Route 53 | Cloud DNS | Azure DNS | Any DNS |
+| Secrets | Secrets Manager | Secret Manager | Key Vault | Vault |
+| Monitoring | CloudWatch | Cloud Monitoring | Azure Monitor | Prometheus |
+
+Control Core works with **all of these** or **self-hosted alternatives**.
+
+## High Availability Architecture
+
+### Component Redundancy
+
+**For 99.9% uptime**:
+- Console: 3 replicas across availability zones
+- API: 3+ replicas with load balancing
+- Bouncer: 5+ replicas with health checks
+- OPAL: 3 replicas with leader election
+- Database: Primary + 2 read replicas with auto-failover
+- Redis: 6-node cluster or Sentinel with 3 nodes
+
+**For 99.99% uptime**:
+- Multi-region deployment
+- Cross-region database replication
+- Global load balancing
+- Automated failover
+
+### Failure Scenarios
+
+**Bouncer Failure**:
+- Impact: Requests to that Bouncer fail
+- Mitigation: Load balancer routes to healthy Bouncers
+- Recovery Time: Immediate (< 1 second)
+
+**API Failure**:
+- Impact: Cannot create/modify policies (enforcement continues)
+- Mitigation: Multiple API replicas
+- Recovery Time: Immediate (< 1 second)
+
+**OPAL Failure**:
+- Impact: Policy updates delayed (enforcement continues with cached policies)
+- Mitigation: Leader election, automatic failover
+- Recovery Time: 10-30 seconds
+
+**Database Failure**:
+- Impact: Cannot modify policies (enforcement continues)
+- Mitigation: Automatic failover to replica
+- Recovery Time: 30-60 seconds
+
+**Complete Region Failure**:
+- Impact: Regional services unavailable
+- Mitigation: DNS failover to secondary region
+- Recovery Time: 2-5 minutes
+
+## Performance Architecture
+
+### Caching Strategy
+
+**Three-Level Caching**:
+
+```
+Level 1: Bouncer Policy Cache
+├─ What: Compiled policies
+├─ TTL: 5-15 minutes
+├─ Hit Rate: 90-95%
+└─ Impact: Fastest evaluation
+
+Level 2: Bouncer Decision Cache
+├─ What: Authorization decisions
+├─ TTL: 1-5 minutes
+├─ Hit Rate: 80-90%
+└─ Impact: No policy evaluation needed
+
+Level 3: PIP Data Cache (Redis)
+├─ What: External data from integrations
+├─ TTL: 5-60 minutes (based on sensitivity)
+├─ Hit Rate: 85-95%
+└─ Impact: No external API calls
+```
+
+### Performance Optimization
+
+**Latency Targets**:
+- Policy evaluation: < 50ms (P95)
+- Total request overhead: < 100ms (P95)
+- OPAL sync propagation: < 30 seconds
+- PIP data sync: < 60 seconds
+
+**Throughput Targets**:
+- Per Bouncer: 500-1,000 req/sec
+- 10 Bouncers: 5,000-10,000 req/sec
+- 100 Bouncers: 50,000-100,000 req/sec
+
+## Disaster Recovery Architecture
+
+### Backup Strategy
+
+**What to Backup**:
+- PostgreSQL database (policies, users, audit logs)
+- Configuration files
+- Secrets (encrypted)
+- Custom policies from Git
+
+**Backup Frequency**:
+- Database: Every 6 hours
+- Configuration: Daily
+- Full system: Weekly
+- Continuous: Transaction logs
+
+**Retention**:
+- Daily backups: 30 days
+- Weekly backups: 90 days
+- Monthly backups: 7 years (compliance)
+
+### Recovery Objectives
+
+**RTO (Recovery Time Objective)**:
+- Kickstart: < 4 hours
+- Pro: < 2 hours (Control Plane managed)
+- Enterprise: < 1 hour (with proper HA)
+
+**RPO (Recovery Point Objective)**:
+- Kickstart: < 6 hours
+- Pro: < 1 hour
+- Enterprise: < 15 minutes (with WAL archiving)
+
+## Integration Architecture
+
+### PIP Integration Pattern
+
+```
+External Systems           Control Core
+┌──────────────┐          ┌─────────────────┐
+│   Okta       │          │                 │
+│   (OAuth)    │ ←───────→│  PIP Service    │
+└──────────────┘          │  (API Layer)    │
+                          └────────┬────────┘
+┌──────────────┐                  │
+│  Workday     │                  │
+│  (API Key)   │ ←────────────────┤
+└──────────────┘                  │
+                                  ▼
+┌──────────────┐          ┌─────────────────┐
+│  Database    │          │  Transform &    │
+│  (PostgreSQL)│ ←───────→│  Normalize      │
+└──────────────┘          └────────┬────────┘
+                                  │
+                                  ▼
+                          ┌─────────────────┐
+                          │  OPAL Server    │
+                          │  (Distribute)   │
+                          └────────┬────────┘
+                                  │
+                    ┌─────────────┼─────────────┐
+                    ▼             ▼             ▼
+              ┌─────────┐   ┌─────────┐   ┌─────────┐
+              │Bouncer 1│   │Bouncer 2│   │Bouncer N│
+              └─────────┘   └─────────┘   └─────────┘
+```
+
+### Webhook Integration Pattern
+
+```
+External Event             Control Core              Action
+┌──────────────┐          ┌─────────────────┐     ┌──────────────┐
+│  Okta        │          │                 │     │              │
+│ User updated │ ────────→│ Webhook Handler │────→│ Update User  │
+└──────────────┘  POST    └─────────┬───────┘     │ Context      │
+                                    │             └──────────────┘
+┌──────────────┐                    │             ┌──────────────┐
+│ Policy       │                    │             │ Send to      │
+│ Decision Made│ ←───────────────── ┤             │ External     │
+└──────────────┘  Trigger Action    │             │ System       │
+                                    │             └──────────────┘
+                                    ▼
+                          ┌─────────────────┐
+                          │ OPAL Distribute │
+                          └─────────────────┘
+```
+
+## Deployment Considerations
+
+### Choosing Cloud Provider
+
+**Considerations**:
+- **Cost**: Compare pricing across providers
+- **Existing Infrastructure**: Use where you already have presence
+- **Geographic Requirements**: Data residency, latency
+- **Compliance**: Provider certifications
+- **Features**: Specific cloud services needed
+
+**Control Core works equally well on all major clouds** - choose based on your needs, not limitations.
+
+### Kubernetes vs Docker Compose
+
+**Use Kubernetes when**:
+- Production deployments
+- Need auto-scaling
+- Multi-region requirements
+- High availability required
+- Enterprise scale (> 100 users)
+
+**Use Docker Compose when**:
+- Development/testing
+- Small deployments (< 50 users)
+- Simple infrastructure
+- Quick setup needed
+- Learning/evaluation
+
+## Next Steps
+
+- **[Kickstart Deployment](/guides/deployment/kickstart)**: Self-hosted with Docker Compose
+- **[Pro Deployment](/guides/deployment/pro)**: Hybrid deployment
+- **[Enterprise Deployment](/guides/deployment/enterprise)**: Production Kubernetes
+- **[Enterprise Architecture](/enterprise/architecture)**: Advanced enterprise patterns
+- **[Security Best Practices](/guides/security)**: Secure your deployment
+
+---
+
+**Control Core's cloud-agnostic architecture ensures you're never locked into a single provider and can deploy wherever your business requires.**

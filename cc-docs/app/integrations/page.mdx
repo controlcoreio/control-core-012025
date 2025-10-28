@@ -1,0 +1,798 @@
+# Integrations
+
+Control Core becomes exponentially more powerful when integrated with your existing systems and data sources. This section covers how to connect external systems to enable real-time, context-aware authorization decisions.
+
+## Why Integrate?
+
+### The Problem with Static Policies
+
+**Without Integrations**:
+```
+User requests access to "Customer Financial Records"
+
+Policy checks:
+- Does user have "finance" role? ✓
+- Decision: ALLOW
+
+Problem: What if:
+- User was terminated yesterday?
+- User is on vacation?
+- Customer is from a sanctioned country?
+- It's outside business hours?
+- User's compliance training expired?
+
+Static policies can't check these!
+```
+
+**With Integrations**:
+```
+User requests access to "Customer Financial Records"
+
+Policy checks (with real-time data):
+- User has "finance" role? ✓ (from Okta)
+- User employment status? "Active" ✓ (from Workday)
+- User compliance training? "Current" ✓ (from LMS)
+- Customer sanctions status? "Clear" ✓ (from OFAC API)
+- Current time? "Business hours" ✓ (from system clock)
+- User's recent activity? "Normal" ✓ (from database)
+- Decision: ALLOW with confidence!
+```
+
+## Key Benefits of Integrations
+
+### 1. Real-Time Context for Policies
+
+Access current information at the moment of decision-making:
+
+**Identity Context** (from Okta, Azure AD, Auth0):
+- User roles and groups (changes reflected immediately)
+- Employment status (active, terminated, on-leave)
+- MFA enrollment and verification status
+- Last login time and location
+- Security clearance level
+- Manager hierarchy
+
+**HR Context** (from Workday, BambooHR):
+- Current employment status
+- Department and cost center
+- Start date and tenure
+- Certifications and training completion
+- Performance reviews
+- Background check status
+
+**Business Context** (from Salesforce, databases):
+- Customer tier and status
+- Account standing
+- Transaction history
+- Risk scores
+- Compliance flags
+- Contract terms
+
+**Example Policy with Real-Time Context**:
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Real-time checks from multiple sources
+allow if {
+    # From Okta (refreshed hourly)
+    user := data.policy_data.okta.identity.users[input.user.id]
+    user.status == "ACTIVE"
+    "Finance_Team" in user.groups
+    
+    # From Workday (refreshed hourly)
+    employee := data.policy_data.workday.hr.employees[input.user.id]
+    employee.employment_status == "active"
+    employee.compliance_training_current == true
+    
+    # From Database (refreshed every 5 minutes)
+    customer := data.policy_data.database.customers[input.resource.customer_id]
+    customer.status == "active"
+    customer.sanctions_clear == true
+    
+    # Current context
+    is_business_hours
+}
+```
+
+### 2. Dynamic Policy Enforcement
+
+Policies adapt automatically to changes in source systems:
+
+**Scenario: Employee Termination**
+
+```
+9:00 AM - Employee has access
+9:30 AM - HR terminates employee in Workday
+9:35 AM - Workday webhook notifies Control Core (or next sync)
+9:35 AM - Control Core updates user data
+9:36 AM - Employee access automatically DENIED
+          (No manual policy updates needed!)
+```
+
+**Scenario: Compliance Training Expiration**
+
+```
+Day 365 - User's compliance training expires
+Next sync - Control Core detects expired training
+Next request - Access automatically DENIED for regulated data
+              User can still access non-regulated resources
+```
+
+### 3. Cross-System Consistency
+
+Make decisions based on data from multiple authoritative sources:
+
+```rego
+# Combine data from 4 different systems
+allow if {
+    # Identity Provider (Okta)
+    okta_user := data.policy_data.okta.identity.users[input.user.id]
+    okta_user.mfa_enabled == true
+    
+    # HR System (Workday)
+    hr_record := data.policy_data.workday.hr.employees[input.user.id]
+    hr_record.employment_status == "active"
+    
+    # CRM (Salesforce)
+    customer := data.policy_data.salesforce.crm.accounts[input.resource.customer_id]
+    customer.tier == "premium"
+    
+    # CMDB (ServiceNow)
+    asset := data.policy_data.servicenow.cmdb.assets[input.resource.asset_id]
+    asset.criticality == "low"
+}
+```
+
+### 4. Automated Action Triggers
+
+Trigger actions based on policy decisions:
+
+**Webhook Triggers**:
+- Send notification when access is denied
+- Create ticket in ServiceNow for suspicious activity
+- Alert security team for unusual access patterns
+- Log high-risk transactions for compliance review
+
+**Example: Trigger on Suspicious Transaction**:
+```rego
+package fintrac.monitoring
+
+import rego.v1
+
+default allow := false
+
+suspicious_transaction if {
+    input.transaction.amount >= 9000
+    input.transaction.amount < 10000
+    count(data.recent_similar_transactions) >= 3
+}
+
+# Allow but trigger investigation
+allow if {
+    suspicious_transaction
+    input.user.roles[_] == "compliance-officer"
+    
+    # Trigger: Create investigation ticket
+    trigger_action("create_investigation", {
+        "type": "suspicious_transaction",
+        "customer_id": input.transaction.customer_id,
+        "amount": input.transaction.amount,
+        "reason": "possible_structuring"
+    })
+}
+
+# Helper to trigger external actions
+trigger_action(action_type, data) if {
+    # Control Core sends webhook to configured endpoint
+    true
+}
+```
+
+### 5. Compliance Automation
+
+Automatically enforce regulatory requirements:
+
+**FINTRAC Example**:
+```rego
+# Automatically detect and flag reportable transactions
+requires_lctr if {
+    # Real-time check of transaction amount
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+}
+
+allow if {
+    requires_lctr
+    
+    # Automatically log for FINTRAC reporting
+    log_for_fintrac_reporting(input.transaction)
+    
+    # User must be FINTRAC-trained (from LMS integration)
+    training := data.policy_data.lms.training[input.user.id]
+    training.fintrac_certification == "current"
+}
+```
+
+**OSFI Example**:
+```rego
+# Automatically enforce segregation of duties
+has_conflicting_roles if {
+    # Check real-time role assignments from Okta
+    user_roles := data.policy_data.okta.identity.users[input.user.id].groups
+    
+    "Transaction_Initiators" in user_roles
+    "Transaction_Approvers" in user_roles
+}
+
+allow if {
+    not has_conflicting_roles  # Automatic OSFI B-10 compliance
+}
+```
+
+### 6. Reduced Policy Maintenance
+
+Update data in source systems, not policies:
+
+**Without Integrations**:
+```rego
+# Bad: Hard-coded list requires policy updates
+allowed_users := [
+    "user-001", "user-002", "user-003"
+    # Need to update policy every time team changes!
+]
+```
+
+**With Integrations**:
+```rego
+# Good: Automatically syncs from Okta
+allow if {
+    user := data.policy_data.okta.identity.users[input.user.id]
+    "Finance_Team" in user.groups  # HR manages group membership in Okta
+}
+```
+
+### 7. Audit Trail and Compliance
+
+Complete visibility into decision-making:
+
+```json
+{
+  "decision": "PERMIT",
+  "policy": "fintrac-lctr",
+  "data_sources_used": [
+    {
+      "source": "okta",
+      "data": "user.groups",
+      "value": ["Finance_Team", "Compliance_Officers"],
+      "last_updated": "2025-01-25T10:00:00Z"
+    },
+    {
+      "source": "workday",
+      "data": "employee.compliance_training",
+      "value": "current",
+      "last_updated": "2025-01-25T09:00:00Z"
+    },
+    {
+      "source": "database",
+      "data": "customer.kyc_status",
+      "value": "verified",
+      "last_updated": "2025-01-24T15:30:00Z"
+    }
+  ],
+  "decision_timestamp": "2025-01-25T10:30:00Z"
+}
+```
+
+## Integration Types
+
+### Policy Information Points (PIP)
+
+Connect data sources to enrich authorization decisions with real-time context.
+
+**Categories**:
+- **Identity & Access Management**: Okta, Azure AD, Auth0, LDAP
+- **Human Resources**: Workday, BambooHR, ADP
+- **Customer Relationship Management**: Salesforce, HubSpot, Dynamics
+- **Enterprise Resource Planning**: SAP, Oracle, NetSuite
+- **Databases**: PostgreSQL, MySQL, MongoDB, SQL Server
+- **Document Management**: SharePoint, Google Drive, Box
+- **Data Warehouses**: Snowflake, BigQuery, Databricks
+
+**Learn More**: [Policy Information Points (PIP) Getting Started](/integrations/pip-getting-started)
+
+### Action Triggers & Webhooks
+
+Execute actions based on policy decisions:
+
+- **Notification Systems**: Send alerts via email, Slack, Teams
+- **Ticketing Systems**: Create incidents in ServiceNow, Jira
+- **Security Systems**: Alert SIEM, trigger incident response
+- **Workflow Automation**: Start approval workflows, escalations
+
+### External Policy Engines
+
+Integrate with other policy engines:
+
+- **OPA Sidecars**: Deploy OPA alongside applications
+- **Cloud Provider IAM**: Integrate with AWS IAM, Azure RBAC, GCP IAM
+- **API Gateways**: Kong, NGINX, AWS API Gateway, Azure APIM
+
+### Application Integrations
+
+Connect applications for policy enforcement:
+
+- **API Gateways**: Enforce policies at the gateway
+- **Microservices**: Policy enforcement for service mesh
+- **Serverless**: Lambda authorizers, Azure Functions
+- **CI/CD**: Policy validation in deployment pipelines
+
+## Integration Architecture
+
+### How Integrations Work
+
+```
+┌─────────────────────────────────────────────────────────┐
+│          Control Core Policy Administration             │
+│                                                          │
+│  1. Configure Integration (One Time)                    │
+│     ├── Select data source (Okta, Database, etc.)       │
+│     ├── Authenticate (OAuth, API Key, etc.)             │
+│     ├── Map attributes to policy fields                 │
+│     └── Set sync frequency                              │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  2. Data Synchronization (Automatic)                    │
+│     ├── Scheduled sync (hourly, daily, etc.)            │
+│     ├── Real-time sync (webhooks)                       │
+│     ├── Fetch data from source                          │
+│     └── Transform to standard format                    │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  3. Policy Synchronization Server (OPAL)                │
+│     ├── Receives data from integrations                 │
+│     ├── Combines with policies                          │
+│     ├── Distributes to all PEPs                         │
+│     └── Real-time updates via WebSocket                 │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│  4. Policy Enforcement Points (Bouncers)                │
+│     ├── Receive data updates automatically              │
+│     ├── Use in policy evaluation                        │
+│     ├── Make context-aware decisions                    │
+│     └── Enforce with <100ms latency                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Data Flow Example
+
+**User Access Request**:
+```
+1. User requests access to customer record
+   ↓
+2. Bouncer receives request
+   ↓
+3. Bouncer evaluates policy with integrated data:
+   - User data from Okta (last synced 5 minutes ago)
+   - Employee data from Workday (last synced 1 hour ago)
+   - Customer data from Database (last synced 1 minute ago)
+   ↓
+4. Policy makes informed decision
+   ↓
+5. Decision logged with all context data
+   ↓
+6. Access granted or denied
+```
+
+## Getting Started with Integrations
+
+### Quick Start: Connect Your First Data Source
+
+**5-Minute Setup**:
+
+1. **Navigate to Integrations**
+   - Policy Administration Console → **Integrations** → **Data Sources**
+
+2. **Add Data Source**
+   - Click **Add Data Source**
+   - Select **Okta** (or your identity provider)
+
+3. **Authenticate**
+   - Choose OAuth 2.0 (recommended)
+   - Enter your Okta domain
+   - Authorize Control Core
+
+4. **Test Connection**
+   - Click **Test Connection**
+   - See real fields from your Okta instance
+
+5. **Map Attributes**
+   - Map `user.email` → `email`
+   - Map `user.department` → `profile.department`
+   - Map `user.roles` → `groups`
+
+6. **Save and Sync**
+   - Click **Save**
+   - First sync happens automatically
+   - Data available in policies within minutes!
+
+### Integration Guides
+
+- **[Policy Information Points (PIP) - Getting Started](/integrations/pip-getting-started)**: Connect data sources for context-aware policies
+- **[PIP Administrator Guide](/integrations/pip-admin-guide)**: Configure and manage data source integrations
+- **[PIP Developer Guide](/integrations/pip-developer-guide)**: Use external data in policies and build custom connectors
+
+## Integration Scenarios
+
+### Scenario 1: Employee Lifecycle Management
+
+**Business Need**: Automatically revoke access when employees leave
+
+**Integration Setup**:
+1. Connect Workday (HR system)
+2. Map `employee.status` → `employment_status`
+3. Set sync frequency: Every 15 minutes
+
+**Policy**:
+```rego
+package employee.lifecycle
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    # Real-time employment status from Workday
+    employee := data.policy_data.workday.hr.employees[input.user.id]
+    employee.employment_status == "active"
+    
+    # Additional checks
+    employee.termination_date == null
+    employee.last_day_worked > time.now_ns()
+}
+```
+
+**Result**: Access automatically revoked within 15 minutes of termination in Workday!
+
+### Scenario 2: Customer Risk-Based Access
+
+**Business Need**: Restrict high-risk customer data to authorized personnel
+
+**Integration Setup**:
+1. Connect Salesforce (customer data)
+2. Connect internal risk database
+3. Map customer risk scores and flags
+
+**Policy**:
+```rego
+package customer.risk_based
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    # Real-time customer risk score
+    customer := data.policy_data.salesforce.crm.accounts[input.resource.customer_id]
+    
+    # Low risk: Standard access
+    customer.risk_score < 50
+    input.user.roles[_] in ["account-manager", "customer-support"]
+}
+
+allow if {
+    # High risk: Requires senior approval
+    customer := data.policy_data.salesforce.crm.accounts[input.resource.customer_id]
+    customer.risk_score >= 50
+    
+    input.user.roles[_] == "senior-account-manager"
+    input.user.attributes.high_risk_approved == true
+}
+```
+
+### Scenario 3: Compliance Training Enforcement
+
+**Business Need**: Block access to regulated data if training expired
+
+**Integration Setup**:
+1. Connect Learning Management System (LMS)
+2. Map training completion and expiration dates
+3. Set sync: Daily
+
+**Policy**:
+```rego
+package compliance.training
+
+import rego.v1
+
+default allow := false
+
+# FINTRAC: Require current FINTRAC training
+allow if {
+    input.resource.attributes.compliance_required == "FINTRAC"
+    
+    # Real-time training status from LMS
+    training := data.policy_data.lms.training[input.user.id]
+    training.fintrac_certification == "current"
+    
+    # Check expiration
+    expiry := time.parse_rfc3339_ns(training.fintrac_expiry_date)
+    time.now_ns() < expiry
+}
+```
+
+### Scenario 4: Geographic Data Residency
+
+**Business Need**: Ensure data stays in appropriate jurisdiction
+
+**Integration Setup**:
+1. Connect database with data location metadata
+2. Map data residency attributes
+3. Get user location from IP or Okta
+
+**Policy**:
+```rego
+package data.residency
+
+import rego.v1
+
+default allow := false
+
+# OSFI: Canadian customer data must be accessed from Canada
+allow if {
+    # Real-time data location
+    data_location := data.policy_data.database.data_locations[input.resource.id]
+    data_location.jurisdiction == "Canada"
+    
+    # User location from Okta
+    user := data.policy_data.okta.identity.users[input.user.id]
+    user.location.country == "CA"
+    
+    # Or user has special approval
+}
+
+allow if {
+    data_location := data.policy_data.database.data_locations[input.resource.id]
+    data_location.jurisdiction == "Canada"
+    
+    # Cross-border access requires approval
+    approval := data.cross_border_approvals[input.user.id]
+    approval.status == "approved"
+    approval.expiry > time.now_ns()
+}
+```
+
+## Supported Integration Categories
+
+### Identity & Access Management (IAM)
+Connect your identity provider for user context:
+- User authentication and authorization
+- Role and group memberships
+- User attributes and metadata
+- MFA status and verification
+- Login history and patterns
+
+**Supported Providers**: Okta, Azure AD, Auth0, Google Workspace, OneLogin, LDAP/AD
+
+### Human Resources (HR)
+Connect HR systems for employment context:
+- Employment status (active, terminated, on-leave)
+- Department and organizational structure
+- Manager hierarchy
+- Certifications and training
+- Compliance status
+- Background checks
+
+**Supported Providers**: Workday, BambooHR, ADP, Paylocity, Namely
+
+### Customer Relationship Management (CRM)
+Connect CRM for customer context:
+- Customer tier and status
+- Account standing and health scores
+- Purchase history and lifetime value
+- Support tickets and satisfaction scores
+- Risk indicators and flags
+
+**Supported Providers**: Salesforce, HubSpot, Microsoft Dynamics, Zoho CRM
+
+### Databases
+Connect databases for resource metadata:
+- Resource ownership and attributes
+- Data classification levels
+- Access history
+- Metadata and tags
+- Relationships and dependencies
+
+**Supported**: PostgreSQL, MySQL, MongoDB, SQL Server, Oracle, Snowflake
+
+### Compliance & Risk
+Connect compliance systems:
+- KYC/AML verification status
+- Sanctions screening results
+- Risk scores and ratings
+- Compliance training status
+- Audit findings and remediation
+
+**Supported**: ComplyAdvantage, Refinitiv, LexisNexis, custom compliance databases
+
+### IT Service Management (ITSM)
+Connect ITSM for asset and incident context:
+- Asset ownership and criticality
+- Change requests and approvals
+- Incident history
+- Maintenance windows
+
+**Supported**: ServiceNow, Jira Service Management, Freshservice
+
+## Integration Patterns
+
+### Pattern 1: Single Source of Truth
+
+Use one authoritative source per data type:
+
+```
+User Identity → Okta (authoritative)
+Employment Data → Workday (authoritative)
+Customer Data → Salesforce (authoritative)
+Asset Data → ServiceNow (authoritative)
+```
+
+### Pattern 2: Multi-Source Enrichment
+
+Combine data from multiple sources:
+
+```rego
+# Enrich user context from 3 sources
+user_full_context(user_id) := context if {
+    # Base identity from Okta
+    okta_user := data.policy_data.okta.identity.users[user_id]
+    
+    # Employment details from Workday
+    hr_data := data.policy_data.workday.hr.employees[user_id]
+    
+    # Performance data from internal DB
+    performance := data.policy_data.database.employee_performance[user_id]
+    
+    # Combine into full context
+    context := {
+        "id": user_id,
+        "email": okta_user.email,
+        "department": okta_user.department,
+        "employment_status": hr_data.status,
+        "clearance_level": hr_data.clearance,
+        "performance_rating": performance.rating
+    }
+}
+```
+
+### Pattern 3: Fallback and Resilience
+
+Handle integration failures gracefully:
+
+```rego
+# Get user department with fallback
+user_department(user_id) := dept if {
+    # Try Okta first
+    okta_user := data.policy_data.okta.identity.users[user_id]
+    dept := okta_user.department
+}
+
+user_department(user_id) := dept if {
+    # Fallback to Workday if Okta unavailable
+    not data.policy_data.okta.identity.users[user_id]
+    hr_data := data.policy_data.workday.hr.employees[user_id]
+    dept := hr_data.department
+}
+
+user_department(user_id) := "unknown" if {
+    # Default if both unavailable
+    not data.policy_data.okta.identity.users[user_id]
+    not data.policy_data.workday.hr.employees[user_id]
+}
+```
+
+## Configuration Best Practices
+
+### 1. Sync Frequency Guidelines
+
+Choose appropriate sync frequencies:
+
+| Data Type | Criticality | Recommended Sync | Rationale |
+|-----------|-------------|------------------|-----------|
+| User status (active/terminated) | High | 15 minutes or webhook | Security-critical |
+| User roles/groups | High | 15 minutes or webhook | Authorization-critical |
+| Compliance training | Medium | Hourly | Changes infrequently |
+| Customer risk scores | Medium | Hourly | Updates regularly |
+| Organizational structure | Low | Daily | Relatively static |
+| Reference data | Low | Weekly | Rarely changes |
+
+### 2. Attribute Mapping Strategy
+
+**Use standard naming conventions**:
+```
+# Good: Standard names work across providers
+user.email
+user.department
+user.roles
+user.manager
+
+# These map to:
+Okta: email, profile.department, groups, profile.manager
+Azure AD: mail, department, memberOf, manager
+```
+
+### 3. Security Considerations
+
+**Principle of Least Privilege**:
+- Use read-only credentials
+- Connect only necessary data sources
+- Select only required fields
+- Limit sync to needed data
+
+**Data Privacy**:
+- Classify data sensitivity
+- Set appropriate cache TTLs
+- Enable encryption in transit
+- Audit all data access
+
+### 4. Performance Optimization
+
+**Incremental Sync**:
+- Use timestamp-based incremental sync for large datasets
+- Reduces load on source systems
+- Faster sync times
+- Lower bandwidth usage
+
+**Caching Strategy**:
+- Cache static data longer (organizational structure)
+- Cache dynamic data shorter (user status)
+- Clear cache on webhook updates
+- Monitor cache hit rates
+
+## Next Steps
+
+Ready to connect your systems? Start here:
+
+1. **[PIP Getting Started](/integrations/pip-getting-started)**: Connect your first data source in 5 minutes
+2. **[PIP Admin Guide](/integrations/pip-admin-guide)**: Learn to configure and manage integrations
+3. **[PIP Developer Guide](/integrations/pip-developer-guide)**: Use integrated data in policies
+
+### Common First Integrations
+
+**Start with these high-value integrations**:
+
+1. **Identity Provider (Okta/Azure AD)**: 
+   - Immediate value for user context
+   - Easy OAuth setup
+   - Real-time user status
+
+2. **HR System (Workday/BambooHR)**:
+   - Critical for employment verification
+   - Compliance training status
+   - Organizational structure
+
+3. **Primary Database**:
+   - Resource metadata
+   - Ownership information
+   - Access history
+
+## Support
+
+- **[PIP Getting Started](/integrations/pip-getting-started)**: Quick start guide
+- **[Troubleshooting](/guides/troubleshooting)**: Common integration issues
+- **[API Reference](/guides/api-reference)**: Integration APIs
+- **Support**: support@controlcore.io
+
+---
+
+**Integrations transform Control Core from a powerful authorization engine into an intelligent, context-aware compliance platform that adapts to your organization's changing reality in real-time.**
+

@@ -1,0 +1,716 @@
+# Getting Started with Control Core
+
+Welcome to Control Core - the centralized authorization and compliance platform built for the AI-driven enterprise. This guide will help you get started with Control Core quickly and effectively.
+
+## What is Control Core?
+
+Control Core solves the core problem of securing the dynamic, real-time interactions between new AI initiatives and legacy technology. By enforcing business, security, and compliance rules with dynamic context management, Control Core eliminates the need for brittle, custom-coded access logic, turning a major security liability into a strategic advantage.
+
+**Built for Regulatory Compliance**: Control Core is specifically designed to help organizations meet stringent regulatory requirements in financial services, healthcare, and other regulated industries. Enforce FINTRAC regulations, OSFI guidelines, AML (Anti-Money Laundering) requirements, GDPR, HIPAA, SOC2, and PCI-DSS compliance through centralized policy management.
+
+### Key Benefits
+
+- **Regulatory Compliance**: Enforce FINTRAC, OSFI, AML, KYC, GDPR, HIPAA, SOC2, and PCI-DSS requirements through policy-based controls
+- **Centralized Authorization**: Single source of truth for all access control and compliance policies
+- **Real-Time Enforcement**: Sub-100ms policy evaluation with intelligent caching
+- **Audit Trail**: Complete audit logging for regulatory reporting and compliance verification
+- **Dynamic Context Management**: Context-aware policies with real-time data enrichment for risk-based decisions
+- **AI Security**: Advanced protection for AI agents, LLMs, and RAG systems
+- **Scalability**: Horizontally scalable architecture for enterprise workloads
+
+## Core Concepts
+
+Understanding these core concepts will help you work effectively with Control Core:
+
+### Policy-Based Access Control (PBAC)
+
+PBAC is a flexible access control model that makes authorization decisions based on policies written in a declarative language (Rego). Unlike traditional RBAC (Role-Based Access Control), PBAC allows you to:
+
+- Define complex authorization logic
+- Make context-aware decisions
+- Incorporate real-time data
+- Support fine-grained permissions
+- Adapt to changing requirements
+
+### Architecture Components
+
+Control Core consists of several key components that work together:
+
+#### Policy Administration Console
+
+The **Policy Administration Console** is your web-based interface for managing policies, users, and resources. It provides:
+
+- Visual policy builder for no-code policy creation
+- Monaco code editor with IntelliSense for advanced policy development
+- Policy testing and validation tools
+- User and resource management
+- Monitoring and analytics dashboards
+
+**Default Access**: `http://localhost:3000`
+
+#### Policy Administration API
+
+The **Policy Administration API** is the backend service that powers the Policy Administration Console. It handles:
+
+- Policy CRUD operations
+- User authentication and authorization
+- Resource management
+- Decision logging and audit trails
+- Integration with external systems
+
+**Default Access**: `http://localhost:8082`
+**API Documentation**: `http://localhost:8082/docs`
+
+#### Policy Enforcement Point (PEP)
+
+The **Policy Enforcement Point** (also called the Bouncer) is a reverse proxy that enforces your policies on incoming requests. It provides:
+
+- Request interception and validation
+- Real-time policy evaluation
+- Content injection for AI agents
+- Response filtering and masking
+- Comprehensive audit logging
+- Sub-100ms decision latency
+
+**Default Access**: `http://localhost:8080`
+
+#### Policy Decision Point (PDP)
+
+The **Policy Decision Point** is integrated into the Bouncer and evaluates policies using the Open Policy Agent (OPA) engine. It:
+
+- Loads and compiles Rego policies
+- Evaluates authorization requests
+- Caches policy decisions
+- Integrates with context data sources
+
+#### Policy Synchronization Server
+
+The **Policy Synchronization Server** (based on OPAL) keeps policies and data synchronized across all components. It:
+
+- Monitors policy repositories for changes
+- Pushes updates to connected PEPs
+- Manages data source integrations
+- Handles real-time policy distribution
+- Supports Git-based policy management
+
+**Default Access**: `http://localhost:7000`
+
+#### Policy Language Server
+
+The **Policy Language Server** provides IDE support for Rego policy development:
+
+- Syntax highlighting and validation
+- IntelliSense and auto-completion
+- Error detection and suggestions
+- Go-to-definition and hover information
+- Integration with VS Code and Monaco editor
+
+
+## System Requirements
+
+Choose your deployment model based on your requirements:
+
+### Kickstart (Self-Hosted)
+
+**Ideal for**: Small teams, development, testing, proof-of-concept
+
+**Requirements**:
+- **Memory**: 4GB RAM minimum, 8GB recommended
+- **CPU**: 2 cores minimum, 4 cores recommended
+- **Storage**: 20GB free space
+- **Software**: Docker 20.10+, Docker Compose 2.0+
+- **Network**: Ports 3000, 8080, 8082, 7000, 5432
+
+**Components Included**:
+- Policy Administration Console
+- Policy Administration API
+- Policy Enforcement Point (Bouncer)
+- Policy Synchronization Server
+- PostgreSQL Database
+- Redis Cache
+
+### Pro (Hybrid)
+
+**Ideal for**: Production environments, reduced infrastructure overhead
+
+**Requirements**:
+- **Memory**: 2GB RAM minimum, 4GB recommended
+- **CPU**: 1 core minimum, 2 cores recommended
+- **Storage**: 10GB free space
+- **Software**: Docker 20.10+, Docker Compose 2.0+
+- **Network**: Ports 8080 (Bouncer)
+
+**Components**:
+- Self-hosted: Policy Enforcement Point (Bouncer)
+- Hosted by Control Core: Policy Administration Console, API, Synchronization Server, Database
+
+### Enterprise (Custom)
+
+**Ideal for**: Large organizations, high-traffic applications, compliance requirements
+
+**Requirements**:
+- **Memory**: 16GB+ RAM across cluster
+- **CPU**: 8+ cores across cluster
+- **Storage**: 100GB+ with SSD
+- **Software**: Kubernetes 1.24+, Helm 3.0+
+- **Network**: Load balancer, multiple availability zones
+
+**Architecture**:
+- Multi-region deployment
+- Auto-scaling for all components
+- High availability with redundancy
+- Advanced monitoring and observability
+- Enterprise security features
+
+## Quick Start by Deployment Model
+
+### Kickstart Quick Start
+
+```bash
+# 1. Download Control Core package
+wget https://downloads.controlcore.io/packages/kickstart-{your-user-id}.zip
+unzip kickstart-{your-user-id}.zip
+cd kickstart-{your-user-id}
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# 3. Start Control Core
+./setup.sh
+./start.sh
+
+# 4. Verify deployment
+docker-compose ps
+
+# 5. Access the console
+# Navigate to http://localhost:3000
+```
+
+**Next Steps**: [Complete Kickstart Deployment Guide](/guides/deployment/kickstart)
+
+### Pro Quick Start
+
+```bash
+# 1. Download Bouncer package
+wget https://downloads.controlcore.io/packages/pro-bouncer-{your-tenant-id}.zip
+unzip pro-bouncer-{your-tenant-id}.zip
+cd pro-bouncer-{your-tenant-id}
+
+# 2. Configure connection to Control Plane
+cp .env.example .env
+# Add your TENANT_ID and API_KEY
+
+# 3. Start Bouncer
+docker-compose up -d
+
+# 4. Verify connection
+curl http://localhost:8080/health
+
+# 5. Access your Control Plane
+# Navigate to https://{your-tenant}.controlplane.controlcore.io
+```
+
+**Next Steps**: [Complete Pro Deployment Guide](/guides/deployment/pro)
+
+### Enterprise Quick Start
+
+```bash
+# 1. Clone or download Helm chart
+helm repo add controlcore https://charts.controlcore.io
+helm repo update
+
+# 2. Create namespace
+kubectl create namespace control-core
+
+# 3. Configure values
+helm show values controlcore/control-core > values.yaml
+# Edit values.yaml with your configuration
+
+# 4. Install Control Core
+helm install control-core controlcore/control-core \
+  --namespace control-core \
+  --values values.yaml
+
+# 5. Verify deployment
+kubectl get pods -n control-core
+
+# 6. Access the console
+kubectl port-forward -n control-core svc/control-core-console 3000:3000
+# Navigate to http://localhost:3000
+```
+
+**Next Steps**: [Complete Enterprise Deployment Guide](/guides/deployment/enterprise)
+
+## Your First Policy
+
+Once you have Control Core running, let's create your first policy:
+
+### Step 1: Access the Policy Administration Console
+
+Navigate to your Policy Administration Console:
+- **Kickstart**: `http://localhost:3000`
+- **Pro**: `https://{your-tenant}.controlplane.controlcore.io`
+- **Enterprise**: `http://your-domain.com` or port-forward to localhost
+
+### Step 2: Create a New Policy
+
+1. Click **Policies** in the sidebar
+2. Click **Create Policy** button
+3. Choose a template or start from scratch
+
+### Step 3: Define Your Policy
+
+Here's a simple RBAC policy to get started:
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Default deny - fail secure
+default allow := false
+
+# Allow admin users full access
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+# Allow developers to read APIs
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name == "read"
+    input.resource.type == "api"
+}
+
+# Allow analysts to read data
+allow if {
+    input.user.roles[_] == "analyst"
+    input.action.name == "read"
+    input.resource.type == "data"
+}
+```
+
+### Step 4: Test Your Policy
+
+1. Click **Test** tab
+2. Add test cases:
+
+```json
+{
+  "name": "Admin can access everything",
+  "input": {
+    "user": {
+      "id": "user-1",
+      "roles": ["admin"]
+    },
+    "action": {
+      "name": "write"
+    },
+    "resource": {
+      "type": "api"
+    }
+  },
+  "expected": true
+}
+```
+
+3. Click **Run Tests**
+4. Verify all tests pass
+
+### Step 5: Deploy Your Policy
+
+1. Click **Deploy** button
+2. Select **Sandbox** environment for testing
+3. Click **Deploy to Sandbox**
+4. Test in sandbox environment
+5. When ready, promote to **Production**
+
+### Step 6: Monitor Policy Decisions
+
+1. Navigate to **Monitoring** > **Decisions**
+2. View real-time policy evaluations
+3. Check audit logs
+4. Analyze decision patterns
+
+## Architecture Overview
+
+Understanding the Control Core architecture will help you make the most of the platform:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Policy Administration Console              │
+│                    (Web UI - React/TypeScript)               │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            │ HTTPS
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Policy Administration API (FastAPI)             │
+│  - Policy Management    - User Management                    │
+│  - Resource Management  - Decision Logging                   │
+│  - Authentication       - Context Generation                 │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+    ┌─────────────┐  ┌─────────────┐  ┌──────────────┐
+    │ PostgreSQL  │  │   Redis     │  │ Policy Sync  │
+    │  Database   │  │   Cache     │  │    Server    │
+    └─────────────┘  └─────────────┘  └──────┬───────┘
+                                              │
+                                              │ WebSocket
+                                              ▼
+                                    ┌──────────────────┐
+                                    │  Policy Repos    │
+                                    │  (Git/GitHub)    │
+                                    └──────────────────┘
+                                              │
+                                              │ Sync
+                                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│               Policy Enforcement Point (Bouncer)             │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Reverse    │→ │   Policy     │→ │   Target     │     │
+│  │   Proxy      │  │   Decision   │  │  Application │     │
+│  │   (Gin/Go)   │  │   Point      │  │              │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                          │                                  │
+│                          │ OPA                              │
+│                          ▼                                  │
+│                  ┌──────────────┐                          │
+│                  │  Policy      │                          │
+│                  │  Cache       │                          │
+│                  └──────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+                   ┌─────────────────┐
+                   │  Protected API  │
+                   │  or Application │
+                   └─────────────────┘
+```
+
+## Key Workflows
+
+### Policy Development Workflow
+
+1. **Create Policy**: Use visual builder or Monaco editor
+2. **Write Tests**: Define comprehensive test cases
+3. **Validate**: Real-time syntax and semantic validation
+4. **Test**: Run tests in sandbox environment
+5. **Review**: Code review and approval (optional)
+6. **Deploy**: Deploy to sandbox first
+7. **Monitor**: Watch decision logs and metrics
+8. **Promote**: Promote to production when ready
+9. **Rollback**: Quick rollback if issues arise
+
+### Request Authorization Flow
+
+1. **Request Received**: Client sends request to Bouncer
+2. **Context Enrichment**: Bouncer enriches request with context
+3. **Policy Evaluation**: PDP evaluates policies against request
+4. **Decision Cache Check**: Check if decision is cached
+5. **OPA Evaluation**: Evaluate using OPA if not cached
+6. **Decision Return**: Allow or deny decision returned
+7. **Action Taken**: Request forwarded or rejected
+8. **Audit Log**: Decision logged for compliance
+9. **Response**: Response returned to client
+
+### Policy Synchronization Flow
+
+1. **Policy Update**: Developer commits policy to Git
+2. **Webhook Trigger**: Git webhook notifies Sync Server
+3. **Policy Fetch**: Sync Server fetches updated policies
+4. **Validation**: Policies validated before distribution
+5. **Broadcast**: Updates pushed to all connected PEPs
+6. **Update PEP**: Each PEP receives and loads new policies
+7. **Cache Clear**: Policy cache cleared for fresh evaluation
+8. **Confirmation**: PEPs confirm successful update
+9. **Monitoring**: Policy version tracked across fleet
+
+## Common Use Cases
+
+### Financial Services Compliance (FINTRAC, OSFI, AML)
+
+**FINTRAC Compliance - Transaction Monitoring**:
+```rego
+package fintrac.compliance
+
+import rego.v1
+
+default allow := false
+
+# FINTRAC: Large Cash Transaction Reporting (>$10,000 CAD)
+requires_reporting if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    input.transaction.type == "cash"
+}
+
+# Allow transaction with reporting requirement
+allow if {
+    input.user.roles[_] in ["teller", "financial-advisor"]
+    input.user.attributes.fintrac_certified == true
+    
+    # Log for FINTRAC reporting if required
+    requires_reporting
+}
+
+# Suspicious Transaction Reporting (STR)
+suspicious_transaction if {
+    # Multiple transactions just under threshold (structuring)
+    transactions := data.recent_transactions[input.user.id]
+    count([t | t := transactions[_]; t.amount >= 9000; t.amount < 10000]) >= 3
+}
+
+# Block suspicious transactions and flag for review
+allow if {
+    not suspicious_transaction
+    input.user.attributes.aml_cleared == true
+}
+```
+
+**OSFI Guidelines - Access Control**:
+```rego
+package osfi.access
+
+import rego.v1
+
+default allow := false
+
+# OSFI: Segregation of Duties (Guideline B-10)
+allow if {
+    # Users cannot both initiate AND approve transactions
+    not has_conflicting_roles(input.user.roles)
+    
+    # Role-appropriate access
+    action_allowed_for_role(input.user.roles, input.action.name)
+    
+    # Audit trail enabled
+    input.context.audit_enabled == true
+}
+
+has_conflicting_roles(roles) if {
+    "transaction-initiator" in roles
+    "transaction-approver" in roles
+}
+
+# OSFI: Data Residency Requirements
+data_residency_compliant if {
+    # Customer data must remain in Canada
+    input.resource.attributes.contains_customer_data == true
+    input.resource.attributes.storage_location == "Canada"
+}
+
+allow if {
+    data_residency_compliant
+    input.user.attributes.jurisdiction == "Canada"
+}
+```
+
+**AML (Anti-Money Laundering) - KYC Verification**:
+```rego
+package aml.kyc
+
+import rego.v1
+
+default allow := false
+
+# AML: Know Your Customer (KYC) Requirements
+allow if {
+    # Customer must have completed KYC
+    customer := data.customers[input.resource.attributes.customer_id]
+    customer.kyc_status == "verified"
+    customer.kyc_date != null
+    
+    # KYC must be current (re-verify annually)
+    kyc_current(customer.kyc_date)
+    
+    # Enhanced Due Diligence for high-risk customers
+    edd_satisfied(customer)
+}
+
+kyc_current(kyc_date) if {
+    # KYC must be less than 365 days old
+    kyc_timestamp := time.parse_rfc3339_ns(kyc_date)
+    age_days := (time.now_ns() - kyc_timestamp) / (24 * 60 * 60 * 1000000000)
+    age_days < 365
+}
+
+# Enhanced Due Diligence (EDD)
+edd_satisfied(customer) if {
+    customer.risk_level != "high"
+}
+
+edd_satisfied(customer) if {
+    customer.risk_level == "high"
+    customer.edd_completed == true
+    customer.beneficial_owner_identified == true
+}
+
+# PEP (Politically Exposed Person) Screening
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    
+    # Block transactions for PEPs without approval
+    customer.pep_status == false
+}
+
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    customer.pep_status == true
+    
+    # PEPs require senior management approval
+    input.transaction.approved_by_senior_management == true
+    input.user.roles[_] == "compliance-officer"
+}
+```
+
+### Healthcare Compliance (HIPAA, PHIPA)
+
+Protect Protected Health Information (PHI):
+
+```rego
+package healthcare.hipaa
+
+import rego.v1
+
+default allow := false
+
+# HIPAA: Minimum Necessary Rule
+allow if {
+    input.user.roles[_] in ["physician", "nurse", "authorized-staff"]
+    
+    # Access only necessary PHI
+    user_treating_patient(input.user.id, input.resource.attributes.patient_id)
+    
+    # Purpose of use documented
+    input.context.purpose_of_use in ["treatment", "payment", "healthcare-operations"]
+}
+
+user_treating_patient(user_id, patient_id) if {
+    assignment := data.patient_assignments[patient_id]
+    user_id in assignment.care_team
+}
+
+# Break-the-glass access for emergencies
+allow if {
+    input.context.emergency == true
+    input.user.roles[_] in ["physician", "emergency-staff"]
+    
+    # Log emergency access for audit
+    input.context.audit_enabled == true
+}
+```
+
+### API Protection
+
+Protect your REST APIs with fine-grained access control:
+
+```rego
+package api.protection
+
+import rego.v1
+
+default allow := false
+
+# Allow authenticated users with valid API keys
+allow if {
+    input.request.headers["X-API-Key"] == data.valid_api_keys[input.user.id]
+    rate_limit_ok
+    
+    # Compliance: Log all API access for audit
+    input.context.audit_enabled == true
+}
+
+# Check rate limiting
+rate_limit_ok if {
+    count(data.recent_requests[input.user.id]) < 1000
+}
+```
+
+### AI Agent Control
+
+Control AI agent access and behavior with compliance guardrails:
+
+```rego
+package ai.agent.control
+
+import rego.v1
+
+default allow := false
+
+# Allow AI agents with safety and compliance checks
+allow if {
+    input.user.type == "ai_agent"
+    prompt_safety_check
+    model_access_allowed
+    content_policy_compliant
+    
+    # Compliance: No PII or regulated data in prompts
+    not contains_regulated_data(input.context.prompt)
+}
+
+# Validate prompt safety
+prompt_safety_check if {
+    not contains_sensitive_data(input.context.prompt)
+    input.context.safety_score > 0.8
+}
+
+contains_regulated_data(prompt) if {
+    # Check for financial data patterns
+    regex.match(`\d{3}-\d{2}-\d{4}`, prompt)  # SSN
+}
+
+contains_regulated_data(prompt) if {
+    # Check for healthcare identifiers
+    contains(lower(prompt), "medical record")
+}
+```
+
+## Next Steps
+
+Now that you understand the basics, explore these resources:
+
+### Documentation
+
+- **[Administrator Guide](/guides/admin)**: Learn how to configure and manage Control Core
+- **[User Guide](/guides/user-guide)**: Master policy creation and management
+- **[Rego Guidelines](/guides/rego-guidelines)**: Deep dive into Rego policy language
+- **[API Reference](/guides/api-reference)**: Complete API documentation
+
+### Deployment
+
+- **[Kickstart Deployment](/guides/deployment/kickstart)**: Self-hosted deployment guide
+- **[Pro Deployment](/guides/deployment/pro)**: Hybrid deployment guide
+- **[Enterprise Deployment](/guides/deployment/enterprise)**: Enterprise-scale deployment
+
+### Best Practices
+
+- **[Security Best Practices](/guides/security)**: Secure your Control Core deployment
+- **[PBAC Best Practices](/guides/pbac-best-practices)**: Policy design patterns
+- **[Policy Templates](/guides/policy-templates)**: Pre-built policy templates
+
+### Support
+
+- **[Troubleshooting Guide](/guides/troubleshooting)**: Common issues and solutions
+- **Documentation**: [https://docs.controlcore.io](https://docs.controlcore.io)
+- **Community**: [GitHub Discussions](https://github.com/controlcore/discussions)
+- **Support**: support@controlcore.io
+
+## Getting Help
+
+If you need assistance:
+
+1. **Check Documentation**: Most questions are answered in our comprehensive guides
+2. **Search Issues**: Check existing GitHub issues for similar problems
+3. **Community Forum**: Ask questions in our community forum
+4. **Contact Support**: 
+   - **Kickstart**: Community support via GitHub
+   - **Pro**: Priority support with SLA
+   - **Enterprise**: Dedicated support team
+
+Welcome to Control Core! We're excited to help you build secure, scalable authorization for your applications.
+

@@ -1,0 +1,38 @@
+{
+  "users": {
+    "admin": {
+      "role": "admin",
+      "department": "IT",
+      "clearance": "top-secret"
+    },
+    "user1": {
+      "role": "user",
+      "department": "Sales",
+      "clearance": "confidential"
+    },
+    "ai_agent": {
+      "role": "ai_agent",
+      "department": "AI",
+      "clearance": "restricted"
+    }
+  },
+  "resources": {
+    "document1": {
+      "type": "document",
+      "department": "IT",
+      "classification": "confidential",
+      "owner": "admin"
+    },
+    "ai_data": {
+      "type": "ai_data",
+      "department": "AI",
+      "classification": "restricted",
+      "owner": "ai_agent"
+    }
+  },
+  "context": {
+    "time": "14:30",
+    "location": "office",
+    "environment": "production"
+  }
+}

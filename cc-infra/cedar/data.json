@@ -1,0 +1,40 @@
+{
+  "entities": [
+    {
+      "uid": {
+        "type": "User",
+        "id": "admin"
+      },
+      "attrs": {
+        "department": "IT",
+        "role": "administrator",
+        "clearance": "top-secret"
+      }
+    },
+    {
+      "uid": {
+        "type": "User",
+        "id": "user1"
+      },
+      "attrs": {
+        "department": "Sales",
+        "role": "manager",
+        "clearance": "confidential"
+      }
+    },
+    {
+      "uid": {
+        "type": "Resource",
+        "id": "document1"
+      },
+      "attrs": {
+        "owner": {
+          "type": "User",
+          "id": "admin"
+        },
+        "department": "IT",
+        "classification": "confidential"
+      }
+    }
+  ]
+}

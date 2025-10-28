@@ -1,0 +1,453 @@
+# Policies as Code API
+
+Control Core provides comprehensive APIs for developing, testing, and deploying policies as code. This enables advanced customers to integrate Control Core directly into their development workflows and IDEs.
+
+## Overview
+
+The Policies as Code API allows you to:
+
+- **Validate policies** with detailed error reporting
+- **Test policies** with comprehensive test cases
+- **Deploy policies** to different environments
+- **Import policies** from Git repositories and external sources
+- **Use policy templates** for common scenarios
+- **Version control** your policies with rollback capabilities
+
+## Authentication
+
+All API endpoints require authentication. Include your API key in the request headers:
+
+```http
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+```
+
+## Base URL
+
+```http
+https://your-control-core-instance.com/api/v1/policies-as-code
+```
+
+## Endpoints
+
+### Validate Policy
+
+Validate Rego policy syntax and structure.
+
+**POST** `/validate`
+
+#### Request Body
+
+```json
+{
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "policy_name": "admin_access_policy"
+}
+```
+
+#### Response
+
+```json
+{
+  "is_valid": true,
+  "errors": [],
+  "warnings": [],
+  "parsed_policy": {
+    "package": "access_control",
+    "rules": ["allow"],
+    "line_count": 5
+  }
+}
+```
+
+#### Example Usage
+
+```bash
+curl -X POST "https://your-instance.com/api/v1/policies-as-code/validate" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+    "policy_name": "admin_access_policy"
+  }'
+```
+
+### Test Policy
+
+Run test cases against a policy to verify its behavior.
+
+**POST** `/test`
+
+#### Request Body
+
+```json
+{
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "test_cases": [
+    {
+      "input": {
+        "user": {"roles": ["admin"]},
+        "resource": {"type": "api"}
+      },
+      "expected": true,
+      "rule": "allow"
+    },
+    {
+      "input": {
+        "user": {"roles": ["user"]},
+        "resource": {"type": "api"}
+      },
+      "expected": false,
+      "rule": "allow"
+    }
+  ],
+  "policy_name": "admin_access_policy"
+}
+```
+
+#### Response
+
+```json
+{
+  "passed": 2,
+  "failed": 0,
+  "total": 2,
+  "results": [
+    {
+      "test_case": 1,
+      "passed": true,
+      "expected": true,
+      "actual": true,
+      "input": {"user": {"roles": ["admin"]}, "resource": {"type": "api"}}
+    },
+    {
+      "test_case": 2,
+      "passed": true,
+      "expected": false,
+      "actual": false,
+      "input": {"user": {"roles": ["user"]}, "resource": {"type": "api"}}
+    }
+  ]
+}
+```
+
+### Deploy Policy
+
+Deploy a validated policy to the specified environment.
+
+**POST** `/deploy`
+
+#### Request Body
+
+```json
+{
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "policy_name": "admin_access_policy",
+  "environment": "sandbox",
+  "description": "Admin access control policy",
+  "auto_promote": false
+}
+```
+
+#### Response
+
+```json
+{
+  "deployment_id": "deploy_123_1643123456",
+  "status": "deploying",
+  "policy_id": 123,
+  "environment": "sandbox",
+  "deployed_at": "2025-01-25T10:30:00Z"
+}
+```
+
+### Get Policy Templates
+
+Retrieve pre-built policy templates for common scenarios.
+
+**GET** `/templates`
+
+#### Query Parameters
+
+- `category` (optional): Filter templates by category (`access-control`, `resource-control`, `ai-safety`)
+
+#### Response
+
+```json
+[
+  {
+    "name": "Basic Allow Policy",
+    "description": "Simple policy that allows access based on user role",
+    "category": "access-control",
+    "policy_content": "package access_control\n\nimport rego.v1\n\n# Allow access if user has required role\nallow if {\n    input.user.roles[_] == \"admin\"\n}\n\n# Allow access if user has specific permission\nallow if {\n    input.user.permissions[_] == input.required_permission\n}",
+    "variables": [
+      {
+        "name": "required_permission",
+        "description": "Permission required for access",
+        "type": "string"
+      },
+      {
+        "name": "user_role",
+        "description": "User role required",
+        "type": "string"
+      }
+    ]
+  }
+]
+```
+
+### Import Policy
+
+Import a policy from external sources.
+
+**POST** `/import`
+
+#### Request Body
+
+```json
+{
+  "source_type": "git",
+  "source_url": "https://github.com/your-org/policies.git",
+  "branch": "main",
+  "path": "policies/admin_access.rego"
+}
+```
+
+#### Supported Source Types
+
+- `git`: Import from Git repository
+- `url`: Import from direct URL
+- `file`: Import from file content
+
+#### Response
+
+```json
+{
+  "success": true,
+  "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+  "message": "Policy imported successfully"
+}
+```
+
+## Policy Templates
+
+### Access Control Templates
+
+#### Basic Role-Based Access
+
+```rego
+package access_control
+
+import rego.v1
+
+# Allow access if user has required role
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+# Allow access if user has specific permission
+allow if {
+    input.user.permissions[_] == input.required_permission
+}
+```
+
+#### Time-Based Access
+
+```rego
+package time_access
+
+import rego.v1
+import future.keywords.contains
+import future.keywords.if
+
+# Allow access only during business hours
+allow if {
+    time.now_ns() >= time.parse_rfc3339_ns("2023-01-01T09:00:00Z")
+    time.now_ns() <= time.parse_rfc3339_ns("2023-01-01T17:00:00Z")
+}
+
+# Allow access on specific days
+allow if {
+    time.weekday(time.now_ns()) in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+}
+```
+
+### Resource Control Templates
+
+#### Resource-Based Access
+
+```rego
+package resource_access
+
+import rego.v1
+import future.keywords.contains
+
+# Allow access to public resources
+allow if {
+    input.resource.public == true
+}
+
+# Allow access to own resources
+allow if {
+    input.resource.owner == input.user.id
+}
+
+# Allow access based on resource tags
+allow if {
+    input.resource.tags[_] in input.user.allowed_tags
+}
+```
+
+### AI Safety Templates
+
+#### Content Filtering
+
+```rego
+package ai_content_filter
+
+import rego.v1
+import future.keywords.contains
+
+# Block content with sensitive information
+violation[msg] if {
+    input.content contains "PII"
+    msg := "Content contains personally identifiable information"
+}
+
+# Block content with inappropriate language
+violation[msg] if {
+    input.content contains "inappropriate"
+    msg := "Content contains inappropriate language"
+}
+
+# Allow content that passes all checks
+allow if {
+    not violation
+}
+```
+
+## Error Handling
+
+The API returns standard HTTP status codes and detailed error messages:
+
+### 400 Bad Request
+
+```json
+{
+  "detail": "Policy validation failed: syntax error at line 3"
+}
+```
+
+### 401 Unauthorized
+
+```json
+{
+  "detail": "Invalid API key"
+}
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "detail": "Policy deployment failed: OPA connection timeout"
+}
+```
+
+## Rate Limits
+
+API requests are rate limited to prevent abuse:
+
+- **Validation**: 100 requests per minute
+- **Testing**: 50 requests per minute
+- **Deployment**: 10 requests per minute
+- **Import**: 20 requests per minute
+
+Rate limit headers are included in responses:
+
+```http
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1643124000
+```
+
+## Best Practices
+
+### Policy Development
+
+1. **Always validate** policies before deployment
+2. **Write comprehensive tests** for your policies
+3. **Use descriptive names** for policies and rules
+4. **Follow Rego best practices** for performance
+5. **Version control** your policies with Git
+
+### API Usage
+
+1. **Use appropriate environments** (sandbox for testing, production for live policies)
+2. **Implement retry logic** for transient failures
+3. **Cache validation results** when possible
+4. **Monitor deployment status** for long-running operations
+5. **Use webhooks** for automated deployments
+
+### Security
+
+1. **Keep API keys secure** and rotate them regularly
+2. **Use HTTPS** for all API communications
+3. **Validate inputs** before sending to the API
+4. **Implement proper error handling** in your applications
+5. **Monitor API usage** for unusual patterns
+
+## SDKs and Libraries
+
+### Python SDK
+
+```python
+from control_core import ControlCoreClient
+
+client = ControlCoreClient(api_key="your-api-key")
+
+# Validate policy
+result = client.policies.validate({
+    "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+    "policy_name": "admin_access"
+})
+
+# Deploy policy
+deployment = client.policies.deploy({
+    "policy_content": "package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == \"admin\"\n}",
+    "policy_name": "admin_access",
+    "environment": "sandbox"
+})
+```
+
+### Node.js SDK
+
+```javascript
+const ControlCore = require('@control-core/sdk');
+
+const client = new ControlCore({
+  apiKey: 'your-api-key'
+});
+
+// Validate policy
+const result = await client.policies.validate({
+  policy_content: 'package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == "admin"\n}',
+  policy_name: 'admin_access'
+});
+
+// Deploy policy
+const deployment = await client.policies.deploy({
+  policy_content: 'package access_control\n\nimport rego.v1\n\nallow if {\n    input.user.roles[_] == "admin"\n}',
+  policy_name: 'admin_access',
+  environment: 'sandbox'
+});
+```
+
+## Support
+
+For API support and questions:
+
+- **Documentation**: [docs.controlcore.io](https://docs.controlcore.io)
+- **Support Email**: api-support@controlcore.io
+- **Community Forum**: [community.controlcore.io](https://community.controlcore.io)
+- **GitHub Issues**: [github.com/controlcore/control-core/issues](https://github.com/controlcore/control-core/issues)

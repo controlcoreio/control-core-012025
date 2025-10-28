@@ -1,0 +1,499 @@
+{
+  "version": "2.0.0",
+  "lastUpdated": "2025-01-26",
+  "totalTemplates": 165,
+  "categories": {
+    "nist-ai-rmf": {
+      "name": "NIST AI RMF",
+      "description": "NIST AI Risk Management Framework compliance policies",
+      "icon": "shield-check",
+      "color": "#0891B2",
+      "priority": 1,
+      "templates": [
+        "ai-risk-assessment-classification",
+        "ai-bias-detection-mitigation",
+        "ai-model-monitoring-drift-detection",
+        "ai-system-validation-verification",
+        "ai-trustworthiness-assessment",
+        "ai-transparency-explainability",
+        "ai-security-resilience",
+        "ai-accountability-framework"
+      ]
+    },
+    "canadian-aida": {
+      "name": "Canadian AIDA",
+      "description": "Artificial Intelligence and Data Act (AIDA) compliance",
+      "icon": "flag",
+      "color": "#DC2626",
+      "priority": 2,
+      "templates": [
+        "high-impact-ai-system-assessment",
+        "ai-impact-assessment-requirements",
+        "ai-harm-prevention-mitigation",
+        "ai-system-accountability-reporting",
+        "ai-data-governance-aida"
+      ]
+    },
+    "canadian-ai-governance": {
+      "name": "Canadian AI Governance",
+      "description": "Canadian AI governance frameworks and directives",
+      "icon": "gavel",
+      "color": "#DC2626",
+      "priority": 3,
+      "templates": [
+        "directive-automated-decision-making",
+        "treasury-board-ai-governance",
+        "privacy-enhanced-ai-pipeda",
+        "algorithmic-impact-assessment",
+        "responsible-ai-framework"
+      ]
+    },
+    "ai-security": {
+      "name": "AI Security",
+      "description": "Comprehensive AI security controls for RAG, LLM, and AI Agents",
+      "icon": "lock-closed",
+      "color": "#7C3AED",
+      "priority": 4,
+      "templates": [
+        "ai-rag-data-protection",
+        "rag-data-protection-pii",
+        "rag-access-control",
+        "rag-data-source-validation",
+        "ai-agent-data-protection",
+        "ai-agent-authorization",
+        "ai-agent-boundary-enforcement",
+        "ai-agent-audit-logging",
+        "ai-chat-data-protection",
+        "llm-input-sanitization",
+        "llm-output-filtering",
+        "llm-rate-limiting",
+        "prompt-injection-prevention",
+        "prompt-injection-advanced",
+        "prompt-jailbreak-detection",
+        "prompt-context-isolation",
+        "ai-model-security",
+        "ai-collaboration-security"
+      ]
+    },
+    "compliance": {
+      "name": "Privacy & Compliance",
+      "description": "Comprehensive privacy and regulatory compliance policies",
+      "icon": "scale",
+      "color": "#F59E0B",
+      "priority": 5,
+      "templates": [
+        "gdpr-data-protection",
+        "gdpr-right-to-erasure",
+        "gdpr-data-portability",
+        "gdpr-consent-management",
+        "gdpr-data-minimization",
+        "gdpr-cross-border-transfer",
+        "hipaa-healthcare-privacy",
+        "hipaa-minimum-necessary",
+        "hipaa-authorization-tracking",
+        "hipaa-breach-notification",
+        "hipaa-business-associate",
+        "hipaa-patient-rights",
+        "pipeda-canadian-privacy",
+        "pipeda-consent-principles",
+        "pipeda-access-rights",
+        "pipeda-cross-border-safeguards",
+        "pipeda-breach-notification",
+        "pipeda-accountability",
+        "phipa-ontario-health",
+        "phipa-consent-directives",
+        "phipa-circle-of-care",
+        "phipa-substitute-decision-maker",
+        "ccpa-consumer-privacy",
+        "ccpa-right-to-know",
+        "ccpa-right-to-delete",
+        "ccpa-opt-out-sale",
+        "ccpa-non-discrimination",
+        "soc2-compliance",
+        "soc2-access-control",
+        "soc2-change-management",
+        "soc2-monitoring-logging",
+        "fintrac-aml-monitoring",
+        "fintrac-str-triggers",
+        "kyc-verification"
+      ]
+    },
+    "data-governance": {
+      "name": "Data Governance",
+      "description": "Comprehensive data governance, masking, classification, and retention",
+      "icon": "database",
+      "color": "#10B981",
+      "priority": 6,
+      "templates": [
+        "dynamic-data-masking",
+        "static-data-masking",
+        "data-masking-conditional",
+        "data-masking-time-based",
+        "data-masking-identity-based",
+        "data-masking-location-based",
+        "data-masking-financial-sensitive",
+        "data-masking-banking-compliance",
+        "tokenization-policy",
+        "format-preserving-encryption",
+        "anonymization-policy",
+        "automated-data-classification",
+        "sensitivity-label-enforcement",
+        "pii-detection-classification",
+        "data-lineage-tracking",
+        "confidential-data-handling",
+        "retention-policy-enforcement",
+        "automated-data-archival",
+        "data-deletion-policy",
+        "legal-hold-management",
+        "backup-retention-policy",
+        "attribute-based-access-control",
+        "row-level-security",
+        "column-level-security",
+        "data-access-audit",
+        "need-to-know-access"
+      ]
+    },
+    "security-controls": {
+      "name": "Security Controls",
+      "description": "Zero Trust, MFA, RBAC, and API security controls",
+      "icon": "shield",
+      "color": "#EF4444",
+      "priority": 7,
+      "templates": [
+        "zero-trust-architecture",
+        "zero-trust-network-access",
+        "micro-segmentation",
+        "least-privilege-access",
+        "continuous-verification",
+        "device-trust-assessment",
+        "multi-factor-authentication",
+        "adaptive-mfa",
+        "passwordless-authentication",
+        "biometric-authentication",
+        "session-timeout-management",
+        "authentication-rate-limiting",
+        "role-based-access-control",
+        "hierarchical-rbac",
+        "dynamic-role-assignment",
+        "separation-of-duties",
+        "permission-review-certification",
+        "emergency-access-override",
+        "api-governance",
+        "api-authentication-oauth2",
+        "api-rate-limiting-throttling",
+        "api-input-validation",
+        "api-quota-management",
+        "api-threat-detection"
+      ]
+    },
+    "jit-access": {
+      "name": "Just-in-Time Access",
+      "description": "Temporary access, privilege escalation, and emergency access controls",
+      "icon": "clock",
+      "color": "#8B5CF6",
+      "priority": 8,
+      "templates": [
+        "temporary-elevated-access",
+        "approval-based-jit",
+        "automated-privilege-revocation",
+        "emergency-break-glass",
+        "jit-mfa-requirement",
+        "privileged-session-monitoring",
+        "on-demand-account-provisioning",
+        "time-bound-access-windows",
+        "jit-audit-logging",
+        "privilege-escalation-control"
+      ]
+    },
+    "industry-frameworks": {
+      "name": "Industry Frameworks",
+      "description": "PCI-DSS, ISO 27001, NIST CSF, FedRAMP, CIS Controls",
+      "icon": "building",
+      "color": "#6366F1",
+      "priority": 9,
+      "templates": [
+        "pci-dss-payment",
+        "pci-dss-cardholder-data",
+        "pci-dss-network-segmentation",
+        "iso27001-security",
+        "iso27001-access-control",
+        "iso27001-cryptography",
+        "nist-csf-identify",
+        "nist-csf-protect",
+        "nist-csf-detect",
+        "fedramp-boundary-protection",
+        "fedramp-incident-response",
+        "cis-controls-basic-hygiene",
+        "soc2-compliance"
+      ]
+    },
+    "cloud-security": {
+      "name": "Cloud Security",
+      "description": "Cloud workload protection, IAM, encryption, and multi-cloud security",
+      "icon": "cloud",
+      "color": "#3B82F6",
+      "priority": 10,
+      "templates": [
+        "cloud-infrastructure-security",
+        "cloud-workload-protection",
+        "cloud-iam-best-practices",
+        "cloud-data-encryption",
+        "multi-cloud-security-posture",
+        "serverless-security"
+      ]
+    },
+    "open-banking": {
+      "name": "Open Banking & Financial",
+      "description": "Open banking, FDX compliance, and financial security controls",
+      "icon": "currency-dollar",
+      "color": "#059669",
+      "priority": 11,
+      "templates": [
+        "fdx-compliance",
+        "open-banking-consent",
+        "open-banking-api-security",
+        "strong-customer-authentication",
+        "transaction-risk-analysis",
+        "third-party-provider-access"
+      ]
+    },
+    "ai-governance": {
+      "name": "AI Governance",
+      "description": "AI system governance, accountability, and oversight",
+      "icon": "brain",
+      "color": "#3B82F6",
+      "priority": 12,
+      "templates": [
+        "ai-model-approval",
+        "ai-decision-transparency",
+        "ai-accountability-framework",
+        "ai-ethics-compliance"
+      ]
+    },
+    "ai-assistants": {
+      "name": "AI Assistants & Agents",
+      "description": "Policies for AI assistants, chatbots, and autonomous agents",
+      "icon": "robot",
+      "color": "#06B6D4",
+      "priority": 13,
+      "templates": [
+        "ai-assistant-boundaries",
+        "ai-agent-autonomy",
+        "ai-human-collaboration",
+        "ai-decision-delegation"
+      ]
+    },
+    "ai-tools": {
+      "name": "AI Tools & Real-Time Context",
+      "description": "AI tools integration with real-time context management",
+      "icon": "cog",
+      "color": "#9333EA",
+      "priority": 14,
+      "templates": [
+        "ai-agent-real-time-context",
+        "ai-tools-integration-context",
+        "rag-system-real-time-context"
+      ]
+    },
+    "platform-orchestration": {
+      "name": "Platform Orchestration",
+      "description": "Vendor management, feature orchestration, and platform access",
+      "icon": "puzzle",
+      "color": "#EC4899",
+      "priority": 15,
+      "templates": [
+        "business-case-access-control",
+        "vendor-service-access-control",
+        "feature-orchestration-control"
+      ]
+    },
+    "network-security": {
+      "name": "Network Security",
+      "description": "Network and microservice security controls",
+      "icon": "globe",
+      "color": "#14B8A6",
+      "priority": 16,
+      "templates": [
+        "microservice-security"
+      ]
+    },
+    "collaboration": {
+      "name": "Collaboration Security",
+      "description": "Secure collaboration and sharing tools",
+      "icon": "users",
+      "color": "#F97316",
+      "priority": 17,
+      "templates": [
+        "sharing-tool-behavior"
+      ]
+    },
+    "data-lake": {
+      "name": "Data Lake Security",
+      "description": "Security controls for data lakes and data stores",
+      "icon": "server",
+      "color": "#0EA5E9",
+      "priority": 18,
+      "templates": [
+        "data-lake-security"
+      ]
+    }
+  },
+  "smartSuggestions": {
+    "resourceTypes": {
+      "healthcare-data": {
+        "suggestedCategories": ["compliance", "security-controls", "data-governance"],
+        "priorityTemplates": [
+          "hipaa-healthcare-privacy",
+          "hipaa-minimum-necessary",
+          "phipa-ontario-health",
+          "zero-trust-architecture",
+          "pii-detection-classification"
+        ],
+        "complianceRequirements": ["HIPAA", "PHIPA", "SOC2"]
+      },
+      "financial-data": {
+        "suggestedCategories": ["compliance", "security-controls", "industry-frameworks", "open-banking"],
+        "priorityTemplates": [
+          "pci-dss-cardholder-data",
+          "soc2-compliance",
+          "fintrac-aml-monitoring",
+          "kyc-verification",
+          "strong-customer-authentication"
+        ],
+        "complianceRequirements": ["PCI-DSS", "SOC2", "ISO27001", "FINTRAC"]
+      },
+      "ai-model": {
+        "suggestedCategories": ["nist-ai-rmf", "canadian-aida", "ai-security"],
+        "priorityTemplates": [
+          "ai-risk-assessment-classification",
+          "ai-bias-detection-mitigation",
+          "ai-model-monitoring-drift-detection",
+          "high-impact-ai-system-assessment",
+          "prompt-injection-prevention"
+        ],
+        "complianceRequirements": ["NIST AI RMF", "Canadian AIDA", "AI Governance"]
+      },
+      "personal-data": {
+        "suggestedCategories": ["compliance", "data-governance"],
+        "priorityTemplates": [
+          "gdpr-data-protection",
+          "pipeda-canadian-privacy",
+          "ccpa-consumer-privacy",
+          "pii-detection-classification",
+          "dynamic-data-masking"
+        ],
+        "complianceRequirements": ["GDPR", "PIPEDA", "CCPA"]
+      },
+      "ai-assistant": {
+        "suggestedCategories": ["ai-assistants", "ai-security", "canadian-ai-governance"],
+        "priorityTemplates": [
+          "ai-assistant-boundaries",
+          "ai-agent-authorization",
+          "prompt-injection-advanced",
+          "llm-input-sanitization",
+          "directive-automated-decision-making"
+        ],
+        "complianceRequirements": ["AI Governance", "Data Protection", "Canadian AIDA"]
+      },
+      "rag-system": {
+        "suggestedCategories": ["ai-security", "data-governance"],
+        "priorityTemplates": [
+          "ai-rag-data-protection",
+          "rag-data-protection-pii",
+          "rag-access-control",
+          "pii-detection-classification"
+        ],
+        "complianceRequirements": ["PIPEDA", "GDPR", "AI Governance"]
+      },
+      "cloud-workload": {
+        "suggestedCategories": ["cloud-security", "security-controls"],
+        "priorityTemplates": [
+          "cloud-workload-protection",
+          "cloud-iam-best-practices",
+          "zero-trust-network-access",
+          "micro-segmentation"
+        ],
+        "complianceRequirements": ["SOC2", "ISO27001"]
+      }
+    },
+    "industryContext": {
+      "healthcare": {
+        "requiredCompliance": ["HIPAA", "PHIPA"],
+        "suggestedTemplates": [
+          "hipaa-healthcare-privacy",
+          "hipaa-minimum-necessary",
+          "phipa-ontario-health",
+          "phipa-circle-of-care",
+          "ai-bias-detection-mitigation"
+        ]
+      },
+      "financial": {
+        "requiredCompliance": ["PCI-DSS", "SOC2", "FINTRAC"],
+        "suggestedTemplates": [
+          "pci-dss-cardholder-data",
+          "soc2-compliance",
+          "fintrac-aml-monitoring",
+          "fintrac-str-triggers",
+          "kyc-verification",
+          "open-banking-api-security"
+        ]
+      },
+      "government": {
+        "requiredCompliance": ["PIPEDA", "GDPR", "FedRAMP"],
+        "suggestedTemplates": [
+          "pipeda-canadian-privacy",
+          "gdpr-data-protection",
+          "directive-automated-decision-making",
+          "fedramp-boundary-protection",
+          "algorithmic-impact-assessment"
+        ]
+      },
+      "technology": {
+        "requiredCompliance": ["SOC2", "ISO27001"],
+        "suggestedTemplates": [
+          "soc2-compliance",
+          "iso27001-security",
+          "ai-risk-assessment-classification",
+          "cloud-security-posture"
+        ]
+      },
+      "canadian-organizations": {
+        "requiredCompliance": ["PIPEDA", "Canadian AIDA"],
+        "suggestedTemplates": [
+          "pipeda-canadian-privacy",
+          "privacy-enhanced-ai-pipeda",
+          "high-impact-ai-system-assessment",
+          "algorithmic-impact-assessment",
+          "treasury-board-ai-governance"
+        ]
+      }
+    },
+    "useCaseContext": {
+      "ai-deployment": {
+        "recommendedPolicies": [
+          "ai-risk-assessment-classification",
+          "ai-bias-detection-mitigation",
+          "ai-model-monitoring-drift-detection",
+          "prompt-injection-prevention"
+        ]
+      },
+      "data-protection": {
+        "recommendedPolicies": [
+          "dynamic-data-masking",
+          "pii-detection-classification",
+          "data-masking-financial-sensitive",
+          "tokenization-policy"
+        ]
+      },
+      "privileged-access": {
+        "recommendedPolicies": [
+          "temporary-elevated-access",
+          "emergency-break-glass",
+          "jit-mfa-requirement",
+          "privileged-session-monitoring"
+        ]
+      }
+    }
+  }
+}
+

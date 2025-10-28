@@ -1,0 +1,257 @@
+# Policy Admin Services - ControlCore Stack
+# This file contains the deployments and services for the policy admin components
+# Part of the controlcore-stack ecosystem
+# 
+# Usage:
+#   kubectl apply -f policy-admin-stack.yaml
+#   
+# Access:
+#   Policy Admin Server: http://localhost:30702
+#   Policy Admin Client: http://localhost:30766
+#   Policy Admin API:    http://localhost:30901
+#   OPA Service:         http://localhost:30181
+
+---
+# Policy Admin Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-admin-server-local
+  labels:
+    app: policy-admin-server
+    stack: controlcore-stack
+    env: local-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: policy-admin-server
+      stack: controlcore-stack
+      env: local-dev
+  template:
+    metadata:
+      labels:
+        app: policy-admin-server
+        stack: controlcore-stack
+        env: local-dev
+    spec:
+      containers:
+        - name: policy-admin-server
+          image: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin:policy-admin-server-controlcoreio
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8084
+          env:
+            - name: OPAL_SERVER_BIND_PORT
+              value: "8084"
+            - name: OPAL_POLICY_SOURCE_TYPE
+              value: "GIT"
+            - name: OPAL_POLICY_REPO_URL
+              value: "https://github.com/controlcoreio/staging-policies-repo.git"
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cc-pap-github-token
+                  key: token
+            - name: OPAL_POLICY_REPO_CLONE_PATH
+              value: "/tmp/staging-policies-repo"
+            - name: OPAL_POLICY_REPO_MAIN_BRANCH
+              value: "main"
+            - name: OPAL_POLICY_REPO_POLLING_INTERVAL
+              value: "30"
+            - name: OPAL_DATA_CONFIG_SOURCES
+              value: '{"config":{"entries":[{"url":"http://policy-admin-server-local:8084/policy-data","topics":["policy_data"],"dst_path":"/static"}]}}'
+            - name: OPAL_LOG_FORMAT_INCLUDE_PID
+              value: "true"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            tcpSocket:
+              port: 8084
+            initialDelaySeconds: 10
+            periodSeconds: 300
+          livenessProbe:
+            tcpSocket:
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: policy-admin-server-local
+  labels:
+    stack: controlcore-stack
+    env: local-dev
+spec:
+  selector:
+    app: policy-admin-server
+    stack: controlcore-stack
+    env: local-dev
+  ports:
+    - port: 8084
+      targetPort: 8084
+      nodePort: 30702
+  type: NodePort
+---
+# Policy Admin Client
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-admin-client-local
+  labels:
+    app: policy-admin-client
+    stack: controlcore-stack
+    env: local-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: policy-admin-client
+      stack: controlcore-stack
+      env: local-dev
+  template:
+    metadata:
+      labels:
+        app: policy-admin-client
+        stack: controlcore-stack
+        env: local-dev
+    spec:
+      containers:
+        - name: policy-admin-client
+          image: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin:policy-admin-client-controlcoreio
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8083
+            - containerPort: 8181
+          env:
+            - name: OPAL_CLIENT_API_SERVER_PORT
+              value: "8083"
+            - name: OPAL_SERVER_URL
+              value: "http://policy-admin-server-local:8084"
+            - name: OPAL_LOG_FORMAT_INCLUDE_PID
+              value: "true"
+            - name: OPAL_INLINE_OPA_LOG_FORMAT
+              value: "http"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 300
+          livenessProbe:
+            tcpSocket:
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: policy-admin-client-local
+  labels:
+    stack: controlcore-stack
+    env: local-dev
+spec:
+  selector:
+    app: policy-admin-client
+    stack: controlcore-stack
+    env: local-dev
+  ports:
+    - name: client
+      port: 8083
+      targetPort: 8083
+      nodePort: 30766
+    - name: opa
+      port: 8181
+      targetPort: 8181
+      nodePort: 30181
+  type: NodePort
+---
+# Policy Admin API
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-admin-api-local
+  labels:
+    app: policy-admin-api
+    stack: controlcore-stack
+    env: local-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: policy-admin-api
+      stack: controlcore-stack
+      env: local-dev
+  template:
+    metadata:
+      labels:
+        app: policy-admin-api
+        stack: controlcore-stack
+        env: local-dev
+    spec:
+      containers:
+        - name: policy-admin-api
+          image: cc-policy-admin-api-policy_admin_api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8082
+          env:
+            - name: PORT
+              value: "8082"
+            - name: OPA_URL
+              value: "http://policy-admin-client-local:8181"
+            - name: OPAL_SERVER_URL
+              value: "http://policy-admin-server-local:8084"
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cc-pap-github-token
+                  key: token
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 300
+          livenessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cc-pap-local
+  labels:
+    stack: controlcore-stack
+    env: local-dev
+spec:
+  selector:
+    app: policy-admin-api
+    stack: controlcore-stack
+    env: local-dev
+  ports:
+    - port: 8082
+      targetPort: 8082
+      nodePort: 30901
+  type: NodePort 

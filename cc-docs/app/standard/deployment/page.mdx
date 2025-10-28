@@ -1,0 +1,117 @@
+# Standard Deployment
+
+## Cloud Infrastructure Requirements
+
+### Minimum System Requirements
+
+Control Core Standard deployment requires specific cloud infrastructure to ensure optimal performance and reliability. The following specifications are based on production workloads and should be adjusted based on your specific use case.
+
+#### **Standard Deployment (Self-hosted)**
+- **Instance Type**: t3.medium or equivalent
+- **CPU**: 2 vCPUs minimum, 4 vCPUs recommended
+- **Memory**: 4GB RAM minimum, 8GB RAM recommended
+- **Storage**: 20GB SSD minimum, 50GB SSD recommended
+- **Network**: 1 Gbps network bandwidth
+- **Operating System**: Ubuntu 20.04 LTS or later
+
+### Cloud Provider Recommendations
+
+#### **Amazon Web Services (AWS)**
+- **Recommended Instance Types**:
+  - Standard: `t3.medium` or `t3.large`
+- **Storage**: EBS gp3 volumes (SSD)
+- **Network**: VPC with public/private subnets
+- **Load Balancer**: Application Load Balancer (ALB)
+- **Database**: RDS PostgreSQL (optional for advanced deployments)
+
+#### **Microsoft Azure**
+- **Recommended VM Sizes**:
+  - Standard: `Standard_B2s` or `Standard_B2ms`
+- **Storage**: Premium SSD
+- **Network**: Virtual Network with subnets
+- **Load Balancer**: Azure Load Balancer
+- **Database**: Azure Database for PostgreSQL (optional for advanced deployments)
+
+#### **Google Cloud Platform (GCP)**
+- **Recommended Machine Types**:
+  - Standard: `e2-medium` or `e2-standard-2`
+- **Storage**: Persistent SSD
+- **Network**: VPC with subnets
+- **Load Balancer**: Google Cloud Load Balancing
+- **Database**: Cloud SQL for PostgreSQL (optional for advanced deployments)
+
+### Network Requirements
+
+#### **Port Configuration**
+- **3000**: Control Core Admin UI (HTTP/HTTPS)
+- **8080**: The Bouncer - Policy Enforcement Point (HTTP/HTTPS)
+- **8082**: PAP API - Policy Administration Point (HTTP/HTTPS)
+- **7000**: OPAL Server - Policy Synchronization (HTTP/HTTPS)
+- **5432**: PostgreSQL Database (TCP)
+- **9090**: Metrics and Monitoring (HTTP/HTTPS)
+
+#### **Security Groups/Firewall Rules**
+- **Inbound Rules**:
+  - HTTP (80) and HTTPS (443) from internet
+  - SSH (22) from management IPs
+  - Custom ports for internal communication
+- **Outbound Rules**:
+  - HTTPS (443) to internet for updates
+  - DNS (53) for name resolution
+  - NTP (123) for time synchronization
+
+### Storage Requirements
+
+#### **Database Storage**
+- **Standard**: 20GB minimum, 50GB recommended
+- **Type**: SSD storage for optimal performance
+- **Backup**: Automated daily backups with 30-day retention
+
+#### **Application Storage**
+- **Container Images**: 5GB for base images
+- **Logs**: 10GB for log retention
+- **Configuration**: 1GB for configuration files
+- **Temporary**: 5GB for temporary files
+
+### High Availability Requirements
+
+#### **Multi-AZ Deployment**
+- Deploy across multiple Availability Zones
+- Use load balancers for traffic distribution
+- Implement health checks and auto-recovery
+- Configure database replication
+
+#### **Backup and Recovery**
+- **Database Backups**: Daily automated backups
+- **Configuration Backups**: Weekly configuration snapshots
+- **Disaster Recovery**: Cross-region backup replication
+- **Recovery Time Objective (RTO)**: < 4 hours
+- **Recovery Point Objective (RPO)**: < 1 hour
+
+### Security Requirements
+
+#### **Network Security**
+- VPC/Private networks for internal communication
+- Security groups/firewall rules for access control
+- VPN or bastion hosts for administrative access
+- SSL/TLS certificates for all external communications
+
+#### **Data Protection**
+- Encryption at rest for all data storage
+- Encryption in transit for all communications
+- Regular security updates and patches
+- Access logging and monitoring
+
+### Performance Optimization
+
+#### **Resource Scaling**
+- **CPU**: Monitor CPU utilization, scale when > 70%
+- **Memory**: Monitor memory usage, scale when > 80%
+- **Network**: Monitor bandwidth usage, scale when > 80%
+- **Storage**: Monitor I/O performance, scale when needed
+
+#### **Auto-scaling Configuration**
+- **Frontend**: 1-5 replicas based on CPU/memory
+- **PAP API**: 1-8 replicas based on request load
+- **Bouncer**: 1-10 replicas based on traffic
+- **Database**: Read replicas for high-traffic scenarios

@@ -1,0 +1,22 @@
+# Values override for ARM64 architecture
+# This file overrides the default values.yaml to use ARM64-specific image tags
+
+frontend:
+  image:
+    tag: latest-arm64
+
+policyAdminServer:
+  image:
+    tag: latest-arm64
+
+policyAdminClient:
+  image:
+    tag: latest-arm64
+
+policyAdminApi:
+  image:
+    tag: latest-arm64
+
+pdp:
+  image:
+    tag: latest-arm64

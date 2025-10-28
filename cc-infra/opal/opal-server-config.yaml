@@ -1,0 +1,108 @@
+# OPAL Server Configuration for Control Core
+# This configuration sets up OPAL server for Git-based policy management
+
+# OPAL Server Configuration
+OPAL_SERVER_PORT: 7000
+OPAL_SERVER_HOST: 0.0.0.0
+
+# Policy Source Configuration
+OPAL_POLICY_SOURCE_TYPE: "GIT"
+OPAL_POLICY_REPO_URL: "https://github.com/controlcoreio/staging-policies-repo.git"
+OPAL_POLICY_REPO_CLONE_PATH: "/tmp/staging-policies-repo"
+OPAL_POLICY_REPO_MAIN_BRANCH: "main"
+OPAL_POLICY_REPO_POLLING_INTERVAL: 30
+
+# Data Sources Configuration
+# OPAL polls these endpoints to fetch data and distribute to all OPA clients
+OPAL_DATA_CONFIG_SOURCES: |
+  {
+    "config": {
+      "entries": [
+        {
+          "url": "http://cc-pap-api:8000/api/v1/policies/data",
+          "topics": ["policy_data"],
+          "dst_path": "/static",
+          "config": {
+            "is_json": true,
+            "process_data": true
+          }
+        },
+        {
+          "url": "http://cc-pap-api:8000/api/v1/users/data",
+          "topics": ["user_data"],
+          "dst_path": "/static",
+          "config": {
+            "is_json": true,
+            "process_data": true
+          }
+        },
+        {
+          "url": "http://cc-pap-api:8000/api/v1/resources/data",
+          "topics": ["resource_data"],
+          "dst_path": "/static",
+          "config": {
+            "is_json": true,
+            "process_data": true
+          }
+        },
+        {
+          "url": "http://cc-pap-api:8000/opal/pip-data",
+          "topics": ["pip_data"],
+          "dst_path": "/pip",
+          "config": {
+            "is_json": true,
+            "process_data": true
+          }
+        }
+      ]
+    }
+  }
+
+# Alternative: Use dynamic configuration endpoint
+# This allows PAP API to dynamically generate OPAL config based on active PIP connections
+# Uncomment to use dynamic config (recommended for production):
+# OPAL_DATA_CONFIG_SOURCES: |
+#   {
+#     "external_source_url": "http://cc-pap-api:8000/opal/data-sources"
+#   }
+
+# Authentication Configuration
+OPAL_AUTH_TYPE: "NONE"  # For internal communication
+OPAL_AUTH_TOKEN: ""
+
+# Logging Configuration
+OPAL_LOG_FORMAT_INCLUDE_PID: "true"
+OPAL_LOG_LEVEL: "INFO"
+
+# Health Check Configuration
+OPAL_HEALTH_CHECK_POLICY_PATH: "/health"
+OPAL_HEALTH_CHECK_POLICY_INTERVAL: 30
+
+# Security Configuration
+OPAL_SECURITY_ENABLED: "false"  # For internal network
+OPAL_CORS_ENABLED: "true"
+OPAL_CORS_ORIGINS: "*"
+
+# Performance Configuration
+OPAL_WORKER_COUNT: 4
+OPAL_MAX_WORKERS: 8
+OPAL_TIMEOUT: 30
+
+# Bundle Configuration
+OPAL_BUNDLE_SERVER_ENABLED: "true"
+OPAL_BUNDLE_SERVER_PORT: 8080
+OPAL_BUNDLE_SERVER_PATH: "/bundle"
+
+# Webhook Configuration (for Git integration)
+OPAL_WEBHOOK_ENABLED: "true"
+OPAL_WEBHOOK_SECRET: "control-core-webhook-secret"
+OPAL_WEBHOOK_PATH: "/webhook"
+
+# Redis Configuration (for caching)
+OPAL_REDIS_URL: "redis://redis:6379"
+OPAL_REDIS_ENABLED: "true"
+
+# Kafka Configuration (for event streaming)
+OPAL_KAFKA_ENABLED: "false"
+OPAL_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+OPAL_KAFKA_TOPIC: "opal-events"

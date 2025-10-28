@@ -1,0 +1,38 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Control Core</title>
+    <meta name="description" content="Enterprise SaaS for no-code fine-grain authorization management" />
+    <meta name="author" content="Control Core" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/controlcore-icon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/controlcore-icon.svg" />
+
+    <!-- Security Headers - Only those that work with meta tags -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.gpteng.co https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https:; connect-src 'self' http://localhost:8000 http://localhost:8082 https:; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; worker-src 'self' blob:;" />
+
+    <meta property="og:title" content="Control Core" />
+    <meta property="og:description" content="Enterprise SaaS for no-code fine-grain authorization management" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/controlcore-icon.svg" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@controlcore" />
+    <meta name="twitter:image" content="/controlcore-icon.svg" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
+    <!-- <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script> -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

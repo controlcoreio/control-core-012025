@@ -1,0 +1,1967 @@
+# Rego Policy Language Guidelines
+
+This comprehensive guide covers the Rego policy language as used in Control Core, including language basics, Control Core-specific patterns, real-world examples, and best practices.
+
+## Introduction to Rego
+
+Rego is a declarative policy language designed for expressing authorization rules. It's used by Open Policy Agent (OPA) and forms the foundation of Control Core's policy engine.
+
+### Why Rego?
+
+- **Declarative**: Express what should happen, not how
+- **Expressive**: Handle complex authorization logic elegantly
+- **Testable**: Built-in support for unit testing
+- **Fast**: Sub-millisecond evaluation with caching
+- **Safe**: No side effects, no infinite loops
+
+### Key Concepts
+
+**Rules**: Define authorization decisions
+```rego
+allow if {
+    input.user.role == "admin"
+}
+```
+
+**Queries**: Ask questions about data
+```rego
+admin_users[user] if {
+    user := data.users[_]
+    user.role == "admin"
+}
+```
+
+**Assignments**: Compute intermediate values
+```rego
+is_admin := input.user.role == "admin"
+```
+
+## Rego Basics
+
+### Package Declaration
+
+Every policy starts with a package declaration:
+
+```rego
+package controlcore.policy
+
+# Your rules here
+```
+
+**Best Practice**: Use hierarchical naming:
+- `controlcore.policy.api` - API policies
+- `controlcore.policy.data` - Data access policies
+- `controlcore.policy.ai` - AI agent policies
+
+### Imports
+
+Import built-in functions and future keywords:
+
+```rego
+import rego.v1           # Use Rego v1 syntax
+import future.keywords   # Use future keywords (if, contains, etc.)
+```
+
+**Recommended imports for Control Core**:
+```rego
+package controlcore.policy
+
+import rego.v1
+import future.keywords.if
+import future.keywords.in
+import future.keywords.contains
+import future.keywords.every
+```
+
+### Data Types
+
+**Strings**:
+```rego
+name := "John Doe"
+role := "admin"
+```
+
+**Numbers**:
+```rego
+age := 30
+clearance_level := 3
+rate_limit := 1000
+```
+
+**Booleans**:
+```rego
+is_active := true
+mfa_enabled := false
+```
+
+**Arrays**:
+```rego
+roles := ["admin", "developer", "manager"]
+permissions := ["read", "write", "delete"]
+```
+
+**Objects**:
+```rego
+user := {
+    "id": "user-123",
+    "name": "John Doe",
+    "roles": ["admin"],
+    "attributes": {
+        "department": "Engineering"
+    }
+}
+```
+
+**Sets**:
+```rego
+allowed_roles := {"admin", "manager", "developer"}
+```
+
+**Null**:
+```rego
+value := null
+```
+
+### Variables and Assignment
+
+**Simple assignment**:
+```rego
+user_id := input.user.id
+role := input.user.roles[0]
+```
+
+**Pattern matching**:
+```rego
+user := input.user
+action := input.action.name
+```
+
+**Iteration**:
+```rego
+# Iterate over array
+role := input.user.roles[_]
+
+# Iterate over object
+value := input.resource.attributes[key]
+
+# Iterate with index
+role := input.user.roles[i]
+```
+
+### Operators
+
+**Comparison**:
+```rego
+x == y   # Equal
+x != y   # Not equal
+x < y    # Less than
+x <= y   # Less than or equal
+x > y    # Greater than
+x >= y   # Greater than or equal
+```
+
+**Logical**:
+```rego
+x; y     # OR (either x or y)
+x
+y        # AND (both x and y)
+not x    # NOT
+```
+
+**Arithmetic**:
+```rego
+x + y    # Addition
+x - y    # Subtraction
+x * y    # Multiplication
+x / y    # Division
+x % y    # Modulo
+```
+
+**Set operations**:
+```rego
+x | y    # Union
+x & y    # Intersection
+x - y    # Difference
+```
+
+**String operations**:
+```rego
+contains(x, y)        # String contains
+startswith(x, y)      # Starts with
+endswith(x, y)        # Ends with
+```
+
+**Array operations**:
+```rego
+x in array           # Element in array
+count(array)         # Array length
+```
+
+## Control Core Input Schema
+
+All Control Core policies receive this input structure:
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Input is provided by Control Core
+# {
+#   "user": {
+#     "id": "user-123",
+#     "email": "user@company.com",
+#     "roles": ["developer", "team-lead"],
+#     "department": "Engineering",
+#     "attributes": {
+#       "clearance_level": 3,
+#       "manager": "user-456",
+#       "mfa_enabled": true
+#     }
+#   },
+#   "resource": {
+#     "id": "resource-789",
+#     "type": "api",
+#     "path": "/api/v1/users",
+#     "attributes": {
+#       "owner": "user-123",
+#       "sensitivity": "confidential",
+#       "environment": "production"
+#     }
+#   },
+#   "action": {
+#     "name": "read",
+#     "method": "GET"
+#   },
+#   "context": {
+#     "ip_address": "192.168.1.100",
+#     "time": "2025-01-25T10:30:00Z",
+#     "request_id": "req-123"
+#   }
+# }
+
+# Access input fields
+user_id := input.user.id
+user_roles := input.user.roles
+resource_type := input.resource.type
+action_name := input.action.name
+```
+
+## Basic Policy Patterns
+
+### Pattern 1: Simple Allow/Deny
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Default deny (fail secure)
+default allow := false
+
+# Allow admin users
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+### Pattern 2: Multiple Conditions (AND)
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# All conditions must be true
+allow if {
+    input.user.roles[_] == "developer"
+    input.resource.type == "api"
+    input.action.name == "read"
+    input.resource.attributes.environment == "development"
+}
+```
+
+### Pattern 3: Alternative Conditions (OR)
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Method 1: Multiple rules (implicit OR)
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+allow if {
+    input.user.roles[_] == "manager"
+}
+
+# Method 2: Using 'in'
+allow if {
+    input.user.roles[_] in ["admin", "manager", "owner"]
+}
+```
+
+### Pattern 4: Negative Conditions
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    # User has developer role
+    input.user.roles[_] == "developer"
+    
+    # BUT not on suspended list
+    not user_suspended
+}
+
+user_suspended if {
+    input.user.id in data.suspended_users
+}
+```
+
+### Pattern 5: Helper Functions
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Helper function
+is_admin if {
+    input.user.roles[_] == "admin"
+}
+
+is_manager if {
+    input.user.roles[_] == "manager"
+}
+
+has_elevated_access if {
+    is_admin
+}
+
+has_elevated_access if {
+    is_manager
+}
+
+# Use in main rule
+allow if {
+    has_elevated_access
+    input.action.name == "write"
+}
+```
+
+## Advanced Patterns
+
+### Pattern 1: Set Operations
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+required_roles := {"admin", "security-officer"}
+user_roles := {role | role := input.user.roles[_]}
+
+# User has all required roles
+allow if {
+    required_roles & user_roles == required_roles
+}
+
+# Alternative: using every
+allow if {
+    every role in required_roles {
+        role in user_roles
+    }
+}
+```
+
+### Pattern 2: Comprehensions
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Array comprehension
+admin_users := [user |
+    user := data.users[_]
+    user.roles[_] == "admin"
+]
+
+# Object comprehension
+user_map := {user.id: user.name |
+    user := data.users[_]
+}
+
+# Set comprehension
+admin_emails := {user.email |
+    user := data.users[_]
+    user.roles[_] == "admin"
+}
+```
+
+### Pattern 3: Recursive Rules
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Check if user is in reporting chain
+is_manager_of(user_id, employee_id) if {
+    employee := data.users[employee_id]
+    employee.manager == user_id
+}
+
+# Recursive: Check entire chain
+is_manager_of(user_id, employee_id) if {
+    employee := data.users[employee_id]
+    employee.manager != user_id
+    is_manager_of(user_id, employee.manager)
+}
+
+# Allow managers to access their reports' data
+allow if {
+    is_manager_of(input.user.id, input.resource.attributes.owner)
+}
+```
+
+### Pattern 4: Dynamic Rules
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Generate rules dynamically based on data
+allow if {
+    policy := data.dynamic_policies[input.resource.type]
+    evaluate_policy(policy)
+}
+
+evaluate_policy(policy) if {
+    required_role := policy.required_role
+    input.user.roles[_] == required_role
+}
+```
+
+## Control Core Specific Patterns
+
+### Pattern 1: Role-Based Access Control (RBAC)
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Role hierarchy
+role_hierarchy := {
+    "admin": 4,
+    "manager": 3,
+    "developer": 2,
+    "viewer": 1
+}
+
+# Get user's highest role level
+user_level := max([level |
+    role := input.user.roles[_]
+    level := role_hierarchy[role]
+])
+
+# Required level for action
+required_levels := {
+    "delete": 4,
+    "write": 3,
+    "read": 2,
+    "view": 1
+}
+
+# Allow if user level >= required level
+allow if {
+    required := required_levels[input.action.name]
+    user_level >= required
+}
+```
+
+### Pattern 2: Attribute-Based Access Control (ABAC)
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+allow if {
+    # User attributes
+    input.user.department == input.resource.attributes.department
+    input.user.attributes.clearance_level >= input.resource.attributes.required_clearance
+    
+    # Resource attributes
+    input.resource.attributes.environment in ["development", "staging"]
+    
+    # Action attributes
+    input.action.name in ["read", "list"]
+    
+    # Context attributes
+    is_business_hours
+}
+
+is_business_hours if {
+    hour := time.clock([time.now_ns()])[0]
+    hour >= 9
+    hour < 17
+}
+```
+
+### Pattern 3: Resource Ownership
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+default allow := false
+
+# Users can access their own resources
+allow if {
+    input.resource.attributes.owner == input.user.id
+}
+
+# Users can access resources in their department
+allow if {
+    input.resource.attributes.department == input.user.department
+    input.action.name in ["read", "list"]
+}
+
+# Managers can access team resources
+allow if {
+    input.user.roles[_] == "manager"
+    employee_ids := {id | 
+        employee := data.users[_]
+        employee.manager == input.user.id
+        id := employee.id
+    }
+    input.resource.attributes.owner in employee_ids
+}
+```
+
+### Pattern 4: Data Filtering (Row-Level Security)
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Filter visible rows based on user permissions
+visible_rows[row] if {
+    some row in input.query.result
+    row.owner_id == input.user.id
+}
+
+visible_rows[row] if {
+    some row in input.query.result
+    input.user.roles[_] == "manager"
+    row.department == input.user.department
+}
+
+visible_rows[row] if {
+    some row in input.query.result
+    input.user.roles[_] == "admin"
+}
+
+# Mask sensitive columns
+masked_data := {key: value |
+    some key, value in input.data
+    not key in sensitive_fields
+}
+
+masked_data[key] := "***REDACTED***" if {
+    some key, _ in input.data
+    key in sensitive_fields
+    not user_can_view_sensitive
+}
+
+sensitive_fields := {"ssn", "salary", "password", "api_key"}
+
+user_can_view_sensitive if {
+    input.user.attributes.clearance_level >= 3
+}
+```
+
+## AI/LLM Policy Patterns
+
+### Pattern 1: AI Agent Access Control
+
+```rego
+package controlcore.policy.ai
+
+import rego.v1
+
+default allow := false
+
+# Allow AI agent with safety checks
+allow if {
+    # User authorized for AI
+    input.user.roles[_] in ["developer", "data-scientist", "ai-engineer"]
+    
+    # Prompt safety validated
+    prompt_safe
+    
+    # Usage limits not exceeded
+    within_usage_limits
+    
+    # Content policy compliant
+    content_compliant
+}
+
+# Validate prompt safety
+prompt_safe if {
+    prompt := input.context.prompt
+    
+    # Check length
+    count(prompt) < 4000
+    
+    # No sensitive keywords
+    not contains_sensitive_keywords(prompt)
+    
+    # Safety score acceptable
+    input.context.safety_score > 0.8
+}
+
+contains_sensitive_keywords(prompt) if {
+    sensitive := ["password", "api-key", "secret", "private-key", "token"]
+    lower_prompt := lower(prompt)
+    some keyword in sensitive
+    contains(lower_prompt, keyword)
+}
+
+# Check usage limits
+within_usage_limits if {
+    user_stats := data.usage_stats[input.user.id]
+    user_stats.requests_today < 1000
+    user_stats.tokens_today < 100000
+}
+
+# Content policy compliance
+content_compliant if {
+    prompt := input.context.prompt
+    not contains(lower(prompt), "malicious")
+    not contains(lower(prompt), "hack")
+    not contains(lower(prompt), "exploit")
+}
+```
+
+### Pattern 2: LLM Context-Aware Policy
+
+```rego
+package controlcore.policy.llm
+
+import rego.v1
+
+default allow := false
+
+# Allow LLM access with context checks
+allow if {
+    user_has_llm_access
+    llm_context_valid
+    prompt_safety_validated
+}
+
+user_has_llm_access if {
+    input.user.roles[_] in ["admin", "developer", "analyst"]
+    input.user.attributes.llm_access_level in ["full", "limited"]
+}
+
+llm_context_valid if {
+    context := input.context
+    
+    # Prompt context available
+    context.prompt_context.available == true
+    
+    # Model capabilities match
+    context.model_context.capabilities[_] in ["text_generation", "completion"]
+    
+    # Performance acceptable
+    context.model_context.performance.score > 0.8
+}
+
+prompt_safety_validated if {
+    prompt := input.context.prompt
+    
+    # Length check
+    prompt.length < 4000
+    
+    # No sensitive data
+    not contains_pii(prompt.content)
+    
+    # Follows safety guidelines
+    follows_safety_guidelines(prompt.content)
+}
+
+contains_pii(text) if {
+    pii_patterns := ["ssn", "credit card", "password", "api key"]
+    lower_text := lower(text)
+    some pattern in pii_patterns
+    contains(lower_text, pattern)
+}
+
+follows_safety_guidelines(text) if {
+    prohibited := ["harmful", "dangerous", "illegal", "malicious"]
+    lower_text := lower(text)
+    every term in prohibited {
+        not contains(lower_text, term)
+    }
+}
+```
+
+### Pattern 3: RAG System Authorization
+
+```rego
+package controlcore.policy.rag
+
+import rego.v1
+
+default allow := false
+
+# Allow RAG system access
+allow if {
+    user_authorized_for_rag
+    query_safe
+    retrieval_context_valid
+}
+
+user_authorized_for_rag if {
+    input.user.roles[_] in ["researcher", "analyst", "developer"]
+    input.user.attributes.rag_access == true
+}
+
+query_safe if {
+    query := input.context.query
+    
+    # Query not malicious
+    not injection_attempt(query)
+    
+    # Query scope appropriate
+    query_scope_valid(query)
+}
+
+injection_attempt(query) if {
+    injection_patterns := ["'; DROP TABLE", "OR 1=1", "../", "<script>"]
+    some pattern in injection_patterns
+    contains(query, pattern)
+}
+
+query_scope_valid(query) if {
+    # User can only query their department's data
+    query_scope := input.context.query_scope
+    query_scope.department == input.user.department
+}
+
+query_scope_valid(query) if {
+    # Admins can query all data
+    input.user.roles[_] == "admin"
+}
+
+retrieval_context_valid if {
+    context := input.context.retrieval
+    
+    # Source documents accessible
+    every doc_id in context.source_documents {
+        user_can_access_document(doc_id)
+    }
+    
+    # Retrieval count reasonable
+    count(context.source_documents) <= 10
+}
+
+user_can_access_document(doc_id) if {
+    doc := data.documents[doc_id]
+    doc.owner == input.user.id
+}
+
+user_can_access_document(doc_id) if {
+    doc := data.documents[doc_id]
+    doc.classification == "public"
+}
+```
+
+### Pattern 4: Content Injection Rules
+
+```rego
+package controlcore.policy.content
+
+import rego.v1
+
+# Pre-prompt content injection
+pre_prompt_injection := {
+    "type": "context_enrichment",
+    "content": enriched_context
+} if {
+    input.context.injection_enabled == true
+}
+
+enriched_context := concat("\n", [
+    sprintf("User: %s", [input.user.email]),
+    sprintf("Department: %s", [input.user.department]),
+    sprintf("Clearance Level: %d", [input.user.attributes.clearance_level]),
+    "Guidelines: Follow company security policies",
+    "Restrictions: Do not share sensitive information"
+])
+
+# Post-response filtering
+filtered_response := response if {
+    response := mask_sensitive_data(input.response)
+}
+
+mask_sensitive_data(response) := masked if {
+    # Replace sensitive patterns
+    masked := replace(response, ssn_pattern, "***-**-****")
+}
+
+ssn_pattern := `\d{3}-\d{2}-\d{4}`
+```
+
+## Built-in Functions
+
+### String Functions
+
+```rego
+# Concatenation
+result := concat("-", ["hello", "world"])  # "hello-world"
+
+# Formatting
+message := sprintf("User %s has role %s", [user, role])
+
+# Case conversion
+lower_text := lower("HELLO")  # "hello"
+upper_text := upper("hello")  # "HELLO"
+
+# String operations
+contains("hello world", "world")      # true
+startswith("hello", "hel")            # true
+endswith("world", "ld")               # true
+trim("  hello  ", " ")                # "hello"
+replace("hello", "l", "r")            # "herro"
+```
+
+### Array Functions
+
+```rego
+# Count
+count([1, 2, 3])  # 3
+
+# Concatenation
+concat_array := array.concat([1, 2], [3, 4])  # [1, 2, 3, 4]
+
+# Slice
+array.slice([1, 2, 3, 4], 1, 3)  # [2, 3]
+```
+
+### Set Functions
+
+```rego
+# Union
+{"a", "b"} | {"b", "c"}  # {"a", "b", "c"}
+
+# Intersection
+{"a", "b"} & {"b", "c"}  # {"b"}
+
+# Difference
+{"a", "b"} - {"b", "c"}  # {"a"}
+```
+
+### Aggregation Functions
+
+```rego
+# Sum
+sum([1, 2, 3, 4])  # 10
+
+# Product
+product([2, 3, 4])  # 24
+
+# Max/Min
+max([1, 5, 3])  # 5
+min([1, 5, 3])  # 1
+
+# Count
+count([1, 2, 3])  # 3
+```
+
+### Type Functions
+
+```rego
+# Type checking
+is_string("hello")     # true
+is_number(42)          # true
+is_boolean(true)       # true
+is_array([1, 2])       # true
+is_object({"a": 1})    # true
+is_set({1, 2})         # true
+is_null(null)          # true
+```
+
+### Time Functions
+
+```rego
+# Current time (nanoseconds since epoch)
+now := time.now_ns()
+
+# Parse time
+parsed := time.parse_rfc3339_ns("2025-01-25T10:30:00Z")
+
+# Clock components [hour, minute, second]
+[hour, minute, second] := time.clock([now])
+
+# Date components [year, month, day]
+[year, month, day] := time.date([now])
+
+# Day of week (0=Sunday, 6=Saturday)
+weekday := time.weekday([now])
+```
+
+### JSON Functions
+
+```rego
+# Parse JSON string
+data := json.unmarshal('{"name": "John", "age": 30}')
+
+# Marshal to JSON
+json_str := json.marshal({"name": "John"})
+```
+
+### Encoding Functions
+
+```rego
+# Base64
+encoded := base64.encode("hello")
+decoded := base64.decode("aGVsbG8=")
+
+# URL encoding
+url_encoded := urlquery.encode("hello world")
+url_decoded := urlquery.decode("hello+world")
+```
+
+### Crypto Functions
+
+```rego
+# MD5
+md5_hash := crypto.md5("hello")
+
+# SHA family
+sha1_hash := crypto.sha1("hello")
+sha256_hash := crypto.sha256("hello")
+```
+
+### Regex Functions
+
+```rego
+# Match
+regex.match("^[a-z]+$", "hello")  # true
+
+# Find all matches
+matches := regex.find_n("[0-9]+", "abc123def456", -1)  # ["123", "456"]
+
+# Replace
+result := regex.replace("hello", "l+", "L")  # "heLo"
+```
+
+## Testing Policies
+
+### Unit Testing
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Policy under test
+default allow := false
+
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+# Test cases
+test_admin_allowed if {
+    allow with input as {
+        "user": {"roles": ["admin"]},
+        "resource": {"type": "api"},
+        "action": {"name": "read"}
+    }
+}
+
+test_developer_denied if {
+    not allow with input as {
+        "user": {"roles": ["developer"]},
+        "resource": {"type": "api"},
+        "action": {"name": "read"}
+    }
+}
+
+test_no_role_denied if {
+    not allow with input as {
+        "user": {"roles": []},
+        "resource": {"type": "api"},
+        "action": {"name": "read"}
+    }
+}
+```
+
+### Testing with Mock Data
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Mock data
+mock_users := {
+    "user-1": {"id": "user-1", "roles": ["admin"]},
+    "user-2": {"id": "user-2", "roles": ["developer"]},
+}
+
+test_with_mock_data if {
+    allow with input as {
+        "user": {"id": "user-1"},
+        "resource": {"type": "api"},
+        "action": {"name": "write"}
+    }
+    with data.users as mock_users
+}
+```
+
+## Best Practices
+
+### 1. Always Default Deny
+
+```rego
+# Good: Explicit default deny
+default allow := false
+
+allow if {
+    # conditions
+}
+
+# Bad: No default (implicit undefined)
+allow if {
+    # conditions
+}
+```
+
+### 2. Use Helper Functions
+
+```rego
+# Good: Reusable helper functions
+is_admin if {
+    input.user.roles[_] == "admin"
+}
+
+is_resource_owner if {
+    input.resource.owner == input.user.id
+}
+
+allow if {
+    is_admin
+}
+
+allow if {
+    is_resource_owner
+}
+
+# Bad: Duplicate logic
+allow if {
+    input.user.roles[_] == "admin"
+}
+
+allow if {
+    input.user.roles[_] == "admin"
+    input.resource.type == "api"
+}
+```
+
+### 3. Document Your Policies
+
+```rego
+package controlcore.policy
+
+import rego.v1
+
+# Policy: API Access Control
+# Owner: Security Team
+# Last Updated: 2025-01-25
+#
+# This policy controls access to production APIs based on:
+# - User roles and permissions
+# - Resource sensitivity levels
+# - Time-based restrictions
+# - MFA requirements for sensitive operations
+#
+# Related Documentation: https://wiki.company.com/api-security
+
+default allow := false
+
+# Allow admin users full access
+# Admins are defined in the identity provider
+allow if {
+    input.user.roles[_] == "admin"
+}
+```
+
+### 4. Keep Policies Simple
+
+```rego
+# Good: Simple and clear
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name == "read"
+}
+
+# Bad: Overly complex
+allow if {
+    count([r | r := input.user.roles[_]; r in ["developer", "engineer", "coder"]]) > 0
+    [a | a := ["read", "get", "list"]][_] == input.action.name
+}
+```
+
+### 5. Use Type Checking
+
+```rego
+# Good: Check types
+allow if {
+    is_string(input.user.id)
+    is_array(input.user.roles)
+    count(input.user.roles) > 0
+    input.user.roles[_] == "admin"
+}
+
+# Bad: Assume types
+allow if {
+    input.user.roles[_] == "admin"  # Could fail if roles is not an array
+}
+```
+
+## Performance Optimization
+
+### 1. Use Early Returns
+
+```rego
+# Good: Check cheap conditions first
+allow if {
+    input.action.name == "read"  # Quick check
+    input.user.roles[_] == "developer"  # Quick check
+    expensive_database_lookup  # Expensive check last
+}
+
+# Bad: Expensive check first
+allow if {
+    expensive_database_lookup  # Slow
+    input.action.name == "read"  # Fast but checked last
+}
+```
+
+### 2. Cache-Friendly Policies
+
+```rego
+# Good: Deterministic (cacheable)
+allow if {
+    input.user.roles[_] == "admin"
+    input.resource.type == "api"
+}
+
+# Bad: Non-deterministic (not cacheable)
+allow if {
+    time.now_ns() < input.session.expiry  # Changes every nanosecond!
+}
+
+# Better: Use reasonable granularity
+allow if {
+    current_hour := time.clock([time.now_ns()])[0]
+    current_hour < 17  # Changes hourly, more cacheable
+}
+```
+
+### 3. Avoid Expensive Operations
+
+```rego
+# Good: Simple operations
+allow if {
+    input.user.department == "Engineering"
+}
+
+# Bad: Complex iteration
+allow if {
+    count([u | u := data.users[_]; u.department == "Engineering"]) > 100
+}
+```
+
+## Regulatory Compliance Patterns
+
+### FINTRAC Compliance (Canada)
+
+**Large Cash Transaction Reporting (LCTR)**:
+```rego
+package fintrac.lctr
+
+import rego.v1
+
+default allow := false
+default requires_lctr := false
+
+# FINTRAC: Large Cash Transaction Report required for CAD $10,000+
+requires_lctr if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "CAD"
+    input.transaction.type in ["cash", "cash_equivalent"]
+}
+
+# Allow with LCTR requirement
+allow if {
+    # User must be FINTRAC-trained
+    input.user.attributes.fintrac_certified == true
+    input.user.roles[_] in ["teller", "financial-advisor", "compliance-officer"]
+    
+    # Required transaction details present
+    input.transaction.customer_id != null
+    input.transaction.conductor_id != null
+    input.transaction.purpose != null
+    input.transaction.source_of_funds != null
+    
+    # Create LCTR if required
+    requires_lctr
+}
+
+# Suspicious Transaction Report (STR) Detection
+str_indicators[reason] if {
+    # Structuring: Multiple transactions just under reporting threshold
+    recent_txns := data.transactions_last_30_days[input.transaction.customer_id]
+    near_threshold := [t | t := recent_txns[_]; t.amount >= 9000; t.amount < 10000]
+    count(near_threshold) >= 3
+    reason := "possible_structuring"
+}
+
+str_indicators[reason] if {
+    # Unusual pattern: Amount significantly higher than normal
+    customer := data.customers[input.transaction.customer_id]
+    input.transaction.amount > (customer.average_transaction * 10)
+    reason := "unusual_amount"
+}
+
+str_indicators[reason] if {
+    # Rapid movement of funds
+    input.transaction.type == "wire_transfer"
+    input.transaction.received_within_hours < 24
+    input.transaction.immediate_withdrawal == true
+    reason := "rapid_movement_of_funds"
+}
+
+# Block suspicious transactions for compliance review
+allow if {
+    count(str_indicators) == 0
+    input.user.attributes.aml_cleared == true
+}
+
+# Compliance officer can process flagged transactions
+allow if {
+    count(str_indicators) > 0
+    input.user.roles[_] == "compliance-officer"
+    input.transaction.compliance_review_completed == true
+}
+```
+
+**Third Party Determination**:
+```rego
+package fintrac.third_party
+
+import rego.v1
+
+# FINTRAC: Identify if conducting on behalf of third party
+third_party_determination_required if {
+    input.transaction.amount >= 10000
+    input.transaction.customer_id != input.transaction.conductor_id
+}
+
+allow if {
+    third_party_determination_required
+    
+    # Third party information collected
+    input.transaction.third_party.name != null
+    input.transaction.third_party.address != null
+    input.transaction.third_party.relationship != null
+    
+    # User verified third party information
+    input.user.roles[_] in ["teller", "compliance-officer"]
+}
+```
+
+### OSFI Guidelines (Canada)
+
+**Guideline B-10: Outsourcing of Business Activities**:
+```rego
+package osfi.outsourcing
+
+import rego.v1
+
+default allow := false
+
+# OSFI B-10: Third-party access requires controls
+allow if {
+    input.user.type == "third_party_vendor"
+    
+    # Vendor must be approved
+    vendor := data.approved_vendors[input.user.vendor_id]
+    vendor.approval_status == "active"
+    vendor.due_diligence_completed == true
+    
+    # Access limited to contracted services only
+    input.resource.type in vendor.contracted_services
+    
+    # Monitoring and audit enabled
+    input.context.audit_enabled == true
+    input.context.vendor_activity_logged == true
+}
+
+# OSFI: Segregation of Duties
+allow if {
+    not has_conflicting_duties(input.user.roles)
+    duty_appropriate_for_action(input.user.roles, input.action.name)
+}
+
+has_conflicting_duties(roles) if {
+    "maker" in roles
+    "checker" in roles
+}
+
+has_conflicting_duties(roles) if {
+    "initiator" in roles
+    "approver" in roles
+}
+```
+
+**Guideline E-21: Technology and Cyber Security**:
+```rego
+package osfi.cyber_security
+
+import rego.v1
+
+default allow := false
+
+# OSFI E-21: Multi-Factor Authentication for sensitive operations
+allow if {
+    input.resource.attributes.sensitivity in ["confidential", "restricted"]
+    
+    # MFA required
+    input.user.attributes.mfa_verified == true
+    input.context.mfa_timestamp_age_seconds < 300  # MFA within last 5 minutes
+    
+    # Access from approved location
+    input.context.ip_address in data.approved_ip_ranges
+}
+
+# OSFI E-21: Privileged Access Management
+allow if {
+    input.user.type == "privileged_user"
+    
+    # Privileged sessions must be recorded
+    input.context.session_recording_enabled == true
+    
+    # Just-in-time access (time-limited)
+    session_timestamp := time.parse_rfc3339_ns(input.context.session_start)
+    session_age_seconds := (time.now_ns() - session_timestamp) / 1000000000
+    session_age_seconds < 3600  # 1 hour max
+    
+    # Approval required
+    input.context.privileged_access_approved == true
+}
+```
+
+### AML Regulations (US & Canada)
+
+**Transaction Monitoring**:
+```rego
+package aml.monitoring
+
+import rego.v1
+
+default allow := false
+
+# AML: Currency Transaction Report (CTR) for USD $10,000+
+requires_ctr if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "USD"
+}
+
+# AML: Suspicious Activity Report (SAR) triggers
+sar_triggers[trigger] if {
+    # Trigger 1: Transactions with no apparent business purpose
+    input.transaction.business_purpose == "unknown"
+    input.transaction.amount >= 5000
+    trigger := "no_business_purpose"
+}
+
+sar_triggers[trigger] if {
+    # Trigger 2: Customer refuses to provide information
+    customer := data.customers[input.transaction.customer_id]
+    customer.info_refusal_count > 0
+    trigger := "customer_refused_information"
+}
+
+sar_triggers[trigger] if {
+    # Trigger 3: Funds transfers to high-risk jurisdictions
+    input.transaction.type == "wire_transfer"
+    input.transaction.destination_country in data.high_risk_countries
+    trigger := "high_risk_jurisdiction"
+}
+
+# Allow with SAR filing requirement
+allow if {
+    count(sar_triggers) > 0
+    input.user.roles[_] == "compliance-officer"
+    input.transaction.sar_filed == true
+}
+
+allow if {
+    count(sar_triggers) == 0
+    requires_ctr
+    input.transaction.ctr_filed == true
+}
+```
+
+**Customer Due Diligence (CDD)**:
+```rego
+package aml.cdd
+
+import rego.v1
+
+default allow := false
+
+# AML: Customer Due Diligence requirements
+allow if {
+    customer := data.customers[input.resource.attributes.customer_id]
+    
+    # Standard CDD (all customers)
+    customer.identity_verified == true
+    customer.name != null
+    customer.address != null
+    customer.date_of_birth != null
+    customer.identification_number != null
+    
+    # Beneficial ownership (for entities)
+    beneficial_ownership_satisfied(customer)
+    
+    # Risk assessment completed
+    customer.risk_assessment_date != null
+    risk_assessment_current(customer.risk_assessment_date)
+}
+
+beneficial_ownership_satisfied(customer) if {
+    customer.type == "individual"
+}
+
+beneficial_ownership_satisfied(customer) if {
+    customer.type == "entity"
+    count(customer.beneficial_owners) > 0
+    every owner in customer.beneficial_owners {
+        owner.ownership_percentage >= 25
+        owner.identity_verified == true
+    }
+}
+
+risk_assessment_current(assessment_date) if {
+    days_since := (time.now_ns() - time.parse_rfc3339_ns(assessment_date)) / (24 * 60 * 60 * 1000000000)
+    days_since < 365  # Annual review required
+}
+```
+
+**Office of Foreign Assets Control (OFAC) Screening**:
+```rego
+package aml.ofac
+
+import rego.v1
+
+default allow := false
+
+# OFAC: Sanctions screening required
+allow if {
+    customer := data.customers[input.transaction.customer_id]
+    
+    # Not on OFAC SDN (Specially Designated Nationals) list
+    not customer.id in data.ofac_sdn_list
+    not customer.name in data.ofac_sdn_names
+    
+    # Not transacting with sanctioned countries
+    not input.transaction.destination_country in data.ofac_sanctioned_countries
+    not input.transaction.origination_country in data.ofac_sanctioned_countries
+    
+    # Screening completed recently
+    screening_age := (time.now_ns() - time.parse_rfc3339_ns(customer.last_ofac_screening)) / (24 * 60 * 60 * 1000000000)
+    screening_age < 1  # Daily screening
+}
+
+# OFAC: 50% Rule (entities owned by sanctioned persons)
+allow if {
+    entity := data.entities[input.transaction.entity_id]
+    
+    # Check all owners
+    sanctioned_ownership := sum([owner.ownership_percentage |
+        owner := entity.owners[_]
+        owner.id in data.ofac_sdn_list
+    ])
+    
+    # Total sanctioned ownership must be < 50%
+    sanctioned_ownership < 50
+}
+```
+
+### FinCEN Regulations (US)
+
+**Bank Secrecy Act (BSA) Compliance**:
+```rego
+package fincen.bsa
+
+import rego.v1
+
+default allow := false
+
+# BSA: Currency Transaction Report (CTR) for $10,000+
+requires_ctr if {
+    input.transaction.amount >= 10000
+    input.transaction.currency == "USD"
+    input.transaction.type in ["cash", "deposit", "withdrawal"]
+}
+
+# BSA: Suspicious Activity Report (SAR)
+requires_sar if {
+    count(suspicious_indicators) >= 2
+}
+
+suspicious_indicators[indicator] if {
+    # Multiple transactions just under $10,000
+    recent := data.transactions_last_7_days[input.transaction.customer_id]
+    count([t | t := recent[_]; t.amount >= 9000; t.amount < 10000]) >= 2
+    indicator := "structuring"
+}
+
+suspicious_indicators[indicator] if {
+    # Unusual transaction for customer profile
+    customer := data.customers[input.transaction.customer_id]
+    input.transaction.amount > (customer.average_monthly_transactions * 5)
+    indicator := "unusual_activity"
+}
+
+suspicious_indicators[indicator] if {
+    # Transactions with known high-risk indicators
+    input.transaction.destination_country in data.high_risk_jurisdictions
+    input.transaction.amount >= 5000
+    indicator := "high_risk_jurisdiction"
+}
+
+allow if {
+    requires_ctr
+    input.transaction.ctr_filed == true
+    input.user.roles[_] in ["teller", "compliance-officer"]
+}
+
+allow if {
+    requires_sar
+    input.transaction.sar_filed == true
+    input.user.roles[_] == "compliance-officer"
+    input.transaction.senior_management_notified == true
+}
+```
+
+**Customer Identification Program (CIP)**:
+```rego
+package fincen.cip
+
+import rego.v1
+
+default allow := false
+
+# FinCEN: CIP requirements for account opening
+allow if {
+    input.action.name == "open_account"
+    customer := input.request.customer_info
+    
+    # Four key pieces of information required
+    customer.name != null
+    customer.date_of_birth != null
+    customer.address != null
+    customer.identification_number != null  # SSN or ITIN
+    
+    # Identification document verified
+    customer.id_verification.method in ["documentary", "non_documentary"]
+    customer.id_verification.status == "verified"
+    
+    # User authorized to open accounts
+    input.user.roles[_] in ["account-officer", "branch-manager"]
+}
+```
+
+### GDPR Compliance (EU)
+
+**Right to Access (Article 15)**:
+```rego
+package gdpr.access
+
+import rego.v1
+
+default allow := false
+
+# GDPR: Data subject has right to access their personal data
+allow if {
+    input.action.name == "read"
+    input.resource.type == "personal_data"
+    
+    # User accessing their own data
+    input.resource.attributes.data_subject_id == input.user.id
+}
+
+# Allow data protection officer to access for compliance
+allow if {
+    input.user.roles[_] == "data-protection-officer"
+    input.context.purpose == "compliance_review"
+    input.context.audit_enabled == true
+}
+```
+
+**Right to Erasure (Article 17)**:
+```rego
+package gdpr.erasure
+
+import rego.v1
+
+default allow := false
+
+# GDPR: Right to be forgotten
+allow if {
+    input.action.name == "delete"
+    input.resource.type == "personal_data"
+    
+    # Verify erasure request
+    erasure_request := data.erasure_requests[input.resource.attributes.data_subject_id]
+    erasure_request.status == "approved"
+    erasure_request.legal_grounds_verified == true
+    
+    # Only DPO can execute erasure
+    input.user.roles[_] == "data-protection-officer"
+    
+    # No legal obligation to retain
+    not legal_retention_required(input.resource)
+}
+
+legal_retention_required(resource) if {
+    # Financial records must be kept for 7 years
+    resource.attributes.type == "financial_record"
+    record_age_days := (time.now_ns() - time.parse_rfc3339_ns(resource.attributes.created_at)) / (24 * 60 * 60 * 1000000000)
+    record_age_days < 2555  # 7 years
+}
+```
+
+**Data Processing Purpose Limitation (Article 5)**:
+```rego
+package gdpr.purpose_limitation
+
+import rego.v1
+
+default allow := false
+
+# GDPR: Data can only be used for specified, explicit purposes
+allow if {
+    consent := data.user_consents[input.resource.attributes.data_subject_id]
+    
+    # Purpose matches consent
+    input.context.processing_purpose in consent.approved_purposes
+    
+    # Consent is still valid
+    consent.status == "active"
+    consent.withdrawal_date == null
+}
+```
+
+### HIPAA Compliance (US Healthcare)
+
+**Minimum Necessary Rule**:
+```rego
+package hipaa.minimum_necessary
+
+import rego.v1
+
+default allow := false
+
+# HIPAA: Access only minimum necessary PHI
+allow if {
+    input.user.roles[_] in ["physician", "nurse", "healthcare-provider"]
+    
+    # User is part of patient's care team
+    patient_id := input.resource.attributes.patient_id
+    care_team := data.patient_care_teams[patient_id]
+    input.user.id in care_team.members
+    
+    # Purpose of use is valid
+    input.context.purpose_of_use in ["treatment", "payment", "healthcare-operations"]
+    
+    # Access limited to necessary fields only
+    requested_fields := input.query.fields
+    every field in requested_fields {
+        field in necessary_fields_for_purpose[input.context.purpose_of_use]
+    }
+}
+
+necessary_fields_for_purpose := {
+    "treatment": ["patient_id", "diagnosis", "medications", "allergies", "vital_signs"],
+    "payment": ["patient_id", "insurance_info", "billing_codes", "charges"],
+    "healthcare-operations": ["patient_id", "encounter_date", "provider_id"]
+}
+```
+
+**Break-the-Glass Emergency Access**:
+```rego
+package hipaa.emergency_access
+
+import rego.v1
+
+default allow := false
+
+# HIPAA: Emergency access with logging
+allow if {
+    input.context.emergency == true
+    input.user.roles[_] in ["physician", "emergency-physician", "nurse"]
+    
+    # Emergency access logged
+    input.context.audit_enabled == true
+    input.context.emergency_justification != null
+    
+    # Access reviewed post-emergency
+    schedule_emergency_access_review(input.user.id, input.resource.id)
+}
+
+schedule_emergency_access_review(user_id, resource_id) if {
+    # Creates audit record for review
+    true
+}
+```
+
+### PCI-DSS Compliance
+
+**Cardholder Data Access Control**:
+```rego
+package pci.cardholder_data
+
+import rego.v1
+
+default allow := false
+
+# PCI-DSS Requirement 7: Restrict access to cardholder data
+allow if {
+    input.resource.attributes.contains_cardholder_data == true
+    
+    # User has business need to know
+    input.user.attributes.pci_access_justification != null
+    input.user.roles[_] in data.pci_authorized_roles
+    
+    # Access from secured network only
+    input.context.network_segment == "cardholder_data_environment"
+    
+    # Strong authentication
+    input.user.attributes.mfa_verified == true
+    
+    # Automatic logout after 15 minutes
+    session_age := (time.now_ns() - time.parse_rfc3339_ns(input.context.session_start)) / 1000000000
+    session_age < 900
+}
+
+# PCI-DSS Requirement 8: Unique ID for each user
+allow if {
+    # Ensure unique user identification
+    input.user.id != null
+    input.user.id != "shared"
+    input.user.id != "generic"
+    
+    # No shared accounts
+    not is_shared_account(input.user.id)
+}
+
+is_shared_account(user_id) if {
+    user_id in ["admin", "root", "service", "shared"]
+}
+```
+
+### SOC 2 Compliance
+
+**Access Control (CC6.1, CC6.2)**:
+```rego
+package soc2.access_control
+
+import rego.v1
+
+default allow := false
+
+# SOC 2 CC6.1: Logical access requires authentication
+allow if {
+    # User must be authenticated
+    input.user.authenticated == true
+    input.user.authentication_method in ["saml", "oauth", "mfa"]
+    
+    # Session must be valid
+    session_valid(input.context.session_id)
+    
+    # Authorization based on role
+    input.user.roles[_] in authorized_roles_for_resource[input.resource.type]
+}
+
+session_valid(session_id) if {
+    session := data.active_sessions[session_id]
+    session.status == "active"
+    
+    # Session not expired
+    expiry := time.parse_rfc3339_ns(session.expiry)
+    time.now_ns() < expiry
+}
+
+# SOC 2 CC6.2: Prior to issuing credentials, registry approved
+allow if {
+    input.action.name == "create_user_account"
+    
+    # Approval workflow completed
+    request := input.request.account_request
+    request.manager_approval == true
+    request.security_approval == true
+    
+    # User provisioning follows principle of least privilege
+    every role in request.requested_roles {
+        role in data.approved_roles
+    }
+}
+```
+
+**Change Management (CC8.1)**:
+```rego
+package soc2.change_management
+
+import rego.v1
+
+default allow := false
+
+# SOC 2 CC8.1: Changes to policies require approval
+allow if {
+    input.action.name in ["create_policy", "update_policy", "delete_policy"]
+    
+    # Change request submitted
+    change_request := input.context.change_request
+    change_request.id != null
+    
+    # Approvals obtained
+    change_request.technical_approval == true
+    change_request.business_approval == true
+    
+    # Testing completed
+    change_request.testing_status == "passed"
+    
+    # User authorized to deploy
+    input.user.roles[_] in ["policy-admin", "devops-engineer"]
+}
+```
+
+## External Resources
+
+### Official Documentation
+
+- **Open Policy Agent**: https://www.openpolicyagent.org/docs/latest/
+- **Rego Language Reference**: https://www.openpolicyagent.org/docs/latest/policy-language/
+- **OPA Playground**: https://play.openpolicyagent.org/
+- **Built-in Functions**: https://www.openpolicyagent.org/docs/latest/policy-reference/
+
+### Tutorials and Learning
+
+- **Rego Tutorial**: https://www.openpolicyagent.org/docs/latest/policy-language/
+- **Policy Testing**: https://www.openpolicyagent.org/docs/latest/policy-testing/
+- **Best Practices**: https://www.openpolicyagent.org/docs/latest/policy-performance/
+
+### Community Resources
+
+- **OPA Slack**: https://slack.openpolicyagent.org/
+- **GitHub**: https://github.com/open-policy-agent/opa
+- **Stack Overflow**: Tagged with `open-policy-agent` or `rego`
+
+### Style Guides
+
+- **Rego Style Guide**: https://www.styra.com/rego-style-guide/
+- **Policy Best Practices**: https://www.styra.com/blog/rego-unit-testing-and-policies/
+
+## Control Core Specific Resources
+
+- **[User Guide](/guides/user-guide)**: Learn to create and manage policies
+- **[Policy Templates](/guides/policy-templates)**: Pre-built policy examples
+- **[PBAC Best Practices](/guides/pbac-best-practices)**: Advanced patterns
+- **[PIP Developer Guide](/guides/pip-developer-guide)**: Use external data in policies
+- **[API Reference](/guides/api-reference)**: Policy API documentation
+
+## Quick Reference
+
+### Common Patterns Cheat Sheet
+
+```rego
+# Basic access control
+default allow := false
+allow if { input.user.roles[_] == "admin" }
+
+# Multiple conditions (AND)
+allow if {
+    input.user.roles[_] == "developer"
+    input.action.name == "read"
+}
+
+# Alternative conditions (OR)
+allow if { input.user.roles[_] == "admin" }
+allow if { input.user.roles[_] == "manager" }
+
+# Set membership
+allow if { input.user.roles[_] in ["admin", "manager"] }
+
+# Negation
+allow if { not user_suspended }
+
+# Iteration
+user_ids := [user.id | user := data.users[_]]
+
+# Helper function
+is_admin if { input.user.roles[_] == "admin" }
+
+# Time-based
+is_business_hours if {
+    hour := time.clock([time.now_ns()])[0]
+    hour >= 9; hour < 17
+}
+
+# Resource ownership
+allow if { input.resource.owner == input.user.id }
+
+# Data filtering
+visible_rows[row] if {
+    some row in input.query.result
+    row.owner == input.user.id
+}
+```
+
+---
+
+**You're now equipped to write powerful, secure, and efficient Rego policies!** Start with simple patterns and gradually incorporate more advanced techniques as needed.
+
+For hands-on practice, use the [OPA Playground](https://play.openpolicyagent.org/) or the Control Core policy editor with live testing.
