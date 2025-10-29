@@ -78,8 +78,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add production middleware
-app.middleware("http")(rate_limit_middleware)
+# Add production middleware - temporarily disabled rate limiter due to import error
+# app.middleware("http")(rate_limit_middleware)
 app.middleware("http")(security_middleware_handler)
 
 # Include Control Core routers

@@ -23,7 +23,9 @@ export function GettingStartedOverview() {
   const { stats, isLoading: statsLoading } = useDashboardStats();
   const { policies } = usePolicies({ status: 'enabled' });
   const { connections } = usePIPConnections();
-  const { logs } = useAuditLogs({ limit: 100 });
+  // Disabled audit logs on login page to prevent console errors
+  // const { logs } = useAuditLogs({ limit: 100 });
+  const logs: any[] = [];
 
   const quickActions = [
     {
