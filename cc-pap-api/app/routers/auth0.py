@@ -410,7 +410,7 @@ async def authenticate_with_passkey(
         from app.routers.auth import create_access_token
         from datetime import timedelta
         
-        access_token = create_access_token(
+        access_token, jti, expire = create_access_token(
             data={"sub": user.username},
             expires_delta=timedelta(minutes=30)
         )

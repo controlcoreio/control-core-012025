@@ -386,7 +386,6 @@ export function SelfHostedDownloadStep({ onComplete, onNext, defaultTab = "contr
           <UnifiedBouncerDownload 
             showControlPlaneSection={false}
             environment="sandbox"
-            onDownloadComplete={onNext}
           />
         </TabsContent>
 

@@ -1,0 +1,82 @@
+═══════════════════════════════════════════════════════════════════
+  SIGNUP SERVICE - CHANGES NOT SHOWING? IT'S YOUR BROWSER CACHE!
+═══════════════════════════════════════════════════════════════════
+
+✅ SERVICE IS RUNNING: http://localhost:8002
+✅ BUILD IS UPDATED: All changes are in the latest build
+❌ BROWSER IS CACHING: Old JavaScript files are cached
+
+═══════════════════════════════════════════════════════════════════
+  SOLUTION 1: HARD REFRESH (Try this first - 5 seconds)
+═══════════════════════════════════════════════════════════════════
+
+Mac:      Cmd + Shift + R
+Windows:  Ctrl + Shift + R
+
+This forces the browser to reload ALL files, bypassing cache.
+
+═══════════════════════════════════════════════════════════════════
+  SOLUTION 2: INCOGNITO MODE (If hard refresh doesn't work)
+═══════════════════════════════════════════════════════════════════
+
+Chrome:   Cmd + Shift + N (Mac) or Ctrl + Shift + N (Windows)
+Firefox:  Cmd + Shift + P (Mac) or Ctrl + Shift + P (Windows)
+Safari:   Cmd + Shift + N
+
+Then go to: http://localhost:8002
+
+═══════════════════════════════════════════════════════════════════
+  SOLUTION 3: CLEAR CACHE (If incognito doesn't work)
+═══════════════════════════════════════════════════════════════════
+
+Chrome:
+1. Open DevTools (F12)
+2. Right-click refresh button
+3. Select "Empty Cache and Hard Reload"
+
+Firefox:
+1. Cmd+Shift+Delete (Mac) or Ctrl+Shift+Delete (Windows)
+2. Select "Cache"
+3. Click "Clear Now"
+
+═══════════════════════════════════════════════════════════════════
+  WHAT YOU SHOULD SEE AFTER CLEARING CACHE
+═══════════════════════════════════════════════════════════════════
+
+✅ Signup Form:
+   - Full Name
+   - Job Title ← NEW! (not "Email")
+   - Company Name
+   - Business Email (will be verified) ← UPDATED!
+
+✅ Downloads Page (if accessible):
+   - 3 bouncer cards (not 5)
+   - Sidecar Bouncer with green "Recommended" badge
+   - MCP Bouncer (AI Agents) with blue "New" badge
+   - Info (?) buttons on each card
+   - Version dropdown shows "v042025 (Latest Stable)" ONLY
+   - Deployment Guide and Troubleshooting links at top
+
+═══════════════════════════════════════════════════════════════════
+  STILL NOT WORKING? RUN THIS COMMAND:
+═══════════════════════════════════════════════════════════════════
+
+cd /Users/rakeshraghu/Code\ Projects/Control_Core/control-core-012025/cc-signup-service
+./check-changes.sh
+
+This will verify the service and build are correct.
+
+═══════════════════════════════════════════════════════════════════
+  PRO TIP: ALWAYS USE INCOGNITO FOR TESTING FRONTEND CHANGES
+═══════════════════════════════════════════════════════════════════
+
+When developing:
+1. Make changes to code
+2. Rebuild: cd frontend && npm run build
+3. Open in NEW incognito window
+4. Test changes
+
+This completely avoids cache issues!
+
+═══════════════════════════════════════════════════════════════════
+

@@ -172,17 +172,29 @@ export function UnifiedPolicyBuilder({
         });
       }
       
-      setPolicyData({
+      // Extract effect from metadata
+      let templateEffect: 'allow' | 'deny' | 'mask' | 'log' = 'allow';
+      if (templateData.metadata?.effect) {
+        templateEffect = templateData.metadata.effect;
+      } else if (templateData.effect) {
+        templateEffect = templateData.effect;
+      }
+      
+      const newPolicyData = {
         name: templateData.name || '',
         description: templateData.description || '',
         resourceId: resourceId || '',
         bouncerId: '',
-        effect: 'allow',
+        effect: templateEffect,  // Use extracted effect instead of hardcoded
         conditions: templateConditions,
         regoCode: templateData.template_content || '',
-        status: 'draft',
-        folder: 'drafts'
-      });
+        status: 'draft' as const,
+        folder: 'drafts' as const
+      };
+      
+      console.log('[UnifiedPolicyBuilder] Setting policyData to:', newPolicyData);
+      console.log('[UnifiedPolicyBuilder] Template data was:', templateData);
+      setPolicyData(newPolicyData);
       
       toast({
         title: "Template Loaded",
@@ -310,7 +322,18 @@ export function UnifiedPolicyBuilder({
   useEffect(() => {
     const checkGitHubConnection = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/settings/github-config`);
+        // Get authentication token
+        const token = SecureStorage.getItem('access_token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json'
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/settings/github-config`, {
+          headers
+        });
         
         // Check if we got HTML instead of JSON (backend not running)
         const contentType = response.headers.get('content-type');
@@ -829,6 +852,7 @@ allow {
               <div className="flex-1 overflow-hidden min-h-0">
                 <TabsContent value="builder" className="h-full m-0">
                   <IntelligentPolicyBuilder
+                    key={`${policyData.name}-${policyData.description}`} // Force re-render when template data changes
                     policyData={policyData}
                     setPolicyData={setPolicyData}
                     onNext={() => setActiveTab('preview')}
@@ -837,6 +861,7 @@ allow {
 
                 <TabsContent value="code" className="h-full m-0">
                   <PolicyCodeEditor
+                    key={`${policyData.name}-${policyData.regoCode?.substring(0, 50)}`} // Force re-render when template content changes
                     policyData={policyData}
                     setPolicyData={setPolicyData}
                     onNext={() => setActiveTab('preview')}

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -106,6 +107,7 @@ export function IntelligentPolicyBuilder({
     pattern: ''
   });
   const [maskFieldInput, setMaskFieldInput] = useState('');
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { toast } = useToast();
 
   const steps = [
@@ -119,24 +121,21 @@ export function IntelligentPolicyBuilder({
 
   // Sync local state when policyData changes externally (e.g., template loading)
   useEffect(() => {
-    if (policyData.name && policyData.name !== policyName) {
-      setPolicyName(policyData.name);
+    console.log('[IntelligentPolicyBuilder] Syncing from policyData:', policyData);
+    // Sync all fields from policyData prop to local state
+    setPolicyName(policyData.name || '');
+    setPolicyDescription(policyData.description || '');
+    setEffect(policyData.effect || 'allow');
+    
+    // Auto-expand description field if template has long description
+    if (policyData.description && policyData.description.length > 50) {
+      setIsDescriptionExpanded(true);
     }
-    if (policyData.description && policyData.description !== policyDescription) {
-      setPolicyDescription(policyData.description);
-    }
-    if (policyData.effect && policyData.effect !== effect) {
-      setEffect(policyData.effect);
-    }
+    
     if (policyData.conditions && policyData.conditions.length > 0) {
-      // Only update if conditions array is different (avoid infinite loops)
-      const currentConditionsIds = conditions.map(c => c.id).join(',');
-      const newConditionsIds = policyData.conditions.map(c => c.id).join(',');
-      if (currentConditionsIds !== newConditionsIds) {
-        setConditions(policyData.conditions);
-      }
+      setConditions(policyData.conditions);
     }
-  }, [policyData.name, policyData.description, policyData.effect, policyData.conditions]);
+  }, [policyData]);  // Remove specific field dependencies, just watch policyData
 
   // Fetch available resources on mount
   useEffect(() => {
@@ -528,16 +527,52 @@ ${effect} {
                 <Label htmlFor="policy-description" className="text-sm font-medium block">
                   Description
                 </Label>
-                <Input
-                  id="policy-description"
-                  placeholder="e.g., Allows administrators to access all API endpoints"
-                  value={policyDescription}
-                  onChange={(e) => setPolicyDescription(e.target.value)}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground">
-                  What does this control do?
-                </p>
+                {!isDescriptionExpanded ? (
+                  <Input
+                    id="policy-description"
+                    placeholder="e.g., Allows administrators to access all API endpoints"
+                    value={policyDescription}
+                    onChange={(e) => setPolicyDescription(e.target.value)}
+                    onFocus={() => setIsDescriptionExpanded(true)}
+                    className="w-full cursor-pointer"
+                    readOnly
+                  />
+                ) : (
+                  <Textarea
+                    id="policy-description"
+                    placeholder="e.g., Allows administrators to access all API endpoints"
+                    value={policyDescription}
+                    onChange={(e) => setPolicyDescription(e.target.value)}
+                    onBlur={() => {
+                      // Only collapse if description is short enough for single line
+                      if (policyDescription.length <= 50 && !policyDescription.includes('\n')) {
+                        setIsDescriptionExpanded(false);
+                      }
+                    }}
+                    className="w-full min-h-[80px] resize-none"
+                    maxLength={1000}
+                    rows={3}
+                  />
+                )}
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-muted-foreground">
+                    What does this control do?
+                  </p>
+                  {isDescriptionExpanded && (
+                    <p className="text-xs text-muted-foreground">
+                      {policyDescription.length}/1000 characters
+                    </p>
+                  )}
+                </div>
+                {!isDescriptionExpanded && policyDescription.length > 50 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDescriptionExpanded(true)}
+                    className="text-xs text-primary hover:text-primary/80 underline"
+                  >
+                    Click to expand and edit full description
+                  </button>
+                )}
               </div>
             </div>
           </div>

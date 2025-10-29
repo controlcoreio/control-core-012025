@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, ChevronLeft, Shield, Users, Code, Bell } from "lucide-react";
 import { Link } from "react-router-dom";
+import { APP_CONFIG } from "@/config/app";
 
 export function IntegrationsPage() {
   return (
@@ -216,10 +217,10 @@ export function DevOpsIntegrationsTab() {
   useEffect(() => {
     const fetchGitHubStatus = async () => {
       try {
-        const response = await fetch('/api/settings/github-config');
+        const response = await fetch(`${APP_CONFIG.api.baseUrl}/settings/github-config`);
         if (response.ok) {
           const config = await response.json();
-          setGithubStatus(config.connectionStatus === 'connected' ? 'connected' : 'not-configured');
+          setGithubStatus(config.connection_status === 'connected' ? 'connected' : 'not-configured');
         }
       } catch (error) {
         console.error('Failed to fetch GitHub status:', error);

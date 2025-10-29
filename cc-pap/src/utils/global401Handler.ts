@@ -27,7 +27,7 @@ export function setupGlobal401Handler() {
       try {
         const data = await clone.json();
         
-        // Check if session was revoked
+        // Check if session was revoked by administrator
         if (data.detail && (
           data.detail.includes('revoked') || 
           data.detail.includes('Session has been revoked')
@@ -40,16 +40,37 @@ export function setupGlobal401Handler() {
           SecureStorage.removeItem('force_password_change');
           SecureStorage.removeItem('last_activity');
           
-          // Redirect to login with reason
+          // Redirect to login with funny message
           setTimeout(() => {
-            window.location.href = '/login?reason=session_revoked';
+            window.location.href = '/login?reason=session_revoked&message=Looks like we have lost Control here! Go back home now.';
           }, 100);
           
           return response;
         }
+        
+        // Check if JWT token has expired (not revoked)
+        if (data.detail && (
+          data.detail.includes('expired') || 
+          data.detail.includes('token') ||
+          data.detail.includes('credentials')
+        )) {
+          console.warn('[Session Management] JWT token expired - showing session warning');
+          
+          // Dispatch custom event to show session warning
+          window.dispatchEvent(new CustomEvent('session-expired', {
+            detail: { reason: 'token_expired' }
+          }));
+          
+          return response;
+        }
       } catch (e) {
-        // If JSON parsing fails, just return the response
-        console.error('Error parsing 401 response:', e);
+        // If JSON parsing fails, assume it's a token expiration
+        console.warn('[Session Management] 401 error - assuming token expiration');
+        
+        // Dispatch custom event to show session warning
+        window.dispatchEvent(new CustomEvent('session-expired', {
+          detail: { reason: 'token_expired' }
+        }));
       }
     }
     

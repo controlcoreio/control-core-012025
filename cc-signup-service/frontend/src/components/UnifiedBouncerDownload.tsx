@@ -88,9 +88,7 @@ const bouncerTypes = [
 ];
 
 const versions = [
-  { id: "v2.1.0", name: "v2.1.0 (Latest Stable)", stable: true },
-  { id: "v2.0.5", name: "v2.0.5 (Stable)", stable: true },
-  { id: "v2.2.0-beta", name: "v2.2.0 (Beta)", stable: false }
+  { id: "042025", name: "v042025 (Latest Stable)", stable: true }
 ];
 
 export function UnifiedBouncerDownload({ 
@@ -100,7 +98,7 @@ export function UnifiedBouncerDownload({
 }: UnifiedBouncerDownloadProps) {
   const [selectedBouncerType, setSelectedBouncerType] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<string>("");
-  const [selectedVersion, setSelectedVersion] = useState<string>("v2.1.0");
+  const [selectedVersion, setSelectedVersion] = useState<string>("042025");
   const [downloading, setDownloading] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalContent, setInfoModalContent] = useState<any>(null);

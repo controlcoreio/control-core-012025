@@ -41,6 +41,13 @@ export function useResources(environment?: string) {
       try {
         const token = SecureStorage.getItem('access_token');
         
+        // Don't fetch if user is not authenticated
+        if (!token) {
+          console.log('[Resources] User not authenticated, skipping fetch');
+          setIsLoading(false);
+          return;
+        }
+        
         // Build URL with optional environment filter
         let url = `${APP_CONFIG.api.baseUrl}/resources`;
         if (environment) {

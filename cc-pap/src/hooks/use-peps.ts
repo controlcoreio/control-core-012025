@@ -40,6 +40,13 @@ export function usePEPs() {
       try {
         const token = SecureStorage.getItem('access_token');
         
+        // Don't fetch if user is not authenticated
+        if (!token) {
+          console.log('[PEPs] User not authenticated, skipping fetch');
+          setIsLoading(false);
+          return;
+        }
+        
         const response = await fetch(`${APP_CONFIG.api.baseUrl}/peps`, {
           headers: {
             'Authorization': `Bearer ${token}`,

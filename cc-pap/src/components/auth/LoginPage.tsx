@@ -32,7 +32,12 @@ export default function LoginPage() {
   // Check if redirected due to session revocation
   useEffect(() => {
     const reason = searchParams.get('reason');
-    if (reason === 'session_revoked') {
+    const message = searchParams.get('message');
+    
+    if (message) {
+      // Use the custom funny message if provided
+      setError(message);
+    } else if (reason === 'session_revoked') {
       setError('Your session was terminated by an administrator. Please log in again.');
     } else if (reason === 'session_expired') {
       setError('Your session has expired. Please log in again.');

@@ -69,10 +69,17 @@ export function PolicyCodeEditor({
 
   // Update code when policyData.regoCode changes (e.g., from template loading)
   useEffect(() => {
+    console.log('[PolicyCodeEditor] policyData.regoCode changed:', policyData.regoCode);
+    console.log('[PolicyCodeEditor] current code:', code);
     if (policyData.regoCode && policyData.regoCode !== code) {
+      console.log('[PolicyCodeEditor] Updating code from template');
+      setCode(policyData.regoCode);
+    } else if (policyData.regoCode && !code) {
+      // Handle case where regoCode is set but code is still empty (initial state)
+      console.log('[PolicyCodeEditor] Setting initial code from template');
       setCode(policyData.regoCode);
     }
-  }, [policyData.regoCode]);
+  }, [policyData.regoCode, code]);
 
   function getDefaultRegoTemplate() {
     return `package controlcore.${policyData.name.replace(/\s+/g, '_').toLowerCase() || 'policy'}

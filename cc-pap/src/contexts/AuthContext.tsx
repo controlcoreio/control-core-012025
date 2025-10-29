@@ -208,7 +208,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const handleLogoutNow = useCallback(async () => {
     await saveUnsavedWork();
     logout();
-  }, []);
+  }, [logout]);
 
   const clearInvalidSession = () => {
     // Clear all auth-related storage
@@ -514,6 +514,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     };
   }, [sessionTimeout]);
+
+  // Listen for session-expired events from 401 handler
+  useEffect(() => {
+    const handleSessionExpired = (event: CustomEvent) => {
+      console.log('[Session Management] Received session-expired event:', event.detail);
+      
+      if (event.detail?.reason === 'token_expired') {
+        // Show session warning with 60 seconds countdown
+        setShowSessionWarning(true);
+        setRemainingSeconds(60); // 60 seconds to stay logged in or logout
+        
+        // Auto-logout after 60 seconds if no action taken
+        const autoLogoutTimer = setTimeout(() => {
+          logout();
+        }, 60000);
+        
+        // Store timer reference for cleanup
+        setSessionTimeout(autoLogoutTimer);
+      }
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired as EventListener);
+    
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired as EventListener);
+    };
+  }, [logout]);
 
   return (
     <AuthContext.Provider value={{

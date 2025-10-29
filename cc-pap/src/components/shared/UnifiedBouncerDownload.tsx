@@ -91,9 +91,7 @@ const bouncerTypes = [
 ];
 
 const versions = [
-  { id: "v2.1.0", name: "v2.1.0 (Latest Stable)", stable: true },
-  { id: "v2.0.5", name: "v2.0.5 (Stable)", stable: true },
-  { id: "v2.2.0-beta", name: "v2.2.0 (Beta)", stable: false }
+  { id: "042025", name: "v042025 (Latest Stable)", stable: true }
 ];
 
 export function UnifiedBouncerDownload({ 
@@ -104,7 +102,7 @@ export function UnifiedBouncerDownload({
   const { toast } = useToast();
   const [selectedBouncerType, setSelectedBouncerType] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<string>("");
-  const [selectedVersion, setSelectedVersion] = useState<string>("v2.1.0");
+  const [selectedVersion, setSelectedVersion] = useState<string>("042025");
   const [downloading, setDownloading] = useState(false);
   const [infoModalOpen, setInfoModalOpen] = useState(false);
   const [infoModalContent, setInfoModalContent] = useState<any>(null);
@@ -121,24 +119,277 @@ export function UnifiedBouncerDownload({
     if (!selectedBouncerType || !selectedFormat) {
       toast({
         title: "Selection Required",
-        description: "Please select a bouncer type and format",
+        description: "Please select bouncer type and format",
         variant: "destructive"
       });
       return;
     }
 
-    setDownloading(true);
+    const bouncer = bouncerTypes.find(b => b.id === selectedBouncerType);
+    if (!bouncer) return;
 
-    // Simulate download
-    setTimeout(() => {
+    setDownloading(true);
+    
+    try {
+      // Generate file content based on format
+      let fileContent = '';
+      let fileName = '';
+      
+      if (selectedFormat === 'docker-compose') {
+        fileName = `${selectedBouncerType}-docker-compose.yml`;
+        fileContent = generateDockerCompose(bouncer, environment);
+      } else if (selectedFormat === 'helm-chart') {
+        fileName = `${selectedBouncerType}-helm-values.yaml`;
+        fileContent = generateHelmValues(bouncer, environment);
+      } else if (selectedFormat === 'kubernetes-manifest') {
+        fileName = `${selectedBouncerType}-kubernetes.yaml`;
+        fileContent = generateKubernetesManifest(bouncer, environment);
+      } else {
+        fileName = `${selectedBouncerType}-${selectedFormat}.txt`;
+        fileContent = `# ${bouncer.name} - ${selectedFormat}\n\nFile format: ${selectedFormat}\nVersion: ${selectedVersion}\n\nPlease contact support for this format.`;
+      }
+
+      // Create and download file
+      const blob = new Blob([fileContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
       toast({
-        title: "Download Started",
-        description: `${selectedBouncer?.name} (${selectedFormat}) ${selectedVersion} for ${environment} is being downloaded.`,
+        title: "Download Complete",
+        description: `Downloaded ${fileName} successfully!`,
       });
       
-      setDownloading(false);
       onDownloadComplete?.(selectedBouncerType);
-    }, 1500);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const generateDockerCompose = (bouncer: typeof bouncerTypes[0], env: string) => {
+    const bouncerId = `bouncer-${bouncer.id}-${env}-1`;
+    const bouncerType = bouncer.id;
+    return `version: '3.8'
+
+# Control Core ${bouncer.name}
+# Version: ${selectedVersion}
+# Environment: ${env}
+
+services:
+  cc-bouncer-${bouncerType}:
+    image: controlcore/cc-bouncer:${selectedVersion}
+    container_name: ${bouncerId}
+    ports:
+      - "8080:8080"
+    environment:
+      - BOUNCER_ID=${bouncerId}
+      - BOUNCER_NAME=${bouncer.name}
+      - BOUNCER_TYPE=${bouncerType}
+      - BOUNCER_VERSION=${selectedVersion}
+      - CONTROL_PLANE_URL=https://controlplane.yourcompany.com
+      - CONTROL_PLANE_API_KEY=your-api-key-here
+      - TENANT_ID=your-tenant-id
+      - ENVIRONMENT=${env}
+      - DEPLOYMENT_PLATFORM=docker
+      - RESOURCE_NAME=My Protected Resource
+      - RESOURCE_TYPE=api
+      - ORIGINAL_HOST_URL=https://api.yourcompany.com
+      - SECURITY_POSTURE=deny-all${bouncerType === 'sidecar' ? `
+      - TARGET_HOST=your-application:3000
+      - TARGET_URL=http://your-application:3000` : ''}${bouncerType === 'reverse-proxy' ? `
+      - PROXY_URL=https://bouncer-${env}.yourcompany.com
+      - TARGET_URL=https://api.yourcompany.com` : ''}${bouncerType === 'mcp' ? `
+      - MCP_SERVER_URL=http://mcp-server:8000
+      - MCP_HEADER_NAME=X-Model-Context
+      - MCP_INJECTION_ENABLED=true` : ''}
+      - HEALTH_CHECK_ENABLED=true
+      - HEARTBEAT_INTERVAL=30
+      - LOG_LEVEL=info
+      - AUDIT_LOGGING_ENABLED=true
+      - DECISION_LOG_EXPORT=true
+      - CACHE_ENABLED=true
+      - RATE_LIMIT_PER_MINUTE=1000
+      - TIMEOUT_SECONDS=30
+    networks:
+      - bouncer-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  bouncer-network:
+    driver: bridge
+
+# DEPLOYMENT INSTRUCTIONS:
+# 1. Update all environment variables (URLs, API keys, tenant ID)
+# 2. Configure target service/resource details
+# 3. Run: docker-compose up -d
+# 4. Verify: docker-compose logs -f
+# 5. Check Control Core UI for bouncer status
+# For help: https://docs.controlcore.io/guides/bouncer-deployment
+`;
+  };
+
+  const generateHelmValues = (bouncer: typeof bouncerTypes[0], env: string) => {
+    return `# Control Core ${bouncer.name} - Helm Values
+# Version: ${selectedVersion}
+# Environment: ${env}
+
+bouncer:
+  id: bouncer-${bouncer.id}-${env}-1
+  name: "${bouncer.name}"
+  type: ${bouncer.id}
+  version: "${selectedVersion}"
+  controlPlane:
+    url: "https://controlplane.yourcompany.com"
+    apiKey: "your-api-key-here"
+    tenantId: "your-tenant-id"
+  environment: ${env}
+  resource:
+    name: "My Protected Resource"
+    type: api
+    originalHostUrl: "https://api.yourcompany.com"
+    securityPosture: deny-all
+
+image:
+  repository: controlcore/cc-bouncer
+  tag: "${selectedVersion}"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 256Mi
+
+performance:
+  cache:
+    enabled: true
+    ttl: 300
+  rateLimit:
+    perMinute: 1000
+  timeout:
+    seconds: 30
+
+logging:
+  level: info
+  auditEnabled: true
+  decisionLogExport: true
+
+# Install: helm install cc-${bouncer.id}-bouncer ./chart -f values.yaml
+# For help: https://docs.controlcore.io/guides/bouncer-deployment
+`;
+  };
+
+  const generateKubernetesManifest = (bouncer: typeof bouncerTypes[0], env: string) => {
+    const bouncerId = `bouncer-${bouncer.id}-${env}`;
+    return `apiVersion: v1
+kind: Namespace
+metadata:
+  name: control-core
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${bouncerId}
+  namespace: control-core
+  labels:
+    app: ${bouncerId}
+    version: "${selectedVersion}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${bouncerId}
+  template:
+    metadata:
+      labels:
+        app: ${bouncerId}
+    spec:
+      containers:
+      - name: bouncer
+        image: controlcore/cc-bouncer:${selectedVersion}
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: BOUNCER_ID
+          value: "${bouncerId}"
+        - name: BOUNCER_NAME
+          value: "${bouncer.name}"
+        - name: BOUNCER_TYPE
+          value: "${bouncer.id}"
+        - name: ENVIRONMENT
+          value: "${env}"
+        - name: CONTROL_PLANE_URL
+          value: "https://controlplane.yourcompany.com"
+        - name: CONTROL_PLANE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ${bouncerId}-secret
+              key: api-key
+        - name: TENANT_ID
+          value: "your-tenant-id"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${bouncerId}
+  namespace: control-core
+spec:
+  selector:
+    app: ${bouncerId}
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${bouncerId}-secret
+  namespace: control-core
+type: Opaque
+stringData:
+  api-key: "your-api-key-here"
+
+# Deploy: kubectl apply -f ${bouncer.id}-kubernetes.yaml
+# For help: https://docs.controlcore.io/guides/bouncer-deployment
+`;
   };
 
   return (

@@ -40,6 +40,13 @@ export function useDashboardStats() {
       try {
         const token = SecureStorage.getItem('access_token');
         
+        // Don't fetch if user is not authenticated
+        if (!token) {
+          console.log('[Dashboard Stats] User not authenticated, skipping fetch');
+          setIsLoading(false);
+          return;
+        }
+        
         const response = await fetch(`${APP_CONFIG.api.baseUrl}/dashboard/stats`, {
           headers: {
             'Authorization': `Bearer ${token}`,
