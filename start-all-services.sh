@@ -113,7 +113,7 @@ if check_port 5432 || check_port 6379 || check_port 8000 || check_port 8080; the
 fi
 
 # Start infrastructure services from cc-infra
-$DOCKER_CMD compose -f controlcore-local-dev.yml up -d cc-db cc-redis cc-pap-api cc-bouncer 2>&1 | grep -E "(Starting|Started|created|healthy|Error)" || true
+$DOCKER_CMD compose -f controlcore-local-dev.yml up -d cc-db cc-redis cc-pap-api cc-pap cc-bouncer 2>&1 | grep -E "(Starting|Started|created|healthy|Error)" || true
 echo "   ✅ Control Core infrastructure services started"
 cd "$SCRIPT_DIR"
 echo ""
