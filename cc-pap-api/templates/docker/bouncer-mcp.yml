@@ -1,0 +1,178 @@
+version: '3.8'
+
+# Control Core MCP Bouncer (AI Agents)
+# Secures Model Context Protocol communications and AI agent interactions
+# Version: {{VERSION}}
+# Environment: {{ENVIRONMENT}}
+# Generated for tenant: {{TENANT_ID}}
+
+services:
+  # Control Core MCP Bouncer
+  cc-bouncer-mcp:
+    image: controlcore/cc-bouncer-mcp:{{VERSION}}
+    container_name: cc-bouncer-mcp-{{ENVIRONMENT}}
+    ports:
+      - "{{BOUNCER_PORT}}:8080"  # MCP server port
+    environment:
+      # Bouncer Identity
+      - BOUNCER_ID={{BOUNCER_ID}}
+      - BOUNCER_NAME={{BOUNCER_NAME}}
+      - BOUNCER_TYPE=mcp
+      - BOUNCER_VERSION={{VERSION}}
+      
+      # Control Plane Connection
+      - CONTROL_PLANE_URL={{CONTROL_PLANE_URL}}
+      - CONTROL_PLANE_API_KEY={{API_KEY}}
+      - TENANT_ID={{TENANT_ID}}
+      
+      # Environment
+      - ENVIRONMENT={{ENVIRONMENT}}  # sandbox or production
+      - DEPLOYMENT_PLATFORM=docker
+      
+      # MCP Protocol Configuration
+      - MCP_SERVER_URL={{MCP_SERVER_URL}}  # CHANGE THIS: e.g., http://mcp-server:8000
+      - MCP_PROTOCOL_VERSION=2024-11-05
+      - MCP_TRANSPORT=stdio  # or sse, http
+      
+      # Model Context Injection
+      - MCP_HEADER_NAME=X-Model-Context
+      - MCP_INJECTION_ENABLED=true
+      - CONTEXT_GENERATION_ENABLED=true
+      
+      # Resource Auto-Discovery
+      - RESOURCE_NAME={{RESOURCE_NAME}}  # CHANGE THIS: e.g., "Claude MCP Server"
+      - RESOURCE_TYPE=mcp-server
+      - ORIGINAL_HOST_URL={{MCP_SERVER_URL}}
+      - SECURITY_POSTURE=deny-all
+      
+      # Health Check
+      - HEALTH_CHECK_ENABLED=true
+      - HEARTBEAT_INTERVAL=30
+      
+      # Logging
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - AUDIT_LOGGING_ENABLED=true
+      - DECISION_LOG_EXPORT=true
+      - LOG_BATCH_SIZE=100
+      - LOG_FLUSH_INTERVAL=5
+      - METRICS_EXPORT_ENABLED=true
+      - MCP_TRACE_ENABLED=true  # Trace MCP protocol messages
+      
+      # Performance
+      - CACHE_ENABLED=true
+      - CACHE_TTL=300
+      - CACHE_MAX_SIZE=100
+      - RATE_LIMIT_PER_MINUTE=500  # Lower for AI agents
+      - TIMEOUT_SECONDS=60  # Higher for LLM responses
+      - MAX_CONNECTIONS=100
+      
+      # Circuit Breaker
+      - CIRCUIT_BREAKER_ENABLED=true
+      - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+      - CIRCUIT_BREAKER_TIMEOUT=60
+      
+      # Policy Sync
+      - POLICY_UPDATE_INTERVAL=30
+      - BUNDLE_DOWNLOAD_TIMEOUT=10
+      - POLICY_CHECKSUM_VALIDATION=true
+      - FAIL_POLICY=fail-closed
+      
+      # AI-Specific Settings
+      - TOKEN_BUDGET_TRACKING=true
+      - CONTEXT_WINDOW_LIMIT=128000
+      - PROMPT_INJECTION_DETECTION=true
+    
+    networks:
+      - mcp-network
+    
+    volumes:
+      - ./config:/app/config:ro
+      - ./policies:/app/policies:ro
+      - mcp-cache:/app/cache
+      - mcp-logs:/app/logs
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Optional: Your MCP Server (if not already running)
+  # mcp-server:
+  #   image: your-mcp-server:latest
+  #   container_name: mcp-server
+  #   ports:
+  #     - "8000:8000"
+  #   networks:
+  #     - mcp-network
+
+volumes:
+  mcp-cache:
+    driver: local
+  mcp-logs:
+    driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
+
+# DEPLOYMENT INSTRUCTIONS FOR MCP BOUNCER:
+# 
+# 1. WHAT IS MCP?
+#    Model Context Protocol (MCP) is an open protocol for AI agent communication.
+#    This bouncer secures MCP servers (like Claude Desktop, VS Code extensions, etc.)
+#
+# 2. CONFIGURATION:
+#    - Set MCP_SERVER_URL to your MCP server address
+#    - Update RESOURCE_NAME (e.g., "Claude MCP Server")
+#    - Configure Control Plane connection settings
+#
+# 3. MCP CLIENT CONFIGURATION:
+#    Configure your MCP client (e.g., Claude Desktop) to connect through bouncer:
+#    
+#    Claude Desktop config (~/.config/claude-desktop/config.json):
+#    {
+#      "mcpServers": {
+#        "your-server": {
+#          "url": "http://localhost:{{BOUNCER_PORT}}",
+#          "transport": "stdio"
+#        }
+#      }
+#    }
+#
+# 4. DEPLOY:
+#    docker-compose -f bouncer-mcp.yml up -d
+#
+# 5. VERIFY:
+#    - Check bouncer logs: docker-compose logs -f cc-bouncer-mcp-{{ENVIRONMENT}}
+#    - Test MCP endpoint: curl http://localhost:{{BOUNCER_PORT}}/mcp/list
+#    - Verify in Control Core UI: Settings > Bouncers
+#
+# 6. POLICY CONFIGURATION:
+#    - Create policies in Control Core UI for AI agent authorization
+#    - Policies can check: user identity, AI model, tools requested, context
+#    - Example: "Allow Claude Desktop to access filesystem tools for engineering team"
+#
+# 7. MONITORING:
+#    - MCP trace logs: docker-compose logs -f | grep MCP
+#    - Metrics: http://localhost:{{BOUNCER_PORT}}/metrics
+#    - Control Plane UI: Real-time MCP activity dashboard
+#
+# For more information, see:
+# - https://docs.controlcore.io/guides/bouncer-deployment
+# - https://docs.controlcore.io/guides/mcp-security
+# - https://modelcontextprotocol.io
+

@@ -1,0 +1,116 @@
+version: '3.8'
+
+# Control Core Sidecar Bouncer
+# Deploy this alongside your application as a sidecar container
+# Version: {{VERSION}}
+# Environment: {{ENVIRONMENT}}
+# Generated for tenant: {{TENANT_ID}}
+
+services:
+  # Your Application (example)
+  your-application:
+    image: your-app:latest
+    container_name: your-application
+    environment:
+      - API_URL=http://localhost:8080  # Route through sidecar bouncer
+    networks:
+      - app-network
+    # Application listens on internal port
+    # No external port exposure - all traffic goes through bouncer
+
+  # Control Core Sidecar Bouncer
+  cc-bouncer-sidecar:
+    image: controlcore/cc-bouncer:{{VERSION}}
+    container_name: cc-bouncer-{{ENVIRONMENT}}
+    ports:
+      - "{{BOUNCER_PORT}}:8080"  # External port mapped to bouncer
+    environment:
+      # Bouncer Identity
+      - BOUNCER_ID={{BOUNCER_ID}}
+      - BOUNCER_NAME={{BOUNCER_NAME}}
+      - BOUNCER_TYPE=sidecar
+      - BOUNCER_VERSION={{VERSION}}
+      
+      # Control Plane Connection
+      - CONTROL_PLANE_URL={{CONTROL_PLANE_URL}}
+      - CONTROL_PLANE_API_KEY={{API_KEY}}
+      - TENANT_ID={{TENANT_ID}}
+      
+      # Environment
+      - ENVIRONMENT={{ENVIRONMENT}}  # sandbox or production
+      - DEPLOYMENT_PLATFORM=docker
+      
+      # Upstream Service (your application)
+      - TARGET_HOST=your-application:3000  # CHANGE THIS to your app's internal port
+      - TARGET_URL=http://your-application:3000
+      
+      # Resource Auto-Discovery
+      - RESOURCE_NAME={{RESOURCE_NAME}}  # CHANGE THIS
+      - RESOURCE_TYPE=api  # CHANGE THIS: api, webapp, database, ai-agent
+      - ORIGINAL_HOST_URL={{ORIGINAL_HOST_URL}}  # CHANGE THIS
+      - SECURITY_POSTURE=deny-all
+      
+      # Health Check
+      - HEALTH_CHECK_ENABLED=true
+      - HEARTBEAT_INTERVAL=30
+      
+      # Logging
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - AUDIT_LOGGING_ENABLED=true
+      - DECISION_LOG_EXPORT=true
+      - LOG_BATCH_SIZE=100
+      - LOG_FLUSH_INTERVAL=5
+      
+      # Performance
+      - CACHE_ENABLED=true
+      - CACHE_TTL=300
+      - CACHE_MAX_SIZE=100
+      - RATE_LIMIT_PER_MINUTE=1000
+      - TIMEOUT_SECONDS=30
+      - MAX_CONNECTIONS=500
+      
+      # Circuit Breaker
+      - CIRCUIT_BREAKER_ENABLED=true
+      - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+      - CIRCUIT_BREAKER_TIMEOUT=60
+      
+      # Policy Sync
+      - POLICY_UPDATE_INTERVAL=30
+      - BUNDLE_DOWNLOAD_TIMEOUT=10
+      - POLICY_CHECKSUM_VALIDATION=true
+    
+    networks:
+      - app-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+networks:
+  app-network:
+    driver: bridge
+
+# DEPLOYMENT INSTRUCTIONS:
+# 1. Update the environment variables above with your actual values
+# 2. Replace "your-application" with your actual application service
+# 3. Set TARGET_HOST to your application's internal address and port
+# 4. Update RESOURCE_NAME, RESOURCE_TYPE, ORIGINAL_HOST_URL
+# 5. Run: docker-compose up -d
+# 6. Verify bouncer appears in Control Core UI (Settings > Bouncers)
+# 7. Check logs: docker-compose logs -f cc-bouncer-{{ENVIRONMENT}}
+

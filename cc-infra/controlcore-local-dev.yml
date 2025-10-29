@@ -57,7 +57,7 @@ services:
       - LOG_LEVEL=info
       - CC_BUILTIN_ADMIN_USER=ccadmin
       - CC_BUILTIN_ADMIN_PASS=SecurePass2025!
-      - CC_DROP_TABLES=true  # Set to 'true' only when you want to reset the database
+      - CC_DROP_TABLES=false  # NEVER set to 'true' in production! Only for initial setup.
     depends_on:
       cc-db:
         condition: service_healthy

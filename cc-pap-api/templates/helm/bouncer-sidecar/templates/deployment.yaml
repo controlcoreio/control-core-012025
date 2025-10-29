@@ -1,0 +1,171 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "control-core-bouncer-sidecar.fullname" . }}
+  labels:
+    {{- include "control-core-bouncer-sidecar.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sidecar-bouncer
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "control-core-bouncer-sidecar.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "control-core-bouncer-sidecar.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "control-core-bouncer-sidecar.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: cc-bouncer
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        # Bouncer Identity
+        - name: BOUNCER_ID
+          value: {{ .Values.bouncer.id | quote }}
+        - name: BOUNCER_NAME
+          value: {{ .Values.bouncer.name | quote }}
+        - name: BOUNCER_TYPE
+          value: {{ .Values.bouncer.type | quote }}
+        - name: BOUNCER_VERSION
+          value: {{ .Values.bouncer.version | quote }}
+        
+        # Control Plane Connection
+        - name: CONTROL_PLANE_URL
+          value: {{ .Values.bouncer.controlPlane.url | quote }}
+        - name: CONTROL_PLANE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "control-core-bouncer-sidecar.fullname" . }}-secret
+              key: api-key
+        - name: TENANT_ID
+          value: {{ .Values.bouncer.controlPlane.tenantId | quote }}
+        
+        # Environment
+        - name: ENVIRONMENT
+          value: {{ .Values.bouncer.environment | quote }}
+        - name: DEPLOYMENT_PLATFORM
+          value: "kubernetes"
+        
+        # Resource Configuration
+        - name: RESOURCE_NAME
+          value: {{ .Values.bouncer.resource.name | quote }}
+        - name: RESOURCE_TYPE
+          value: {{ .Values.bouncer.resource.type | quote }}
+        - name: ORIGINAL_HOST_URL
+          value: {{ .Values.bouncer.resource.originalHostUrl | quote }}
+        - name: SECURITY_POSTURE
+          value: {{ .Values.bouncer.resource.securityPosture | quote }}
+        
+        # Performance
+        - name: CACHE_ENABLED
+          value: {{ .Values.performance.cache.enabled | quote }}
+        - name: CACHE_TTL
+          value: {{ .Values.performance.cache.ttl | quote }}
+        - name: CACHE_MAX_SIZE
+          value: {{ .Values.performance.cache.maxSize | quote }}
+        - name: CACHE_STRATEGY
+          value: {{ .Values.performance.cache.strategy | quote }}
+        - name: RATE_LIMIT_PER_MINUTE
+          value: {{ .Values.performance.rateLimit.perMinute | quote }}
+        - name: TIMEOUT_SECONDS
+          value: {{ .Values.performance.timeout.seconds | quote }}
+        - name: MAX_CONNECTIONS
+          value: {{ .Values.performance.maxConnections | quote }}
+        - name: CIRCUIT_BREAKER_ENABLED
+          value: {{ .Values.performance.circuitBreaker.enabled | quote }}
+        - name: CIRCUIT_BREAKER_FAILURE_THRESHOLD
+          value: {{ .Values.performance.circuitBreaker.failureThreshold | quote }}
+        - name: CIRCUIT_BREAKER_TIMEOUT
+          value: {{ .Values.performance.circuitBreaker.timeout | quote }}
+        
+        # Logging
+        - name: LOG_LEVEL
+          value: {{ .Values.logging.level | quote }}
+        - name: LOG_FORMAT
+          value: {{ .Values.logging.format | quote }}
+        - name: AUDIT_LOGGING_ENABLED
+          value: {{ .Values.logging.auditEnabled | quote }}
+        - name: DECISION_LOG_EXPORT
+          value: {{ .Values.logging.decisionLogExport | quote }}
+        - name: LOG_BATCH_SIZE
+          value: {{ .Values.logging.logBatchSize | quote }}
+        - name: LOG_FLUSH_INTERVAL
+          value: {{ .Values.logging.logFlushInterval | quote }}
+        - name: METRICS_EXPORT_ENABLED
+          value: {{ .Values.logging.metricsExport | quote }}
+        
+        # Policy Sync
+        - name: POLICY_UPDATE_INTERVAL
+          value: {{ .Values.policySync.updateInterval | quote }}
+        - name: BUNDLE_DOWNLOAD_TIMEOUT
+          value: {{ .Values.policySync.bundleTimeout | quote }}
+        - name: POLICY_CHECKSUM_VALIDATION
+          value: {{ .Values.policySync.checksumValidation | quote }}
+        - name: FAIL_POLICY
+          value: {{ .Values.policySync.failPolicy | quote }}
+        
+        {{- with .Values.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 12 }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: cache
+          mountPath: /app/cache
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "control-core-bouncer-sidecar.fullname" . }}-config
+      - name: cache
+        emptyDir: {}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

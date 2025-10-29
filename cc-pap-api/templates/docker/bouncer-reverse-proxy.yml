@@ -1,0 +1,164 @@
+version: '3.8'
+
+# Control Core Reverse Proxy Bouncer
+# Deploy in front of your API/service to enforce policies
+# Version: {{VERSION}}
+# Environment: {{ENVIRONMENT}}
+# Generated for tenant: {{TENANT_ID}}
+
+services:
+  # Control Core Reverse Proxy Bouncer
+  cc-bouncer-reverse-proxy:
+    image: controlcore/cc-bouncer:{{VERSION}}
+    container_name: cc-bouncer-{{ENVIRONMENT}}
+    ports:
+      - "{{BOUNCER_PORT}}:8080"  # Public port for client access
+    environment:
+      # Bouncer Identity
+      - BOUNCER_ID={{BOUNCER_ID}}
+      - BOUNCER_NAME={{BOUNCER_NAME}}
+      - BOUNCER_TYPE=reverse-proxy
+      - BOUNCER_VERSION={{VERSION}}
+      
+      # Control Plane Connection
+      - CONTROL_PLANE_URL={{CONTROL_PLANE_URL}}
+      - CONTROL_PLANE_API_KEY={{API_KEY}}
+      - TENANT_ID={{TENANT_ID}}
+      
+      # Environment
+      - ENVIRONMENT={{ENVIRONMENT}}  # sandbox or production
+      - DEPLOYMENT_PLATFORM=docker
+      
+      # Upstream Protected Service
+      - TARGET_HOST={{TARGET_HOST}}  # CHANGE THIS: e.g., api.yourcompany.com:443
+      - TARGET_URL={{TARGET_URL}}  # CHANGE THIS: e.g., https://api.yourcompany.com
+      - PROXY_TIMEOUT=30
+      
+      # Public Proxy URL (clients will use this)
+      - PROXY_URL={{PROXY_URL}}  # CHANGE THIS: e.g., https://bouncer-{{ENVIRONMENT}}.yourcompany.com
+      
+      # Resource Auto-Discovery
+      - RESOURCE_NAME={{RESOURCE_NAME}}  # CHANGE THIS: e.g., "Customer API"
+      - RESOURCE_TYPE=api  # CHANGE THIS: api, webapp, ai-agent, mcp-server
+      - ORIGINAL_HOST_URL={{ORIGINAL_HOST_URL}}  # CHANGE THIS: e.g., https://api.yourcompany.com
+      - SECURITY_POSTURE=deny-all
+      
+      # DNS & SSL Configuration
+      - DNS_DOMAIN={{DNS_DOMAIN}}  # CHANGE THIS: e.g., yourcompany.com
+      - DNS_SUBDOMAIN=bouncer-{{ENVIRONMENT}}
+      - SSL_ENABLED=true
+      - SSL_CERTIFICATE_TYPE=letsencrypt
+      - SSL_AUTO_RENEW=true
+      
+      # Health Check
+      - HEALTH_CHECK_ENABLED=true
+      - HEARTBEAT_INTERVAL=30
+      
+      # Logging
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - AUDIT_LOGGING_ENABLED=true
+      - DECISION_LOG_EXPORT=true
+      - LOG_BATCH_SIZE=100
+      - LOG_FLUSH_INTERVAL=5
+      - METRICS_EXPORT_ENABLED=true
+      
+      # Performance
+      - CACHE_ENABLED=true
+      - CACHE_TTL=300
+      - CACHE_MAX_SIZE=100
+      - CACHE_STRATEGY=lru
+      - RATE_LIMIT_PER_MINUTE=1000
+      - TIMEOUT_SECONDS=30
+      - MAX_CONNECTIONS=500
+      - RETRY_ATTEMPTS=3
+      
+      # Circuit Breaker
+      - CIRCUIT_BREAKER_ENABLED=true
+      - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+      - CIRCUIT_BREAKER_SUCCESS_THRESHOLD=2
+      - CIRCUIT_BREAKER_TIMEOUT=60
+      
+      # Traffic Management
+      - INGRESS_ENABLED=true
+      - EGRESS_ENABLED=true
+      
+      # Policy Sync
+      - POLICY_UPDATE_INTERVAL=30
+      - BUNDLE_DOWNLOAD_TIMEOUT=10
+      - POLICY_CHECKSUM_VALIDATION=true
+      - FAIL_POLICY=fail-closed  # fail-closed (secure) or fail-open (available)
+    
+    networks:
+      - bouncer-network
+    
+    volumes:
+      - ./config:/app/config:ro
+      - ./certs:/app/certs:ro
+      - bouncer-cache:/app/cache
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+volumes:
+  bouncer-cache:
+    driver: local
+
+networks:
+  bouncer-network:
+    driver: bridge
+
+# DEPLOYMENT INSTRUCTIONS:
+# 
+# 1. CONFIGURATION:
+#    - Update all environment variables marked with CHANGE THIS
+#    - Set your Control Plane URL and API key
+#    - Configure target service URL
+#    - Set public proxy URL (requires DNS configuration)
+#
+# 2. DNS SETUP (Required for Reverse Proxy):
+#    - Create A or CNAME record pointing to this bouncer's IP
+#    - Example: bouncer-{{ENVIRONMENT}}.yourcompany.com → <bouncer-server-ip>
+#    - Wait for DNS propagation (can take up to 48 hours)
+#
+# 3. SSL CERTIFICATES:
+#    - If using Let's Encrypt: Ensure DNS is configured first
+#    - Bouncer will auto-provision certificate on first startup
+#    - For custom certs: Place in ./certs/ directory
+#
+# 4. DEPLOY:
+#    docker-compose -f bouncer-reverse-proxy.yml up -d
+#
+# 5. VERIFY:
+#    - Check logs: docker-compose logs -f cc-bouncer-{{ENVIRONMENT}}
+#    - Test health: curl http://localhost:{{BOUNCER_PORT}}/health
+#    - Verify in UI: Settings > Bouncers > Deployment Status
+#    - Should show: Connected ✅, Intercepting Traffic ⚡, {{ENVIRONMENT}} badge
+#
+# 6. CLIENT CONFIGURATION:
+#    - Update clients to use proxy URL instead of original URL
+#    - Example: https://bouncer-{{ENVIRONMENT}}.yourcompany.com/api/v1/users
+#    - All requests now flow through bouncer for policy enforcement
+#
+# 7. MONITORING:
+#    - Metrics: http://localhost:{{BOUNCER_PORT}}/metrics
+#    - Logs: docker-compose logs -f
+#    - Control Plane UI: Real-time status and metrics
+#
+# For more information, see: https://docs.controlcore.io/guides/bouncer-deployment
+

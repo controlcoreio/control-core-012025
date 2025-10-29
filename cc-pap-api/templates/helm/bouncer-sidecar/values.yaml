@@ -1,0 +1,169 @@
+# Default values for Control Core Sidecar Bouncer
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Bouncer Configuration
+bouncer:
+  # Bouncer Identity (CHANGE THESE)
+  id: {{BOUNCER_ID}}
+  name: {{BOUNCER_NAME}}
+  type: sidecar
+  version: {{VERSION}}
+  
+  # Control Plane Connection (CHANGE THESE)
+  controlPlane:
+    url: {{CONTROL_PLANE_URL}}
+    apiKey: {{API_KEY}}  # Store in Kubernetes Secret in production
+    tenantId: {{TENANT_ID}}
+  
+  # Environment (CHANGE THIS)
+  environment: {{ENVIRONMENT}}  # sandbox or production
+  
+  # Resource Configuration (CHANGE THESE)
+  resource:
+    name: {{RESOURCE_NAME}}
+    type: api  # api, webapp, database, ai-agent
+    originalHostUrl: {{ORIGINAL_HOST_URL}}
+    securityPosture: deny-all
+
+# Image Configuration
+image:
+  repository: controlcore/cc-bouncer
+  pullPolicy: IfNotPresent
+  tag: "{{VERSION}}"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod Annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Container Security Context
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+# Service Configuration (ClusterIP for sidecar)
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Resource Limits
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 256Mi
+
+# Health Checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Auto-scaling (optional)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Node Selection
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Performance Configuration
+performance:
+  cache:
+    enabled: true
+    ttl: 300
+    maxSize: 100  # MB
+    strategy: lru  # lru, lfu, ttl
+  
+  rateLimit:
+    perMinute: 1000
+    burst: 100
+  
+  timeout:
+    seconds: 30
+  
+  maxConnections: 500
+  
+  circuitBreaker:
+    enabled: true
+    failureThreshold: 5
+    successThreshold: 2
+    timeout: 60
+
+# Logging Configuration
+logging:
+  level: info  # debug, info, warn, error
+  format: json
+  auditEnabled: true
+  decisionLogExport: true
+  logBatchSize: 100
+  logFlushInterval: 5
+  metricsExport: true
+
+# Policy Synchronization
+policySync:
+  updateInterval: 30  # seconds
+  bundleTimeout: 10  # seconds
+  checksumValidation: true
+  failPolicy: fail-closed  # fail-closed (secure) or fail-open (available)
+
+# Additional Environment Variables (optional)
+extraEnv: []
+# - name: CUSTOM_VAR
+#   value: "custom-value"
+
+# Additional Volumes (optional)
+extraVolumes: []
+# - name: custom-config
+#   configMap:
+#     name: custom-config
+
+# Additional Volume Mounts (optional)
+extraVolumeMounts: []
+# - name: custom-config
+#   mountPath: /app/custom-config
+#   readOnly: true
+

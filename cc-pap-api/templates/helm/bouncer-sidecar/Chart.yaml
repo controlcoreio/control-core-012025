@@ -1,0 +1,31 @@
+apiVersion: v2
+name: control-core-bouncer-sidecar
+description: Control Core Sidecar Bouncer for runtime application protection
+type: application
+version: {{VERSION}}
+appVersion: "{{VERSION}}"
+
+keywords:
+  - authorization
+  - policy
+  - security
+  - sidecar
+  - pep
+
+home: https://controlcore.io
+sources:
+  - https://github.com/controlcore/cc-bouncer
+
+maintainers:
+  - name: Control Core Team
+    email: support@controlcore.io
+    url: https://controlcore.io
+
+icon: https://controlcore.io/assets/bouncer-icon.svg
+
+# Dependencies (optional)
+# dependencies:
+#   - name: common
+#     version: "1.x.x"
+#     repository: https://charts.bitnami.com/bitnami
+

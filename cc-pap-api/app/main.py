@@ -62,7 +62,12 @@ async def shutdown_event():
 
 # Create tables and initialize data if empty
 Base.metadata.create_all(bind=engine)
-populate_control_core_data(drop_tables=False)
+# CRITICAL: Only drop tables if explicitly requested via environment variable
+# In production, this should NEVER be True as it deletes all customer data
+drop_tables_flag = os.getenv("CC_DROP_TABLES", "false").lower() == "true"
+if drop_tables_flag:
+    logger.warning("⚠️  CC_DROP_TABLES=true - Database will be reset! This should NEVER happen in production!")
+populate_control_core_data(drop_tables=drop_tables_flag)
 
 # Configure CORS
 app.add_middleware(

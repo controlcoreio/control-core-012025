@@ -59,16 +59,28 @@ else
 fi
 echo ""
 
-# 4. Verify Admin User Can Be Created
-echo "4️⃣  Verifying Admin User Setup..."
+# 4. CRITICAL: Verify CC_DROP_TABLES is false
+echo "4️⃣  Checking CC_DROP_TABLES Setting..."
+if [ "$CC_DROP_TABLES" == "true" ]; then
+    echo -e "   ${RED}❌ CRITICAL: CC_DROP_TABLES=true${NC}"
+    echo -e "   ${RED}   This will DELETE ALL DATA on every restart!${NC}"
+    echo -e "   ${RED}   NEVER set this to true in production!${NC}"
+    ERRORS=$((ERRORS + 1))
+else
+    echo -e "   ${GREEN}✅ CC_DROP_TABLES=false (data will persist)${NC}"
+fi
+echo ""
+
+# 5. Verify Admin User Can Be Created
+echo "5️⃣  Verifying Admin User Setup..."
 if [ "$CC_BUILTIN_ADMIN_PASS" == "SecurePass2025!" ] || [ "$CC_BUILTIN_ADMIN_PASS" == "admin123" ]; then
     echo -e "   ${YELLOW}⚠️  WARNING: Using default password!${NC}"
     echo -e "   ${YELLOW}   Change CC_BUILTIN_ADMIN_PASS before production deployment${NC}"
 fi
 echo ""
 
-# 5. Check for Pending Migrations
-echo "5️⃣  Checking for Pending Migrations..."
+# 6. Check for Pending Migrations
+echo "6️⃣  Checking for Pending Migrations..."
 MIGRATION_COUNT=$(find migrations/ -name "*.py" -not -name "__init__.py" -not -name "migration_template.py" -not -name "README.md" | wc -l)
 echo -e "   ℹ️  Found $MIGRATION_COUNT migration scripts"
 echo -e "   ${YELLOW}   Ensure all migrations have been applied!${NC}"

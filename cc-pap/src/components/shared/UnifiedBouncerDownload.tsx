@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Download, Server, Shield, Database, ExternalLink, Code, Cloud, Cpu, FileText, Info, BookOpen } from "lucide-react";
+import { Download, Server, Shield, Cpu, ExternalLink, FileText, Info, BookOpen, AlertCircle, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { BouncerInfoModal } from "./BouncerInfoModal";
 
 interface UnifiedBouncerDownloadProps {
   showControlPlaneSection?: boolean;
@@ -15,43 +16,77 @@ interface UnifiedBouncerDownloadProps {
 
 const bouncerTypes = [
   { 
-    id: "reverse-proxy", 
-    name: "Reverse Proxy Bouncer", 
-    description: "Deploy in front of your API/webapp. Routes all traffic through Control Core for policy enforcement (deploy in pairs: Sandbox + Production)",
-    icon: Server,
-    formats: ["docker-compose", "helm-chart", "kubernetes-manifest", "binary"],
-    recommended: true
-  },
-  { 
     id: "sidecar", 
     name: "Sidecar Bouncer", 
-    description: "Deploys alongside your service as a sidecar container for fine-grained control",
+    description: "Container sidecar for runtime application protection. Deploys alongside your service for fine-grained method-level control",
     icon: Shield,
-    formats: ["docker-compose", "helm-chart", "kubernetes-manifest"]
+    formats: ["docker-compose", "helm-chart", "kubernetes-manifest"],
+    recommended: true,
+    architecture: "Application ←→ Sidecar Bouncer ←→ Control Plane",
+    examples: [
+      "Banking Application - Sidecar Bouncer - Control Plane",
+      "Healthcare System - Sidecar Bouncer - Control Plane",
+      "Enterprise App - Sidecar Bouncer - Control Plane"
+    ],
+    useCases: [
+      "Fine-grained method-level authorization",
+      "Applications requiring embedded policy enforcement",
+      "Services that need runtime interception without DNS changes"
+    ],
+    deploymentTips: [
+      "Deploy as a sidecar container alongside your application",
+      "No DNS or network routing changes required",
+      "Best for Kubernetes deployments with pod-level control"
+    ]
+  },
+  { 
+    id: "reverse-proxy", 
+    name: "Reverse Proxy Bouncer", 
+    description: "Proxy-based enforcement for APIs, AI agents, and web services. Sits in front of resources and generates secure proxy URLs",
+    icon: Server,
+    formats: ["docker-compose", "helm-chart", "kubernetes-manifest", "binary"],
+    recommended: false,
+    architecture: "Client/AI Agent → Reverse Proxy Bouncer → Protected API/Service",
+    examples: [
+      "Client - Reverse Proxy Bouncer - Protected API",
+      "AI Agent - Reverse Proxy Bouncer - AI Service",
+      "Web App - Reverse Proxy Bouncer - Backend API"
+    ],
+    useCases: [
+      "API Gateway-level control and protection",
+      "AI agent communication control",
+      "Centralized enforcement point for multiple services"
+    ],
+    deploymentTips: [
+      "Requires DNS configuration to route traffic through bouncer",
+      "Generates secure proxy URLs for client access",
+      "Ideal for API protection and AI agent control"
+    ]
   },
   { 
     id: "mcp", 
     name: "MCP Bouncer (AI Agents)", 
-    description: "Control enforcement for Model Context Protocol - secure your AI agent interactions",
+    description: "Specialized control for Model Context Protocol. Secures AI agent interactions and LLM communications",
     icon: Cpu,
     formats: ["python-library", "docker", "npm-package"],
-    new: true
-  },
-  { 
-    id: "agent-to-agent", 
-    name: "Google A2A Bouncer", 
-    description: "Control enforcement for Google Agent-to-Agent communication protocols",
-    icon: Code,
-    formats: ["go-library", "cloud-function", "docker"],
-    new: true
-  },
-  { 
-    id: "iot", 
-    name: "IoT Device Bouncer", 
-    description: "Lightweight control enforcement for IoT devices and edge computing",
-    icon: Database,
-    formats: ["c-library", "edge-gateway", "firmware-module"],
-    new: true
+    recommended: false,
+    new: true,
+    architecture: "AI Application → MCP Bouncer → MCP Server/LLM",
+    examples: [
+      "Claude Desktop - MCP Bouncer - MCP Server",
+      "AI Chatbot - MCP Bouncer - LLM Service",
+      "AI Agent Platform - MCP Bouncer - Multiple MCP Servers"
+    ],
+    useCases: [
+      "AI agent security and authorization",
+      "MCP server protection and context injection",
+      "LLM communication control and monitoring"
+    ],
+    deploymentTips: [
+      "Can be deployed as library or standalone service",
+      "Inject dynamic context into AI agent interactions",
+      "Monitor and control all MCP protocol communications"
+    ]
   }
 ];
 
@@ -71,8 +106,16 @@ export function UnifiedBouncerDownload({
   const [selectedFormat, setSelectedFormat] = useState<string>("");
   const [selectedVersion, setSelectedVersion] = useState<string>("v2.1.0");
   const [downloading, setDownloading] = useState(false);
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalContent, setInfoModalContent] = useState<any>(null);
 
   const selectedBouncer = bouncerTypes.find(b => b.id === selectedBouncerType);
+
+  const handleInfoClick = (bouncer: typeof bouncerTypes[0], e: React.MouseEvent) => {
+    e.stopPropagation();
+    setInfoModalContent(bouncer);
+    setInfoModalOpen(true);
+  };
 
   const handleDownload = async () => {
     if (!selectedBouncerType || !selectedFormat) {
@@ -100,17 +143,25 @@ export function UnifiedBouncerDownload({
 
   return (
     <div className="space-y-6">
-      {/* Documentation Link */}
+      {/* Documentation Links */}
       <Alert>
         <BookOpen className="h-4 w-4" />
         <AlertDescription>
-          <div className="flex items-center justify-between">
-            <span>Need help with deployment? Check out our comprehensive guide.</span>
-            <Button variant="link" className="h-auto p-0" asChild>
-              <a href="https://docs.controlcore.io/guides/bouncer-deployment" target="_blank" rel="noopener noreferrer">
-                View Deployment Guide <ExternalLink className="h-3 w-3 ml-1" />
-              </a>
-            </Button>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-sm">Need help? Access our comprehensive guides:</span>
+            <div className="flex gap-3">
+              <Button variant="link" className="h-auto p-0 text-sm" asChild>
+                <a href="https://docs.controlcore.io/guides/bouncer-deployment" target="_blank" rel="noopener noreferrer">
+                  Deployment Guide <ExternalLink className="h-3 w-3 ml-1" />
+                </a>
+              </Button>
+              <span className="text-muted-foreground">|</span>
+              <Button variant="link" className="h-auto p-0 text-sm" asChild>
+                <a href="https://docs.controlcore.io/troubleshooting" target="_blank" rel="noopener noreferrer">
+                  Troubleshooting <AlertCircle className="h-3 w-3 ml-1" />
+                </a>
+              </Button>
+            </div>
           </div>
         </AlertDescription>
       </Alert>
@@ -128,37 +179,48 @@ export function UnifiedBouncerDownload({
       {/* Bouncer Type Selection */}
       <div>
         <h3 className="text-lg font-semibold mb-4">1. Select Bouncer Type</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {bouncerTypes.map((bouncer) => (
-            <Card 
-              key={bouncer.id} 
-              className={`cursor-pointer transition-all hover:border-primary ${
-                selectedBouncerType === bouncer.id ? "border-2 border-primary bg-primary/5" : ""
-              }`}
-              onClick={() => {
-                setSelectedBouncerType(bouncer.id);
-                setSelectedFormat("");
-              }}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start mb-2">
-                  <bouncer.icon className="h-8 w-8 text-primary" />
-                  <div className="flex gap-1">
-                    {bouncer.recommended && (
-                      <Badge variant="default" className="text-xs">Recommended</Badge>
-                    )}
-                    {bouncer.new && (
-                      <Badge variant="outline" className="bg-primary/10 text-xs">New</Badge>
-                    )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {bouncerTypes.map((bouncer) => {
+            const Icon = bouncer.icon;
+            return (
+              <Card 
+                key={bouncer.id} 
+                className={`cursor-pointer transition-all hover:border-primary relative ${
+                  selectedBouncerType === bouncer.id ? "border-2 border-primary bg-primary/5" : ""
+                }`}
+                onClick={() => {
+                  setSelectedBouncerType(bouncer.id);
+                  setSelectedFormat("");
+                }}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start mb-2">
+                    <Icon className="h-8 w-8 text-primary" />
+                    <div className="flex gap-1 items-center">
+                      {bouncer.recommended && (
+                        <Badge className="bg-green-600 hover:bg-green-700 text-xs">Recommended</Badge>
+                      )}
+                      {bouncer.new && (
+                        <Badge variant="outline" className="bg-blue-100 text-blue-900 text-xs">New</Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-primary/10"
+                        onClick={(e) => handleInfoClick(bouncer, e)}
+                      >
+                        <HelpCircle className="h-4 w-4 text-primary" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <CardTitle className="text-base">{bouncer.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">{bouncer.description}</p>
-              </CardContent>
-            </Card>
-          ))}
+                  <CardTitle className="text-base pr-8">{bouncer.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{bouncer.description}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
@@ -248,44 +310,47 @@ export function UnifiedBouncerDownload({
         </Card>
       )}
 
-      {/* Deployment Architecture Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Dual Environment Deployment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="font-semibold text-sm">Sandbox Bouncer</span>
+      {/* Dual Environment Deployment Architecture */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-5 h-5 rounded-full bg-blue-600 dark:bg-blue-400 flex items-center justify-center mt-0.5">
+            <div className="w-2 h-2 bg-white rounded-full"></div>
+          </div>
+          <div>
+            <p className="font-medium text-blue-900 dark:text-blue-100 mb-2">Dual Environment Deployment</p>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+              Control Core Bouncers should be deployed in <strong>pairs</strong> - one for Sandbox (testing) and one for Production (live traffic). 
+              This ensures you can safely test policies before enforcing them on production resources.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="font-semibold text-sm text-green-900 dark:text-green-100">Sandbox Environment</span>
+                </div>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  Deploy Sandbox bouncer in front of your test resources. Connected to PAP Sandbox mode for policy validation.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Deploy this bouncer in front of your test/staging resources. 
-                It connects to the Control Plane in Sandbox mode for policy testing and validation.
-              </p>
+              
+              <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="font-semibold text-sm text-red-900 dark:text-red-100">Production Environment</span>
+                </div>
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  Deploy Production bouncer in front of your live resources. Connected to PAP Production mode for policy enforcement.
+                </p>
+              </div>
             </div>
             
-            <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="font-semibold text-sm">Production Bouncer</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Deploy this bouncer in front of your live resources. 
-                It connects to the Control Plane in Production mode for policy enforcement.
-              </p>
-            </div>
-          </div>
-          
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <p className="text-xs">
-              <strong>Important:</strong> You must deploy both bouncers in your infrastructure. 
-              The deployment guide includes instructions for configuring environment-specific settings.
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              <strong>Your Responsibility:</strong> You must deploy both bouncers in your infrastructure - one for testing and one for production.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Next Steps */}
       {selectedBouncerType && (
@@ -305,6 +370,13 @@ export function UnifiedBouncerDownload({
           </CardContent>
         </Card>
       )}
+
+      {/* Bouncer Info Modal */}
+      <BouncerInfoModal
+        open={infoModalOpen}
+        onOpenChange={setInfoModalOpen}
+        bouncerInfo={infoModalContent}
+      />
     </div>
   );
 }
