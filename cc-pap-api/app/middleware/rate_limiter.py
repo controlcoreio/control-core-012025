@@ -6,6 +6,7 @@ Implements Redis-based rate limiting with sliding window algorithm
 import time
 import json
 import hashlib
+import os
 from typing import Dict, Optional, Tuple
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse

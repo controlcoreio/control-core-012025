@@ -33,6 +33,14 @@ export function useAuditLogs(options: UseAuditLogsOptions = {}) {
     const fetchLogs = async () => {
       try {
         const token = SecureStorage.getItem('access_token');
+        
+        // Don't fetch if user is not authenticated
+        if (!token) {
+          console.log('[Audit Logs] User not authenticated, skipping fetch');
+          setIsLoading(false);
+          return;
+        }
+        
         const params = new URLSearchParams();
         
         if (options.limit) params.append('limit', options.limit.toString());
@@ -51,6 +59,12 @@ export function useAuditLogs(options: UseAuditLogsOptions = {}) {
         );
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // User not authenticated - don't show error, just return empty logs
+            setLogs([]);
+            setError(null);
+            return;
+          }
           throw new Error('Failed to fetch audit logs');
         }
 
@@ -59,7 +73,9 @@ export function useAuditLogs(options: UseAuditLogsOptions = {}) {
         setError(null);
       } catch (err) {
         console.error('Error fetching audit logs:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        // Don't set error for network issues - just return empty logs
+        setLogs([]);
+        setError(null);
       } finally {
         setIsLoading(false);
       }
