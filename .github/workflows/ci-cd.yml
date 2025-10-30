@@ -19,12 +19,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: |
+            cc-pap/package-lock.json
+            cc-docs/package-lock.json
+            cc-demoapp/package-lock.json
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -40,15 +47,15 @@ jobs:
         run: |
           # Frontend dependencies
           if [ -f "cc-pap/package.json" ]; then
-            cd cc-pap && npm ci
+            cd cc-pap && npm ci --legacy-peer-deps || npm install
             cd ..
           fi
           if [ -f "cc-demoapp/package.json" ]; then
-            cd cc-demoapp && npm ci
+            cd cc-demoapp && npm ci --legacy-peer-deps || npm install
             cd ..
           fi
           if [ -f "cc-docs/package.json" ]; then
-            cd cc-docs && npm ci
+            cd cc-docs && npm ci --legacy-peer-deps || npm install
             cd ..
           fi
           
@@ -100,11 +107,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            cc-pap/package-lock.json
+            cc-docs/package-lock.json
+            cc-demoapp/package-lock.json
 
       - name: Setup Python
         uses: actions/setup-python@v4
