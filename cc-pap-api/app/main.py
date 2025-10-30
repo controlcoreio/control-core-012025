@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, policies, resources, peps, audit, decisions, dashboard, environments, integrations, ai_agents, ai_templates, auth0, monaco_editor, context_generation, pip, mcp, ai_integration, settings, opal_data, pep_config, opal
+from app.routers import auth, policies, resources, peps, audit, decisions, dashboard, environments, integrations, ai_agents, ai_templates, auth0, monaco_editor, context_generation, pip, mcp, ai_integration, settings, opal_data, pep_config, opal, notifications
 from app.database import engine, SessionLocal
 from app.models import Base, AuditLog
 from app.models_config import GlobalPEPConfig, IndividualPEPConfig
@@ -104,6 +104,7 @@ app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 app.include_router(ai_integration.router, prefix="/ai", tags=["ai-integration"])
 app.include_router(opal_data.router)
 app.include_router(opal.router)
+app.include_router(notifications.router, prefix="/v1")
 
 @app.get("/")
 def read_root():

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import get_db
-from app.models import PEP, User, AuditLog, ProtectedResource
+from app.models import PEP, User, AuditLog, ProtectedResource, BouncerOPALConfiguration
 from app.schemas import PEPCreate, PEPUpdate, PEPResponse, BouncerRegistrationRequest
 from app.routers.auth import get_current_user
 from app.services.opal_distribution import get_opal_distribution_service
@@ -436,4 +436,126 @@ async def get_pep_logs(
         "environment": pep.environment,
         "logs": logs[:limit],
         "total_logs": len(logs)
+    }
+
+
+@router.get("/{pep_id}/opal-config")
+async def get_bouncer_opal_config(
+    pep_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get OPAL configuration for a specific bouncer."""
+    pep = db.query(PEP).filter(PEP.id == pep_id).first()
+    if not pep:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PEP (Bouncer) not found"
+        )
+    
+    # Get or create OPAL config for this bouncer
+    config = db.query(BouncerOPALConfiguration).filter(
+        BouncerOPALConfiguration.bouncer_id == pep.bouncer_id
+    ).first()
+    
+    if not config:
+        # Auto-create config using opal_distribution service
+        opal_service = get_opal_distribution_service(db)
+        config_dict = opal_service.auto_configure_bouncer_opal(
+            bouncer_id=pep.bouncer_id,
+            environment=pep.environment,
+            resource_name=pep.name
+        )
+        return config_dict
+    
+    return {
+        "bouncer_id": config.bouncer_id,
+        "environment": config.environment,
+        "cache_enabled": config.cache_enabled,
+        "cache_ttl": config.cache_ttl,
+        "cache_max_size": config.cache_max_size,
+        "rate_limit_rps": config.rate_limit_rps,
+        "rate_limit_burst": config.rate_limit_burst,
+        "auto_configured": config.auto_configured,
+        "resource_name": config.resource_name
+    }
+
+
+@router.put("/{pep_id}/opal-config")
+async def update_bouncer_opal_config(
+    pep_id: int,
+    cache_enabled: bool = None,
+    cache_ttl: int = None,
+    cache_max_size: str = None,
+    rate_limit_rps: int = None,
+    rate_limit_burst: int = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update OPAL configuration for a specific bouncer."""
+    pep = db.query(PEP).filter(PEP.id == pep_id).first()
+    if not pep:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PEP (Bouncer) not found"
+        )
+    
+    # Get or create OPAL config
+    config = db.query(BouncerOPALConfiguration).filter(
+        BouncerOPALConfiguration.bouncer_id == pep.bouncer_id
+    ).first()
+    
+    if not config:
+        # Create new config
+        config = BouncerOPALConfiguration(
+            bouncer_id=pep.bouncer_id,
+            environment=pep.environment,
+            resource_name=pep.name,
+            auto_configured=False
+        )
+        db.add(config)
+    
+    # Update provided fields
+    if cache_enabled is not None:
+        config.cache_enabled = cache_enabled
+    if cache_ttl is not None:
+        config.cache_ttl = cache_ttl
+    if cache_max_size is not None:
+        config.cache_max_size = cache_max_size
+    if rate_limit_rps is not None:
+        config.rate_limit_rps = rate_limit_rps
+    if rate_limit_burst is not None:
+        config.rate_limit_burst = rate_limit_burst
+    
+    config.auto_configured = False  # Mark as manually configured
+    
+    db.commit()
+    db.refresh(config)
+    
+    # Log the update
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        user=current_user.username,
+        action=f"Updated OPAL config for bouncer {pep.name}",
+        resource=f"bouncer_{pep.bouncer_id}",
+        resource_type="pep",
+        result="success",
+        event_type="OPAL_CONFIG_UPDATED",
+        outcome="SUCCESS",
+        environment=pep.environment,
+        reason=f"OPAL configuration manually updated for {pep.name}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    logger.info(f"OPAL config updated for bouncer {pep.name} by {current_user.username}")
+    
+    return {
+        "message": "OPAL configuration updated successfully",
+        "bouncer_id": config.bouncer_id,
+        "cache_enabled": config.cache_enabled,
+        "cache_ttl": config.cache_ttl,
+        "cache_max_size": config.cache_max_size,
+        "rate_limit_rps": config.rate_limit_rps,
+        "rate_limit_burst": config.rate_limit_burst
     }

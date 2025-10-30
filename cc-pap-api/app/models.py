@@ -740,3 +740,56 @@ class BouncerOPALConfiguration(Base):
     auto_configured = Column(Boolean, default=True)  # Automatically configured by Control Core
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+# Notification Settings (Environment-specific)
+class NotificationSettings(Base):
+    __tablename__ = "notification_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    environment = Column(String, nullable=False, index=True)  # sandbox or production
+    
+    # Alert Rules (environment-specific)
+    alert_types = Column(JSON, default=list)  # List of enabled alert types with settings
+    
+    # Channel Configurations (environment-specific channels, shared credentials)
+    email_enabled = Column(Boolean, default=True)
+    email_recipients = Column(JSON, default=list)  # Different recipients per environment
+    
+    slack_enabled = Column(Boolean, default=False)
+    slack_channel = Column(String)  # Different channel per environment
+    
+    servicenow_enabled = Column(Boolean, default=False)
+    servicenow_instance = Column(String)  # Different instance per environment
+    
+    webhook_enabled = Column(Boolean, default=False)
+    webhook_url = Column(String)  # Different webhook URL per environment
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User")
+
+
+# Notification Credentials (Shared across environments)
+class NotificationCredentials(Base):
+    __tablename__ = "notification_credentials"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    
+    # Slack credentials (shared)
+    slack_token = Column(String)  # Should be encrypted in production
+    slack_workspace = Column(String)
+    
+    # ServiceNow credentials (shared)
+    servicenow_api_key = Column(String)  # Should be encrypted in production
+    servicenow_domain = Column(String)
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User")

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -7,53 +7,126 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { AlertType } from "../NotificationAlertSettingsPage";
 import { toast } from "sonner";
+import { APP_CONFIG } from "@/config/app";
+import { SecureStorage } from "@/utils/secureStorage";
 
-export function GeneralSystemAlerts() {
-  const [alertTypes, setAlertTypes] = useState<AlertType[]>([
-    {
-      id: "resource-status",
-      name: "Resource Status Change",
-      description: "Notifies when a protected Resource (URL) changes status (e.g., disconnected, error).",
-      enabled: true,
-      channels: { email: true, slack: false, serviceNow: false, webhook: false }
-    },
-    {
-      id: "critical-policy-error",
-      name: "Critical Policy Error",
-      description: "Alerts if a policy fails to evaluate or an enforcement point encounters a critical error.",
-      enabled: true,
-      channels: { email: true, slack: true, serviceNow: false, webhook: false }
-    },
-    {
-      id: "high-denial-volume",
-      name: "High Volume of Denials Detected",
-      description: "Notifies if an unusually high rate of access denials occurs across your resources.",
-      enabled: false,
-      channels: { email: true, slack: false, serviceNow: false, webhook: false }
-    },
-    {
-      id: "trial-expiration",
-      name: "Trial Expiration Reminder",
-      description: "Receive reminders as your 30-day free trial approaches expiration.",
-      enabled: true,
-      channels: { email: true, slack: false, serviceNow: false, webhook: false },
-      required: true
+interface GeneralSystemAlertsProps {
+  environment: string;
+}
+
+const defaultAlertTypes: AlertType[] = [
+  {
+    id: "resource-status",
+    name: "Resource Status Change",
+    description: "Notifies when a protected Resource (URL) changes status (e.g., disconnected, error).",
+    enabled: true,
+    channels: { email: true, slack: false, serviceNow: false, webhook: false }
+  },
+  {
+    id: "critical-policy-error",
+    name: "Critical Policy Error",
+    description: "Alerts if a policy fails to evaluate or an enforcement point encounters a critical error.",
+    enabled: true,
+    channels: { email: true, slack: true, serviceNow: false, webhook: false }
+  },
+  {
+    id: "high-denial-volume",
+    name: "High Volume of Denials Detected",
+    description: "Notifies if an unusually high rate of access denials occurs across your resources.",
+    enabled: false,
+    channels: { email: true, slack: false, serviceNow: false, webhook: false }
+  },
+  {
+    id: "trial-expiration",
+    name: "Trial Expiration Reminder",
+    description: "Receive reminders as your 30-day free trial approaches expiration.",
+    enabled: true,
+    channels: { email: true, slack: false, serviceNow: false, webhook: false },
+    required: true
+  }
+];
+
+export function GeneralSystemAlerts({ environment }: GeneralSystemAlertsProps) {
+  const [alertTypes, setAlertTypes] = useState<AlertType[]>(defaultAlertTypes);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load settings when environment changes
+  useEffect(() => {
+    loadSettings();
+  }, [environment]);
+
+  const loadSettings = async () => {
+    setIsLoading(true);
+    try {
+      const token = SecureStorage.getItem('access_token');
+      const response = await fetch(
+        `${APP_CONFIG.api.baseUrl}/v1/notifications/settings?environment=${environment}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.alert_types && data.alert_types.length > 0) {
+          setAlertTypes(data.alert_types);
+        } else {
+          setAlertTypes(defaultAlertTypes);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load alert settings:", error);
+      setAlertTypes(defaultAlertTypes);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
+
+  const saveSettings = async (updatedAlerts: AlertType[]) => {
+    try {
+      const token = SecureStorage.getItem('access_token');
+      const response = await fetch(
+        `${APP_CONFIG.api.baseUrl}/v1/notifications/settings?environment=${environment}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({
+            alert_types: updatedAlerts
+          })
+        }
+      );
+
+      if (response.ok) {
+        toast.success("Alert settings saved successfully");
+      }
+    } catch (error) {
+      console.error("Failed to save alert settings:", error);
+      toast.error("Failed to save alert settings");
+    }
+  };
 
   const updateAlertType = (id: string, updates: Partial<AlertType>) => {
-    setAlertTypes(prev => prev.map(alert => 
+    const updated = alertTypes.map(alert => 
       alert.id === id ? { ...alert, ...updates } : alert
-    ));
-    toast.success("Alert settings updated");
+    );
+    setAlertTypes(updated);
+    saveSettings(updated);
   };
 
   const updateChannel = (alertId: string, channel: keyof AlertType['channels'], enabled: boolean) => {
-    setAlertTypes(prev => prev.map(alert => 
+    const updated = alertTypes.map(alert => 
       alert.id === alertId 
         ? { ...alert, channels: { ...alert.channels, [channel]: enabled } }
         : alert
-    ));
+    );
+    setAlertTypes(updated);
+    saveSettings(updated);
   };
 
   return (

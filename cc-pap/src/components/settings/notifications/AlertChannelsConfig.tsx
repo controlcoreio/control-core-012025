@@ -1,9 +1,10 @@
 
-import { useState } from "react";
-import { Mail, MessageSquare, Wrench, Webhook, Plus, Settings, Trash2, TestTube } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Mail, MessageSquare, Wrench, Webhook, Plus, Settings, Trash2, TestTube, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 
@@ -14,17 +15,20 @@ interface WebhookConfig {
   status: "active" | "inactive" | "error";
 }
 
-export function AlertChannelsConfig() {
+interface AlertChannelsConfigProps {
+  environment: string;
+}
+
+export function AlertChannelsConfig({ environment }: AlertChannelsConfigProps) {
   const [slackConnected, setSlackConnected] = useState(false);
   const [serviceNowConnected, setServiceNowConnected] = useState(false);
-  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([
-    {
-      id: "webhook-1",
-      name: "SIEM Integration",
-      url: "https://my-siem.com/webhook/controlcore",
-      status: "active"
-    }
-  ]);
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+
+  // Reload channel configurations when environment changes
+  useEffect(() => {
+    // In full implementation, load channel configs per environment from API
+    setWebhooks([]);
+  }, [environment]);
 
   const connectSlack = () => {
     // Simulate OAuth flow
@@ -55,6 +59,13 @@ export function AlertChannelsConfig() {
 
   return (
     <div className="space-y-6">
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          Channel configurations (Slack channels, webhook URLs) are environment-specific. Authentication credentials (Slack tokens, API keys) are shared across both environments for simplified credential management.
+        </AlertDescription>
+      </Alert>
+
       {/* Email Configuration */}
       <Card>
         <CardHeader>

@@ -13,7 +13,6 @@ import { DataSourcesPage } from "@/components/settings/DataSourcesPage";
 import { EnhancedResourcesPage } from "@/components/settings/EnhancedResourcesPage";
 import { PEPManagementPage } from "@/components/settings/pep/PEPManagementPage";
 import { PolicyRepositorySettings } from "@/components/settings/PolicyRepositorySettings";
-import { OPALSettings } from "@/components/settings/OPALSettings";
 import UserManagementPage from "@/components/settings/UserManagementPage";
 import { NotificationsPage } from "@/components/settings/NotificationsPage";
 import { SubscriptionPlanPage } from "@/components/settings/SubscriptionPlanPage";
@@ -45,7 +44,6 @@ export default function Index() {
         <Route path="/settings/peps" element={<SafeComponent component={PEPManagementPage} />} />
         <Route path="/settings/resources" element={<SafeComponent component={EnhancedResourcesPage} />} />
         <Route path="/settings/controls-repository" element={<SafeComponent component={PolicyRepositorySettings} />} />
-        <Route path="/settings/opal" element={<SafeComponent component={OPALSettings} />} />
         <Route path="/settings/users" element={<SafeComponent component={UserManagementPage} />} />
         <Route path="/settings/notifications" element={<SafeComponent component={NotificationsPage} />} />
         <Route path="/settings/subscription" element={<SafeComponent component={SubscriptionPlanPage} />} />

@@ -86,6 +86,207 @@ The Control Core admin dashboard provides a comprehensive view of system status:
    redis-cli --scan --pattern "policy:*" | xargs redis-cli del
    ```
 
+## Environment Management
+
+Control Core provides dual-environment architecture with complete isolation between Sandbox and Production environments.
+
+### Understanding Environments
+
+#### Sandbox Environment
+
+The **Sandbox** environment is where you:
+- Create and test all new policies before deploying to production
+- Experiment with policy changes safely without affecting live systems
+- Validate policies with test users and simulated scenarios
+- Run development and QA workflows
+
+All policies must start in Sandbox. Only validated Sandbox policies can be promoted to Production.
+
+#### Production Environment
+
+The **Production** environment is where:
+- Validated, tested policies are enforced on live systems
+- Real users and production applications are protected
+- Policies have been through complete testing and approval processes
+- Changes are strictly controlled and audited
+
+### Environment Selector
+
+The environment selector in the top header controls which environment you're viewing and managing:
+
+1. **Switching Environments**
+   - Click the environment badge (Sandbox/Production) in the top header
+   - Select the environment you want to work in
+   - All pages automatically update to show the selected environment's data
+
+2. **Environment Indicators**
+   - Each page displays an environment badge showing the current environment
+   - Sandbox is indicated with a yellow/blue badge
+   - Production is indicated with a red/orange badge
+
+### Environment-Specific Settings
+
+Many system settings are configured separately for each environment to provide complete isolation.
+
+#### Data Sources
+
+Data sources (Policy Information Points) are environment-specific:
+
+1. **Configuring Data Sources**
+   - Navigate to **Settings → Data Sources**
+   - The current environment is shown in the page header
+   - Each data source is associated with either Sandbox or Production
+   - Switch environments to manage data sources for that environment
+
+2. **Best Practices**
+   - Use test/development endpoints for Sandbox data sources
+   - Use production endpoints for Production data sources
+   - Credentials may differ between environments for security
+   - Test data source connections in Sandbox before creating Production versions
+
+3. **Managing Connections**
+   - Create separate data source connections for each environment
+   - Configure different endpoints, databases, or API URLs per environment
+   - Monitor connection health separately for each environment
+
+#### Notifications and Alerts
+
+Alert configurations are environment-specific to prevent alert fatigue and ensure relevant notifications:
+
+1. **Alert Rules**
+   - Navigate to **Settings → Notifications**
+   - Configure different alert rules for Sandbox and Production
+   - Sandbox alerts typically go to development teams
+   - Production alerts go to operations and on-call teams
+
+2. **Notification Channels**
+   - Email recipients can differ per environment
+   - Slack channels are environment-specific (e.g., #alerts-sandbox vs #alerts-prod)
+   - Webhook URLs can point to different systems per environment
+   - ServiceNow instances can be different (dev vs production ITSM)
+
+3. **Shared Credentials**
+   - Authentication tokens and API keys are shared across environments
+   - Only channel endpoints and recipients differ
+   - Configure credentials once in the **Credentials** section
+   - Simplifies management while maintaining environment separation
+
+#### Protected Resources
+
+Resources are managed per environment:
+
+1. **Resource Configuration**
+   - Navigate to **Settings → Protected Resources**
+   - View and manage resources for the current environment
+   - Each environment has its own set of protected resources
+   - Resources typically have different URLs per environment
+
+2. **Environment Isolation**
+   - Sandbox resources point to development/staging systems
+   - Production resources point to live systems
+   - Bouncers are deployed separately for each environment
+   - Each Bouncer protects resources in its assigned environment
+
+#### Policy Repository
+
+The policy repository uses a shared GitHub repository with environment-specific folders:
+
+1. **Repository Structure**
+   ```
+   policies/
+   ├── sandbox/
+   │   ├── enabled/
+   │   └── disabled/
+   └── production/
+       ├── enabled/
+       └── disabled/
+   ```
+
+2. **Configuration**
+   - Navigate to **Settings → Controls Repository**
+   - Configure GitHub repository connection once
+   - Policies are automatically organized by environment
+   - Separate folders ensure complete policy isolation
+
+3. **Sync Behavior**
+   - Changes sync to the appropriate environment folder
+   - Sandbox policies deploy from `policies/sandbox/enabled/`
+   - Production policies deploy from `policies/production/enabled/`
+   - Disabled policies are moved to respective `disabled/` folders
+
+### Bouncer Configuration
+
+Bouncers (Policy Enforcement Points) are environment-aware:
+
+1. **Per-Environment Deployment**
+   - Each protected resource has separate Bouncers for Sandbox and Production
+   - Bouncers automatically receive policies for their environment
+   - Environment is set during Bouncer deployment
+
+2. **Performance Tuning**
+   - Navigate to **Settings → Bouncers**, select a Bouncer
+   - View and adjust OPAL (policy distribution) settings
+   - Configure cache settings:
+     - **Cache TTL**: How long to cache policy evaluations
+     - **Cache Size**: Maximum cache size
+   - Configure rate limits:
+     - **Requests Per Second**: Maximum policy evaluation rate
+     - **Burst Size**: Maximum burst capacity
+
+3. **Auto-Configuration**
+   - Bouncers are auto-configured based on their environment
+   - Settings can be customized per Bouncer if needed
+   - Default settings are optimized for typical usage
+
+### Environment Promotion
+
+Moving policies from Sandbox to Production:
+
+1. **Promotion Process**
+   - Create and test policy in Sandbox environment
+   - Run comprehensive test suite in Sandbox
+   - Validate policy behaves as expected
+   - Click **Promote to Production** from the policy detail page
+   - Review and confirm promotion
+
+2. **Safety Controls**
+   - Policies must pass all tests before promotion
+   - Promotion creates a new policy in Production environment
+   - Original Sandbox policy remains unchanged
+   - Production policies cannot be edited directly
+   - Changes must be made in Sandbox, then re-promoted
+
+3. **Audit Trail**
+   - All promotions are logged
+   - Track who promoted what policy and when
+   - View promotion history in audit logs
+
+### Environment Best Practices
+
+1. **Development Workflow**
+   - Always create policies in Sandbox first
+   - Test thoroughly with various scenarios
+   - Use test users and data in Sandbox
+   - Only promote stable, validated policies to Production
+
+2. **Data Isolation**
+   - Use separate data sources for each environment
+   - Connect to test/dev systems in Sandbox
+   - Connect to production systems in Production
+   - Never mix development and production data
+
+3. **Team Structure**
+   - Developers work primarily in Sandbox
+   - Operations team manages Production
+   - Restricted access to Production environment
+   - Use role-based access control
+
+4. **Monitoring**
+   - Monitor both environments separately
+   - Set appropriate alert thresholds per environment
+   - Sandbox can be more lenient with alerts
+   - Production should have strict monitoring
+
 ## User Management
 
 ### User Accounts

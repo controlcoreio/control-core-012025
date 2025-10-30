@@ -1,35 +1,26 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EnterpriseIcon } from "@/components/ui/enterprise-icon";
 import { CustomAlertRuleModal, CustomAlertRule } from "./CustomAlertRuleModal";
 
-export function CustomAlertRules() {
-  const [rules, setRules] = useState<CustomAlertRule[]>([
-    {
-      id: "1",
-      name: "Multiple Failed Logins",
-      description: "Trigger when more than 5 failed login attempts occur within 10 minutes",
-      condition: "failed_logins > 5 AND time_window = 10m",
-      enabled: true,
-      channels: ["email", "slack"],
-      severity: "high"
-    },
-    {
-      id: "2",
-      name: "Unusual API Access Pattern",
-      description: "Alert on API access patterns that deviate from normal behavior",
-      condition: "api_requests > baseline * 3 AND time_window = 5m",
-      enabled: false,
-      channels: ["webhook"],
-      severity: "medium"
-    }
-  ]);
+interface CustomAlertRulesProps {
+  environment: string;
+}
 
+export function CustomAlertRules({ environment }: CustomAlertRulesProps) {
+  const [rules, setRules] = useState<CustomAlertRule[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<CustomAlertRule | null>(null);
+
+  // Reload rules when environment changes
+  useEffect(() => {
+    // In a full implementation, load rules from API per environment
+    // For now, just clear rules to show environment-specific behavior
+    setRules([]);
+  }, [environment]);
 
   const handleAddRule = () => {
     setEditingRule(null);
@@ -43,6 +34,7 @@ export function CustomAlertRules() {
 
   const handleDeleteRule = (ruleId: string) => {
     setRules(prev => prev.filter(rule => rule.id !== ruleId));
+    // In full implementation, make DELETE API call with environment parameter
   };
 
   const handleSaveRule = (rule: CustomAlertRule) => {
@@ -53,6 +45,7 @@ export function CustomAlertRules() {
     }
     setIsModalOpen(false);
     setEditingRule(null);
+    // In full implementation, make POST/PUT API call with environment parameter
   };
 
   const getSeverityColor = (severity: string) => {

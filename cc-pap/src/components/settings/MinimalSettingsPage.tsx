@@ -42,14 +42,6 @@ export function MinimalSettingsPage() {
       bgColor: "bg-purple-50 dark:bg-purple-900/20"
     },
     {
-      title: "OPAL Configuration",
-      description: "Configure policy and data distribution",
-      icon: "server",
-      href: "/settings/opal",
-      color: "text-orange-600",
-      bgColor: "bg-orange-50 dark:bg-orange-900/20"
-    },
-    {
       title: "User Management",
       description: "Manage users, roles, and permissions",
       icon: "users",
