@@ -77,7 +77,13 @@ export function SignupPage() {
   const { signup } = useAuth();
   const { createKickstartSubscription } = useSubscription();
 
-  const handleSignup = async (data: any) => {
+  const handleSignup = async (data: {
+    name: string;
+    email: string;
+    company: string;
+    password: string;
+    acceptTerms: boolean;
+  }) => {
     setIsLoading(true);
     try {
       // Prepare signup data for cc-signup-service

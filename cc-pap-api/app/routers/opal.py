@@ -82,10 +82,9 @@ async def get_data_sources_for_bouncer(
     
     environment = bouncer.environment
     
-    # Get PIPs for this environment
+    # Get PIPs for this environment (no "both" support)
     pip_connections = db.query(PIPConnection).filter(
-        (PIPConnection.environment == environment) |
-        (PIPConnection.environment == "both")
+        PIPConnection.environment == environment
     ).all()
     
     data_sources = []

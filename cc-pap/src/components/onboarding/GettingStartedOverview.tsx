@@ -25,7 +25,14 @@ export function GettingStartedOverview() {
   const { connections } = usePIPConnections();
   // Disabled audit logs on login page to prevent console errors
   // const { logs } = useAuditLogs({ limit: 100 });
-  const logs: any[] = [];
+  const logs: Array<{
+    id: number;
+    timestamp: string;
+    user: string;
+    action: string;
+    resource: string;
+    result: string;
+  }> = [];
 
   const quickActions = [
     {

@@ -520,7 +520,7 @@ class PIPConnection(Base):
     status = Column(Enum(ConnectionStatus), default=ConnectionStatus.PENDING)
     configuration = Column(JSON, nullable=False)  # Connection-specific config
     credentials = Column(JSON, nullable=False)  # Encrypted credentials
-    environment = Column(String, default="both", index=True)  # sandbox, production, both
+    environment = Column(String, nullable=False, index=True)  # sandbox or production (no "both")
     sandbox_endpoint = Column(String)  # Optional separate endpoint for sandbox
     production_endpoint = Column(String)  # Optional separate endpoint for production
     health_check_url = Column(String)

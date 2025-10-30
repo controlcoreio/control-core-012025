@@ -108,8 +108,10 @@ export function PasswordChangeModal({
       } else if (!isAdminChange) {
         window.location.href = '/';
       }
-    } catch (err: any) {
-      setPasswordChangeError(err.message || "Failed to change password. Please try again.");
+    } catch (err: unknown) {
+      setPasswordChangeError(
+        err instanceof Error ? err.message : "Failed to change password. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

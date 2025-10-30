@@ -7,6 +7,8 @@ import { PIPsTable } from "../pips/PIPsTable";
 import { AddInformationSourceWizard } from "../pips/AddInformationSourceWizard";
 import { useToast } from "@/hooks/use-toast";
 import pipService, { PIPConnection } from "@/services/pipService";
+import { useEnvironment } from "@/contexts/EnvironmentContext";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
 
 export function DataSourcesPage() {
   const [connections, setConnections] = useState<PIPConnection[]>([]);
@@ -14,15 +16,18 @@ export function DataSourcesPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<PIPConnection | null>(null);
   const { toast } = useToast();
+  const { currentEnvironment } = useEnvironment();
 
+  // Load connections when component mounts or environment changes
   useEffect(() => {
     loadConnections();
-  }, []);
+  }, [currentEnvironment]);
 
   const loadConnections = async () => {
     try {
       setIsLoading(true);
-      const data = await pipService.getConnections();
+      // Filter by current environment
+      const data = await pipService.getConnections(currentEnvironment);
       setConnections(data);
     } catch (error) {
       console.error("Failed to load connections:", error);

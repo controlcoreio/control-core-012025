@@ -48,6 +48,7 @@ async def get_pip_connections(
     connection_type: Optional[str] = None,
     provider: Optional[str] = None,
     status: Optional[str] = None,
+    environment: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     request: Request = None,
@@ -61,6 +62,13 @@ async def get_pip_connections(
         if skip < 0:
             skip = 0
         
+        # Validate environment if provided
+        if environment and environment not in ["sandbox", "production"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Environment must be 'sandbox' or 'production'"
+            )
+        
         # Sanitize input parameters
         if connection_type:
             connection_type = InputValidator.sanitize_input(connection_type)
@@ -68,6 +76,8 @@ async def get_pip_connections(
             provider = InputValidator.sanitize_input(provider)
         if status:
             status = InputValidator.sanitize_input(status)
+        if environment:
+            environment = InputValidator.sanitize_input(environment)
         
         # Use connection pool for database access
         async with get_database_session() as session:
@@ -79,6 +89,8 @@ async def get_pip_connections(
                 query = query.filter(PIPConnection.provider == provider)
             if status:
                 query = query.filter(PIPConnection.status == status)
+            if environment:
+                query = query.filter(PIPConnection.environment == environment)
             
             connections = query.offset(skip).limit(limit).all()
             
@@ -88,7 +100,7 @@ async def get_pip_connections(
                 event_type="pip_connections_accessed",
                 user_id=getattr(request.state, 'user_id', None) if request else None,
                 client_ip=request.client.host if request else "unknown",
-                details={"connection_type": connection_type, "provider": provider, "status": status},
+                details={"connection_type": connection_type, "provider": provider, "status": status, "environment": environment},
                 severity="info"
             )
             

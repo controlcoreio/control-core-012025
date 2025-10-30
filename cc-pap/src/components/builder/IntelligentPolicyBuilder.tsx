@@ -38,7 +38,7 @@ interface PolicyData {
   conditions: PolicyCondition[];
   regoCode: string;
   status: 'draft' | 'active';
-  contextConfig?: any;
+  contextConfig?: Record<string, unknown>;
 }
 
 interface PolicyCondition {
@@ -68,7 +68,7 @@ interface ResourceSchema {
   endpoints: string[];
   authentication_required: boolean;
   data_classification: string;
-  learned_attributes?: any[];
+  learned_attributes?: Array<{name: string; type: string; frequency?: number}>;
 }
 
 interface SmartSuggestion {
@@ -76,7 +76,7 @@ interface SmartSuggestion {
   priority: 'high' | 'medium' | 'low';
   title: string;
   description: string;
-  implementation?: any;
+  implementation?: Record<string, unknown>;
   reason: string;
 }
 

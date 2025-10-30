@@ -28,7 +28,13 @@ interface PolicyData {
   resourceId: string;
   bouncerId: string;
   effect: 'allow' | 'deny' | 'mask' | 'log';
-  conditions: any[];
+  conditions: Array<{
+    id: string;
+    attribute: string;
+    operator: string;
+    value: string;
+    enabled: boolean;
+  }>;
   regoCode: string;
   status: 'draft' | 'active';
   contextConfig?: ContextConfig;
@@ -52,14 +58,14 @@ interface ContextAction {
   id: string;
   type: string; // webhook, notification, log, workflow
   trigger: string; // on_allow, on_deny, on_error
-  config: any;
+  config: Record<string, unknown>;
   enabled: boolean;
 }
 
 interface ResponseModification {
   id: string;
   type: string; // add_header, inject_metadata, modify_body
-  config: any;
+  config: Record<string, unknown>;
   enabled: boolean;
 }
 

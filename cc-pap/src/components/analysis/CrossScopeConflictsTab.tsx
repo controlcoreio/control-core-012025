@@ -185,14 +185,14 @@ export function CrossScopeConflictsTab() {
                       </TableCell>
                       <TableCell className="text-sm">{conflict.impact}</TableCell>
                       <TableCell>
-                        <Badge variant={getSeverityColor(conflict.severity) as any}>
+                        <Badge variant={getSeverityColor(conflict.severity) as "default" | "secondary" | "destructive" | "outline"}>
                           {conflict.severity}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           {getStatusIcon(conflict.status)}
-                          <Badge variant={getStatusColor(conflict.status) as any}>
+                          <Badge variant={getStatusColor(conflict.status) as "default" | "secondary" | "destructive" | "outline"}>
                             {conflict.status}
                           </Badge>
                         </div>
