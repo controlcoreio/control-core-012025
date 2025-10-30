@@ -73,9 +73,6 @@ export function SessionWarningDialog({
             <p className="text-sm">
               Any unsaved work will be automatically saved before logout. Click "Stay Logged In" to continue your session.
             </p>
-            <p className="text-sm text-muted-foreground italic">
-              💡 <em>Looks like we have lost Control here! Go back home now.</em>
-            </p>
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-2 sm:gap-2">

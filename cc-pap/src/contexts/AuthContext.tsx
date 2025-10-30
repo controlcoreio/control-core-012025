@@ -49,6 +49,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [showSessionWarning, setShowSessionWarning] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const lastActivityRef = useRef<number>(Date.now());
+  const manualResetRef = useRef<number>(0); // Track when user manually resets session
 
   const checkSession = (): boolean => {
     const sessionData = SecureStorage.getItem('auth_session');
@@ -202,6 +203,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const handleStayLoggedIn = useCallback(() => {
     setShowSessionWarning(false);
+    manualResetRef.current = Date.now(); // Mark that user manually reset the session
     resetSessionTimeout();
   }, [resetSessionTimeout]);
 
@@ -458,6 +460,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       activityDebounceTimer = setTimeout(() => {
         const now = Date.now();
         const timeSinceLastActivity = now - lastActivityRef.current;
+        const timeSinceManualReset = now - manualResetRef.current;
+
+        // Don't reset if user manually reset within the last 10 seconds
+        // This prevents the dialog from reappearing immediately after clicking "Stay Logged In"
+        if (timeSinceManualReset < 10000) {
+          return;
+        }
 
         // Only reset if it's been more than 5 seconds since last activity
         if (timeSinceLastActivity >= 5000) {
