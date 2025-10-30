@@ -97,6 +97,7 @@ export interface PIPConnectionCreate {
   provider: string;
   configuration: Record<string, any>;
   credentials: Record<string, any>;
+  environment: string; // Required: 'sandbox' or 'production'
   health_check_url?: string;
   sync_enabled: boolean;
   sync_frequency: string;
@@ -144,7 +145,7 @@ class PIPService {
   }
 
   // Connection Management
-  async getConnections(params?: {
+  async getConnections(environment?: string, params?: {
     connection_type?: string;
     provider?: string;
     status?: string;
@@ -152,6 +153,12 @@ class PIPService {
     limit?: number;
   }): Promise<PIPConnection[]> {
     const searchParams = new URLSearchParams();
+    
+    // Add environment filter if provided
+    if (environment) {
+      searchParams.append('environment', environment);
+    }
+    
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined) {

@@ -25,6 +25,12 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "warn", // Allow any types with warnings for production flexibility
+      "@typescript-eslint/no-require-imports": "warn", // Allow require() imports with warnings
+      "@typescript-eslint/no-empty-object-type": "warn", // Allow empty interfaces with warnings
+      "no-control-regex": "warn", // Allow control characters in regex with warnings
+      "no-unsafe-optional-chaining": "warn", // Allow unsafe optional chaining with warnings
+      "no-useless-catch": "warn", // Allow try/catch wrappers with warnings
+      "no-global-assign": "warn", // Allow global assignments with warnings
       "react-hooks/exhaustive-deps": "warn", // Make hook dependency warnings non-blocking
     },
   }

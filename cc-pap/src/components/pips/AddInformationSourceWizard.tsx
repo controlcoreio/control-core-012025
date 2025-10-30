@@ -25,6 +25,7 @@ interface AddInformationSourceWizardProps {
   onClose: () => void;
   onAdd: (pip: any) => void;
   preselectedType?: string;
+  environment: string; // 'sandbox' or 'production' from top header
 }
 
 const dataSourceTypes = [

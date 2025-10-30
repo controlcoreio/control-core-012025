@@ -107,9 +107,12 @@ export function DataSourcesPage() {
       </div>
 
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Data Sources</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-3xl font-bold tracking-tight">Data Sources</h1>
+          <EnvironmentBadge />
+        </div>
         <p className="text-muted-foreground">
-          Configure your Policy Information Points (PIPs) and data connections
+          Configure your Policy Information Points (PIPs) and data connections for {currentEnvironment} environment
         </p>
       </div>
 
@@ -129,6 +132,7 @@ export function DataSourcesPage() {
         isOpen={isWizardOpen}
         onClose={handleWizardClose}
         onAdd={handleAddConnection}
+        environment={currentEnvironment}
       />
     </div>
   );
