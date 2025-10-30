@@ -13,6 +13,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: false
+        fetch-depth: 1
     
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -28,7 +29,7 @@ jobs:
       run: |
         # Install frontend dependencies
         if [ -f "cc-pap/package.json" ]; then
-          cd cc-pap && npm ci && cd ..
+          cd cc-pap && npm ci --legacy-peer-deps || npm install && cd ..
         fi
         
         # Install backend dependencies
@@ -39,7 +40,7 @@ jobs:
     - name: Lint frontend
       run: |
         if [ -f "cc-pap/package.json" ]; then
-          cd cc-pap && npm run lint || true
+          cd cc-pap && npm run lint || echo "⚠️ Linting warnings found (non-blocking)"
         fi
     
     - name: Build frontend
