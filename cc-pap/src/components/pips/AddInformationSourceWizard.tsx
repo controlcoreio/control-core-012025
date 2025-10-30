@@ -169,7 +169,7 @@ const proposedAttributes = [
   { key: "user.status", description: "User employment status" }
 ];
 
-export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselectedType }: AddInformationSourceWizardProps) {
+export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselectedType, environment }: AddInformationSourceWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedType, setSelectedType] = useState<string>("");
   const [activeCategory, setActiveCategory] = useState("all");
@@ -421,6 +421,7 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
       provider,
       type: selectedTypeData?.title || selectedType,
       endpoint,
+      environment, // Auto-set from current environment context
       attributeMapping,
       updateFrequency,
       privacyLevel,
