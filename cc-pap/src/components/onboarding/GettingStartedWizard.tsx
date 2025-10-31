@@ -26,7 +26,6 @@ export function GettingStartedWizard() {
   const { updateStepStatus, markOnboardingComplete } = useOnboardingProgress();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isProduction, currentEnvironment } = useEnvironment();
 
   // Check deployment model and component deployment status from localStorage
   useEffect(() => {
@@ -74,36 +73,6 @@ export function GettingStartedWizard() {
     markOnboardingComplete();
     navigate("/");
   };
-  
-  // Block wizard access in production mode
-  if (isProduction) {
-    return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <div className="space-y-2">
-              <p className="font-semibold">Getting Started Wizard Not Available in Production</p>
-              <p className="text-sm">
-                The Getting Started wizard is only available in Sandbox mode for initial setup and testing. 
-                Production environment is for deploying and monitoring validated policies only.
-              </p>
-              <p className="text-sm mt-2">
-                To use this wizard, switch to Sandbox mode using the environment selector at the top of the page.
-              </p>
-            </div>
-          </AlertDescription>
-        </Alert>
-        
-        <div className="flex gap-4">
-          <Button onClick={handleBackToOverview} variant="outline">
-            <EnterpriseIcon name="arrow-left" size={16} className="mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   const renderStepContent = () => {
     if (hasDeployedComponents) {
