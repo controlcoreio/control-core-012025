@@ -74,9 +74,9 @@ export function usePolicies(options: UsePoliciesOptions = {}) {
     } catch (err) {
       console.error('Error fetching policies:', err);
       if (err instanceof Error && err.name === 'AbortError') {
-        setError('Request timeout - backend may not be running');
+        setError('Request timed out. Please try again.');
       } else {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError('Unable to load policies. Please try again.');
       }
       setPolicies([]);
     } finally {
@@ -125,9 +125,9 @@ export function usePolicyTemplates(category?: string) {
       } catch (err) {
         console.error('Error fetching policy templates:', err);
         if (err instanceof Error && err.name === 'AbortError') {
-          setError('Request timeout - backend may not be running');
+          setError('Request timed out. Please try again.');
         } else {
-          setError(err instanceof Error ? err.message : 'Unknown error');
+          setError('Unable to load policy templates. Please try again.');
         }
         setTemplates([]);
       } finally {

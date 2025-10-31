@@ -184,7 +184,7 @@ export function PEPManagementPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               <div className="text-center text-muted-foreground">Loading Bouncer configurations...</div>
               <p className="text-xs text-muted-foreground">
-                If this takes too long, ensure cc-pap-api is running
+                This may take a few moments
               </p>
             </div>
           </CardContent>
@@ -201,15 +201,10 @@ export function PEPManagementPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <div className="flex flex-col gap-2">
-              <p className="font-semibold">Failed to load Bouncer configurations</p>
-              <p className="text-sm">{pepsError}</p>
+              <p className="font-semibold">Unable to load Bouncer configurations</p>
+              <p className="text-sm">The system is currently unavailable. Please try again in a few moments.</p>
               <p className="text-xs mt-2">
-                Please ensure:
-                <ul className="list-disc list-inside mt-1">
-                  <li>cc-pap-api is running (check Docker Desktop)</li>
-                  <li>You are logged in with a valid session</li>
-                  <li>Backend is accessible at {APP_CONFIG.api.baseUrl}</li>
-                </ul>
+                If the problem persists, please contact your administrator or refresh the page.
               </p>
             </div>
           </AlertDescription>

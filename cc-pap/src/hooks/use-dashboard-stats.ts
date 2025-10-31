@@ -68,9 +68,9 @@ export function useDashboardStats() {
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);
       if (err instanceof Error && err.name === 'AbortError') {
-        setError('Request timeout - backend may not be running');
+        setError('Request timed out. Please try again.');
       } else {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError('Unable to load dashboard statistics. Please try again.');
       }
     } finally {
       setIsLoading(false);
