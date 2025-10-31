@@ -31,45 +31,64 @@ export function usePolicies(options: UsePoliciesOptions = {}) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchPolicies = async () => {
-      try {
-        const token = SecureStorage.getItem('access_token');
-        const params = new URLSearchParams();
-        
-        if (options.status) params.append('status', options.status);
-        if (options.environment) params.append('environment', options.environment);
-        if (options.limit) params.append('limit', options.limit.toString());
-        if (options.skip) params.append('skip', options.skip.toString());
-        
-        const response = await fetch(
-          `${APP_CONFIG.api.baseUrl}/policies?${params.toString()}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch policies');
-        }
-
-        const data = await response.json();
-        setPolicies(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching policies:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
+  const refetch = async () => {
+    setIsLoading(true);
+    try {
+      const token = SecureStorage.getItem('access_token');
+      
+      if (!token) {
+        console.log('[Policies] User not authenticated, skipping fetch');
         setIsLoading(false);
+        setPolicies([]);
+        return;
       }
-    };
+      
+      const params = new URLSearchParams();
+      if (options.status) params.append('status', options.status);
+      if (options.environment) params.append('environment', options.environment);
+      if (options.limit) params.append('limit', options.limit.toString());
+      if (options.skip) params.append('skip', options.skip.toString());
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(
+        `${APP_CONFIG.api.baseUrl}/policies?${params.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        }
+      );
+      
+      clearTimeout(timeoutId);
 
-    fetchPolicies();
+      if (!response.ok) {
+        throw new Error('Failed to fetch policies');
+      }
+
+      const data = await response.json();
+      setPolicies(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching policies:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timeout - backend may not be running');
+      } else {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      }
+      setPolicies([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refetch();
   }, [options.status, options.environment, options.limit, options.skip]);
 
-  return { policies, isLoading, error };
+  return { policies, isLoading, error, refetch };
 }
 
 export function usePolicyTemplates(category?: string) {
@@ -84,10 +103,17 @@ export function usePolicyTemplates(category?: string) {
         
         if (category) params.append('category', category);
         
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
         // Templates endpoint is public, no authentication required
         const response = await fetch(
-          `${APP_CONFIG.api.baseUrl}/policies/templates/?${params.toString()}`
+          `${APP_CONFIG.api.baseUrl}/policies/templates/?${params.toString()}`,
+          { signal: controller.signal }
         );
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error('Failed to fetch policy templates');
@@ -98,7 +124,12 @@ export function usePolicyTemplates(category?: string) {
         setError(null);
       } catch (err) {
         console.error('Error fetching policy templates:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        if (err instanceof Error && err.name === 'AbortError') {
+          setError('Request timeout - backend may not be running');
+        } else {
+          setError(err instanceof Error ? err.message : 'Unknown error');
+        }
+        setTemplates([]);
       } finally {
         setIsLoading(false);
       }

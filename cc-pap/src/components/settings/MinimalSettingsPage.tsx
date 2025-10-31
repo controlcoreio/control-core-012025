@@ -34,10 +34,10 @@ export function MinimalSettingsPage() {
       bgColor: "bg-red-50 dark:bg-red-900/20"
     },
     {
-      title: "Controls Repository",
-      description: "GitHub repository synchronization for controls",
+      title: "GitHub Configuration",
+      description: "Configure GitHub repository per bouncer",
       icon: "git-branch",
-      href: "/settings/controls-repository",
+      href: "/settings/peps",
       color: "text-purple-600",
       bgColor: "bg-purple-50 dark:bg-purple-900/20"
     },

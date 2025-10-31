@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Search, Edit, Trash2, ExternalLink, Copy, Shield, Link as LinkIcon, AlertTriangle, Info, Clock, RefreshCw, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useResources } from "@/hooks/use-resources";
 import { AddEditResourceModal } from "./pep/AddEditResourceModal";
 import { APP_CONFIG } from "@/config/app";
+import { useEnvironment } from "@/contexts/EnvironmentContext";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
 
 interface ProtectedResource {
   id: string;
@@ -34,14 +36,14 @@ export function EnhancedResourcesPage() {
   const [filterType, setFilterType] = useState("all");
   const [filterPEP, setFilterPEP] = useState("all");
   const [filterDiscovery, setFilterDiscovery] = useState("all"); // all, auto, manual
-  const [filterEnvironment, setFilterEnvironment] = useState("all"); // all, sandbox, production
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
+  const { currentEnvironment } = useEnvironment();
   
-  // Fetch real resources from backend
-  const { resources: backendResources, isLoading, setResources } = useResources();
+  // Fetch real resources from backend filtered by current environment
+  const { resources: backendResources, isLoading, setResources } = useResources(currentEnvironment);
   
   if (isLoading) {
     return (
@@ -64,10 +66,8 @@ export function EnhancedResourcesPage() {
                             (filterDiscovery === "auto" && resource.auto_discovered) ||
                             (filterDiscovery === "manual" && !resource.auto_discovered);
     
-    const matchesEnvironment = filterEnvironment === "all" ||
-                              ((resource as any).environment || 'sandbox') === filterEnvironment;
-    
-    return matchesSearch && matchesDiscovery && matchesEnvironment;
+    // Resources are already filtered by environment from the hook
+    return matchesSearch && matchesDiscovery;
   });
 
   const getPEPStatusBadge = (status: ProtectedResource['pepStatus']) => {

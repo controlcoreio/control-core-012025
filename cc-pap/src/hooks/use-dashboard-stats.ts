@@ -35,42 +35,52 @@ export function useDashboardStats() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = SecureStorage.getItem('access_token');
-        
-        // Don't fetch if user is not authenticated
-        if (!token) {
-          console.log('[Dashboard Stats] User not authenticated, skipping fetch');
-          setIsLoading(false);
-          return;
-        }
-        
-        const response = await fetch(`${APP_CONFIG.api.baseUrl}/dashboard/stats`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard stats');
-        }
-
-        const data = await response.json();
-        setStats(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching dashboard stats:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
+  const refetch = async () => {
+    setIsLoading(true);
+    try {
+      const token = SecureStorage.getItem('access_token');
+      
+      if (!token) {
+        console.log('[Dashboard Stats] User not authenticated, skipping fetch');
         setIsLoading(false);
+        return;
       }
-    };
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(`${APP_CONFIG.api.baseUrl}/dashboard/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
 
-    fetchStats();
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats');
+      }
+
+      const data = await response.json();
+      setStats(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching dashboard stats:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timeout - backend may not be running');
+      } else {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refetch();
   }, []);
 
-  return { stats, isLoading, error };
+  return { stats, isLoading, error, refetch };
 }
 

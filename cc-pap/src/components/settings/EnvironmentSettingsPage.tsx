@@ -146,11 +146,11 @@ export function EnvironmentSettingsPage() {
   };
 
   const saveEnvironmentSettings = async () => {
-    // Note: GitHub repository is configured in Settings > Controls Repository
-    // This is a universal setting used for both environments via folder structure
+    // Note: GitHub repository is configured per-bouncer in Settings > PEP Management
+    // Each bouncer can have its own GitHub repository configuration
     toast({
       title: "Info",
-      description: "GitHub repository is configured in Settings > Controls Repository"
+      description: "GitHub repository is configured per-bouncer in Settings > PEP Management"
     });
   };
 
@@ -294,9 +294,9 @@ export function EnvironmentSettingsPage() {
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <span className="text-sm">GitHub Repository</span>
                     <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                      <Link to="/settings/controls-repository" className="flex items-center gap-1">
+                      <Link to="/settings/peps" className="flex items-center gap-1">
                         <GitBranch className="h-3 w-3" />
-                        Configure in Controls Repository
+                        Configure in PEP Management
                       </Link>
                     </Badge>
                   </div>
@@ -407,9 +407,9 @@ export function EnvironmentSettingsPage() {
                   <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <span className="text-sm">GitHub Repository</span>
                     <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                      <Link to="/settings/controls-repository" className="flex items-center gap-1">
+                      <Link to="/settings/peps" className="flex items-center gap-1">
                         <GitBranch className="h-3 w-3" />
-                        Configure in Controls Repository
+                        Configure in PEP Management
                       </Link>
                     </Badge>
                   </div>

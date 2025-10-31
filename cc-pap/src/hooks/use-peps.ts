@@ -44,17 +44,32 @@ export function usePEPs() {
         if (!token) {
           console.log('[PEPs] User not authenticated, skipping fetch');
           setIsLoading(false);
+          setPEPs([]); // Set empty array
           return;
         }
+        
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
         const response = await fetch(`${APP_CONFIG.api.baseUrl}/peps`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
-          throw new Error('Failed to fetch PEPs');
+          if (response.status === 401) {
+            console.error('[PEPs] Unauthorized - token may be expired');
+            setError('Unauthorized');
+          } else {
+            throw new Error(`Failed to fetch PEPs: ${response.status}`);
+          }
+          setPEPs([]);
+          return;
         }
 
         const data = await response.json();
@@ -62,7 +77,12 @@ export function usePEPs() {
         setError(null);
       } catch (err) {
         console.error('Error fetching PEPs:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        if (err instanceof Error && err.name === 'AbortError') {
+          setError('Request timeout - backend may not be running');
+        } else {
+          setError(err instanceof Error ? err.message : 'Unknown error');
+        }
+        setPEPs([]); // Set empty array on error
       } finally {
         setIsLoading(false);
       }

@@ -1,5 +1,5 @@
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { PoliciesPage } from "@/components/policies/PoliciesPage";
 import { PolicyEnvironmentsPage } from "@/components/policies/PolicyEnvironmentsPage";
@@ -37,6 +37,7 @@ export default function Index() {
         <Route path="/policies" element={<SafeComponent component={PoliciesPage} />} />
         <Route path="/policies/environments" element={<SafeComponent component={PolicyEnvironmentsPage} />} />
         <Route path="/policies/templates" element={<SafeComponent component={PolicyTemplatesPage} />} />
+        <Route path="/pips" element={<SafeComponent component={PIPsPage} />} />
         <Route path="/audit" element={<SafeComponent component={AuditLogPage} />} />
         <Route path="/settings" element={<SafeComponent component={MinimalSettingsPage} />} />
         <Route path="/settings/environments" element={<SafeComponent component={EnvironmentSettingsPage} />} />
@@ -47,6 +48,8 @@ export default function Index() {
         <Route path="/settings/subscription" element={<SafeComponent component={SubscriptionPlanPage} />} />
         <Route path="/settings/general" element={<SafeComponent component={GeneralSettingsPage} />} />
         <Route path="/settings/data-sources" element={<SafeComponent component={DataSourcesPage} />} />
+        {/* Redirect old controls-repository route to PEP management */}
+        <Route path="/settings/controls-repository" element={<Navigate to="/settings/peps" replace />} />
         <Route path="/test" element={<SafeComponent component={TestConsole} />} />
         <Route path="/knowledge" element={<SafeComponent component={KnowledgePage} />} />
       </Routes>

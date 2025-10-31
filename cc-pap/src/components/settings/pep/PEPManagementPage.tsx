@@ -46,6 +46,7 @@ import { BouncerOPALConfig } from "./BouncerOPALConfig";
 import { BouncerGitHubTab } from "./BouncerGitHubTab";
 import { pepApi, PEPConfigData, IndividualPEPConfigData, GlobalPEPConfigData } from "@/services/pepApi";
 import { Loader2 } from "lucide-react";
+import { APP_CONFIG } from "@/config/app";
 
 interface DeployedPEP {
   id: string;
@@ -110,10 +111,10 @@ interface BouncerConfiguration {
 
 export function PEPManagementPage() {
   // Fetch real PEPs from backend
-  const { peps: backendPEPs, isLoading } = usePEPs();
+  const { peps: backendPEPs, isLoading, error: pepsError } = usePEPs();
   
   // Map backend PEPs to UI format
-  const deployedPEPs: DeployedPEP[] = backendPEPs.map(pep => ({
+  const deployedPEPs: DeployedPEP[] = (backendPEPs || []).map(pep => ({
     id: pep.bouncer_id || `pep-${pep.id}`,
     name: pep.name,
     type: pep.deployment_mode === 'reverse-proxy' ? 'api-gateway' : 'sidecar',
@@ -177,7 +178,42 @@ export function PEPManagementPage() {
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center text-muted-foreground">Loading Bouncer configurations...</div>
+        <Card>
+          <CardContent className="p-12">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="text-center text-muted-foreground">Loading Bouncer configurations...</div>
+              <p className="text-xs text-muted-foreground">
+                If this takes too long, ensure cc-pap-api is running
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Show error state if API failed
+  if (pepsError) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="flex flex-col gap-2">
+              <p className="font-semibold">Failed to load Bouncer configurations</p>
+              <p className="text-sm">{pepsError}</p>
+              <p className="text-xs mt-2">
+                Please ensure:
+                <ul className="list-disc list-inside mt-1">
+                  <li>cc-pap-api is running (check Docker Desktop)</li>
+                  <li>You are logged in with a valid session</li>
+                  <li>Backend is accessible at {APP_CONFIG.api.baseUrl}</li>
+                </ul>
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }

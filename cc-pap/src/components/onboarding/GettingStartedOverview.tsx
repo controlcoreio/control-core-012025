@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useOnboardingProgress } from "@/hooks/use-onboarding-progress";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import { useEnvironment } from "@/contexts/EnvironmentContext";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { usePolicies } from "@/hooks/use-policies";
 import { usePIPConnections } from "@/hooks/use-pip-connections";
@@ -18,11 +19,36 @@ export function GettingStartedOverview() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === 'dark';
+  const { currentEnvironment, isProduction } = useEnvironment();
   
-  // Fetch real data from backend
-  const { stats, isLoading: statsLoading } = useDashboardStats();
-  const { policies } = usePolicies({ status: 'enabled' });
-  const { connections } = usePIPConnections();
+  // Fetch real data from backend filtered by current environment
+  const { stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats();
+  const { policies, refetch: refetchPolicies } = usePolicies({ 
+    status: 'enabled',
+    environment: currentEnvironment 
+  });
+  const { connections, refetch: refetchConnections } = usePIPConnections();
+  
+  // Listen to environment changes and refetch data
+  useEffect(() => {
+    const handleEnvironmentChange = () => {
+      console.log('[Dashboard] Environment changed, refetching data for:', currentEnvironment);
+      refetchStats?.();
+      refetchPolicies?.();
+      refetchConnections?.();
+    };
+    
+    window.addEventListener('environmentChanged', handleEnvironmentChange);
+    return () => window.removeEventListener('environmentChanged', handleEnvironmentChange);
+  }, [refetchStats, refetchPolicies, refetchConnections]);
+  
+  // Refetch data when environment changes directly
+  useEffect(() => {
+    console.log('[Dashboard] Current environment changed to:', currentEnvironment);
+    refetchStats?.();
+    refetchPolicies?.();
+    refetchConnections?.();
+  }, [currentEnvironment]);
   // Disabled audit logs on login page to prevent console errors
   // const { logs } = useAuditLogs({ limit: 100 });
   const logs: Array<{
