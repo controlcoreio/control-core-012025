@@ -6,10 +6,11 @@ Integrated with OPAL for real-time policy distribution
 
 import logging
 import httpx
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 from github import Github, GithubException
 from sqlalchemy.orm import Session
 from app.models import GitHubConfiguration, OPALConfiguration
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +298,219 @@ class GitHubService:
             True if configured and ready, False otherwise
         """
         return self._repo is not None and self._config is not None
+    
+    def validate_folder_structure(self) -> Dict[str, any]:
+        """Validate that the expected folder structure exists in GitHub repository
+        
+        Expected structure:
+        - policies/
+          - drafts/
+          - sandbox/
+            - enabled/
+            - disabled/
+          - production/
+            - enabled/
+            - disabled/
+        
+        Returns:
+            Dictionary with validation results including missing folders and status
+        """
+        if not self._repo:
+            return {
+                "valid": False,
+                "error": "GitHub repository not initialized"
+            }
+        
+        try:
+            branch = self._get_branch()
+            expected_paths = [
+                "policies",
+                "policies/drafts",
+                "policies/sandbox",
+                "policies/sandbox/enabled",
+                "policies/sandbox/disabled",
+                "policies/production",
+                "policies/production/enabled",
+                "policies/production/disabled"
+            ]
+            
+            missing_folders = []
+            existing_folders = []
+            
+            for path in expected_paths:
+                try:
+                    self._repo.get_contents(path, ref=branch)
+                    existing_folders.append(path)
+                except GithubException as e:
+                    if e.status == 404:
+                        missing_folders.append(path)
+                    else:
+                        raise
+            
+            return {
+                "valid": len(missing_folders) == 0,
+                "missing_folders": missing_folders,
+                "existing_folders": existing_folders,
+                "message": "Folder structure is valid" if len(missing_folders) == 0 else f"Missing {len(missing_folders)} required folders"
+            }
+            
+        except GithubException as e:
+            logger.error(f"GitHub API error validating folder structure: {e}")
+            return {
+                "valid": False,
+                "error": f"GitHub API error: {str(e)}"
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error validating folder structure: {e}")
+            return {
+                "valid": False,
+                "error": f"Validation error: {str(e)}"
+            }
+    
+    def detect_unauthorized_changes(self, known_policy_ids: List[int]) -> Dict[str, any]:
+        """Detect files in GitHub that were not synced by Control Core
+        
+        This checks for:
+        1. Files with unexpected naming patterns (not policy_<id>.rego)
+        2. Files that don't correspond to known policies in the database
+        
+        Args:
+            known_policy_ids: List of policy IDs that exist in the database
+            
+        Returns:
+            Dictionary with unauthorized file details
+        """
+        if not self._repo:
+            return {
+                "has_unauthorized_changes": False,
+                "error": "GitHub repository not initialized"
+            }
+        
+        try:
+            branch = self._get_branch()
+            unauthorized_files = []
+            
+            # Check all policy folders
+            folders_to_check = [
+                "policies/drafts",
+                "policies/sandbox/enabled",
+                "policies/sandbox/disabled",
+                "policies/production/enabled",
+                "policies/production/disabled"
+            ]
+            
+            for folder in folders_to_check:
+                try:
+                    contents = self._repo.get_contents(folder, ref=branch)
+                    if not isinstance(contents, list):
+                        contents = [contents]
+                    
+                    for item in contents:
+                        if item.type == "file" and item.name.endswith(".rego"):
+                            # Check if file follows expected naming convention
+                            if not item.name.startswith("policy_"):
+                                unauthorized_files.append({
+                                    "path": item.path,
+                                    "name": item.name,
+                                    "folder": folder,
+                                    "reason": "Unexpected naming pattern (expected: policy_<id>.rego)",
+                                    "last_modified": item.last_modified if hasattr(item, 'last_modified') else "unknown"
+                                })
+                            else:
+                                # Extract policy ID and check if it exists in database
+                                try:
+                                    policy_id = int(item.name.replace("policy_", "").replace(".rego", ""))
+                                    if policy_id not in known_policy_ids:
+                                        unauthorized_files.append({
+                                            "path": item.path,
+                                            "name": item.name,
+                                            "folder": folder,
+                                            "reason": f"Policy ID {policy_id} not found in database",
+                                            "last_modified": item.last_modified if hasattr(item, 'last_modified') else "unknown"
+                                        })
+                                except ValueError:
+                                    unauthorized_files.append({
+                                        "path": item.path,
+                                        "name": item.name,
+                                        "folder": folder,
+                                        "reason": "Invalid policy ID format",
+                                        "last_modified": item.last_modified if hasattr(item, 'last_modified') else "unknown"
+                                    })
+                
+                except GithubException as e:
+                    if e.status == 404:
+                        # Folder doesn't exist, that's okay
+                        logger.info(f"Folder {folder} does not exist in GitHub")
+                    else:
+                        raise
+            
+            return {
+                "has_unauthorized_changes": len(unauthorized_files) > 0,
+                "unauthorized_files": unauthorized_files,
+                "count": len(unauthorized_files),
+                "message": f"Found {len(unauthorized_files)} unauthorized file(s)" if len(unauthorized_files) > 0 else "No unauthorized changes detected"
+            }
+            
+        except GithubException as e:
+            logger.error(f"GitHub API error detecting unauthorized changes: {e}")
+            return {
+                "has_unauthorized_changes": False,
+                "error": f"GitHub API error: {str(e)}"
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error detecting unauthorized changes: {e}")
+            return {
+                "has_unauthorized_changes": False,
+                "error": f"Detection error: {str(e)}"
+            }
+    
+    def create_folder_structure(self) -> bool:
+        """Create the expected folder structure in GitHub if it doesn't exist
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._repo:
+            logger.error("GitHub repository not initialized")
+            return False
+        
+        try:
+            branch = self._get_branch()
+            folders_to_create = [
+                ("policies/drafts", "Placeholder for draft policies"),
+                ("policies/sandbox/enabled", "Placeholder for enabled sandbox policies"),
+                ("policies/sandbox/disabled", "Placeholder for disabled sandbox policies"),
+                ("policies/production/enabled", "Placeholder for enabled production policies"),
+                ("policies/production/disabled", "Placeholder for disabled production policies")
+            ]
+            
+            for folder_path, readme_content in folders_to_create:
+                readme_path = f"{folder_path}/.gitkeep"
+                try:
+                    # Check if folder exists by checking for .gitkeep
+                    self._repo.get_contents(readme_path, ref=branch)
+                    logger.info(f"Folder {folder_path} already exists")
+                except GithubException as e:
+                    if e.status == 404:
+                        # Folder doesn't exist, create it with .gitkeep
+                        self._repo.create_file(
+                            path=readme_path,
+                            message=f"Create folder structure: {folder_path}",
+                            content=readme_content,
+                            branch=branch
+                        )
+                        logger.info(f"Created folder {folder_path}")
+                    else:
+                        raise
+            
+            return True
+            
+        except GithubException as e:
+            logger.error(f"GitHub API error creating folder structure: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error creating folder structure: {e}")
+            return False
     
     async def notify_opal_policy_update(self, policy_id: int, folder: str, action: str = "update") -> bool:
         """Notify OPAL server about policy changes

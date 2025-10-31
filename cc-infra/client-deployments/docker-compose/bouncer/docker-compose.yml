@@ -1,0 +1,102 @@
+# Control Core - Standalone Bouncer (PEP) Deployment
+# This docker-compose file deploys a standalone Control Core Bouncer
+# that connects to a remote Control Plane (hosted or self-hosted)
+
+version: '3.8'
+
+services:
+  # Control Core Bouncer (PEP + PDP + OPAL Client)
+  cc-bouncer:
+    image: controlcore/cc-bouncer:${CC_VERSION:-latest}
+    container_name: cc-bouncer-${BOUNCER_NAME:-default}
+    ports:
+      - "${BOUNCER_PORT:-8080}:8080"
+      - "${METRICS_PORT:-9090}:9090"
+    environment:
+      # Bouncer Configuration
+      - BOUNCER_PORT=8080
+      - BOUNCER_NAME=${BOUNCER_NAME:-default}
+      - TENANT_ID=${TENANT_ID:?TENANT_ID required}
+      - API_KEY=${API_KEY:?API_KEY required}
+      
+      # Target Application
+      - TARGET_HOST=${TARGET_HOST:?TARGET_HOST required}
+      - TARGET_PORT=${TARGET_PORT:-8000}
+      
+      # Control Plane Connection
+      - PAP_API_URL=${PAP_API_URL:?PAP_API_URL required}
+      
+      # OPAL Configuration
+      - OPAL_SERVER_URL=${OPAL_SERVER_URL:-${PAP_API_URL}/opal}
+      - OPAL_CLIENT_ID=${OPAL_CLIENT_ID:-}
+      - OPAL_CLIENT_SECRET=${OPAL_CLIENT_SECRET:-}
+      
+      # GitHub Policy Repository (Optional)
+      - GITHUB_REPO_URL=${GITHUB_REPO_URL:-}
+      - GITHUB_REPO_BRANCH=${GITHUB_REPO_BRANCH:-main}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_POLICY_PATH=${GITHUB_POLICY_PATH:-policies/}
+      
+      # Caching Configuration
+      - CACHE_ENABLED=${CACHE_ENABLED:-true}
+      - CACHE_TTL=${CACHE_TTL:-5m}
+      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-1000}
+      - DECISION_CACHE_TTL=${DECISION_CACHE_TTL:-1m}
+      
+      # Logging Configuration
+      - LOG_ENABLED=true
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      
+      # Metrics Configuration
+      - METRICS_ENABLED=true
+      - METRICS_PORT=9090
+      
+      # Security
+      - TLS_ENABLED=${TLS_ENABLED:-false}
+      - TLS_CERT_PATH=${TLS_CERT_PATH:-/certs/tls.crt}
+      - TLS_KEY_PATH=${TLS_KEY_PATH:-/certs/tls.key}
+    volumes:
+      - cc_bouncer_cache:/var/lib/bouncer/cache
+      - cc_bouncer_logs:/var/log/controlcore
+      - ${TLS_CERTS_PATH:-./certs}:/certs:ro
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Optional: Redis for distributed caching (recommended for production)
+  cc-bouncer-redis:
+    image: redis:7-alpine
+    container_name: cc-bouncer-redis-${BOUNCER_NAME:-default}
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - cc_bouncer_redis:/data
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}"
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - with-redis
+
+networks:
+  controlcore-network:
+    driver: bridge
+
+volumes:
+  cc_bouncer_cache:
+    driver: local
+  cc_bouncer_logs:
+    driver: local
+  cc_bouncer_redis:
+    driver: local
+

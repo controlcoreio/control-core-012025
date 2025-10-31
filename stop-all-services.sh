@@ -65,37 +65,108 @@ echo ""
 
 # Git operations - Stage and commit changes
 echo "5️⃣  Syncing codebase to GitHub..."
+echo "=================================================="
 echo ""
 
 # Check for uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
-    echo "   📝 Staging changes..."
+    echo "   📝 Staging all changes..."
     git add -A
     
     echo "   💾 Committing changes..."
-    git commit -m "chore: end of session - sync development changes" || echo "   ℹ️  No changes to commit"
+    COMMIT_MESSAGE="chore: end of session - sync development changes $(date '+%Y-%m-%d %H:%M')"
+    git commit -m "$COMMIT_MESSAGE" || echo "   ℹ️  No changes to commit"
+    echo ""
 fi
 
-# Push to dev branch (personal repo)
-echo "   🔄 Pushing to dev branch (rakeshcontrolcore)..."
-git push origin dev 2>&1 || echo "   ⚠️  Failed to push to origin dev"
+# Show current status
+echo "   📊 Repository Status:"
+echo "   • Current branch: $(git branch --show-current)"
+echo "   • Uncommitted changes: $(git status --porcelain | wc -l | tr -d ' ') files"
+echo "   • Last commit: $(git log -1 --pretty=format:'%h - %s')"
+echo ""
 
-# Update master/main branch
-echo "   🔄 Updating master branch..."
-git checkout master 2>&1 || git checkout -b master
-git merge dev -m "Merge dev into master: sync development changes" 2>&1 || echo "   ⚠️  Merge conflicts - manual resolution needed"
+# Push to dev branch (origin - personal/working repo)
+echo "   🔄 Step 1/4: Pushing to 'dev' branch (origin)..."
+if git push origin dev 2>&1; then
+    echo "   ✅ Successfully pushed to origin/dev"
+else
+    echo "   ⚠️  Failed to push to origin/dev"
+    echo "   📝 Check: git remote -v | grep origin"
+fi
+echo ""
 
-# Push master to personal repo
-echo "   🔄 Pushing master to rakeshcontrolcore..."
-git push origin master 2>&1 || echo "   ⚠️  Failed to push to origin master"
+# Update and push master/main branch
+echo "   🔄 Step 2/4: Merging dev into 'master' branch..."
+CURRENT_BRANCH=$(git branch --show-current)
+git checkout master 2>/dev/null || git checkout -b master
 
-# Push to organization repo
-echo "   🔄 Pushing to controlcoreio organization..."
-git push org dev 2>&1 || echo "   ⚠️  Failed to push to org dev"
-git push org master 2>&1 || echo "   ⚠️  Failed to push to org master"
+if git merge dev -m "Merge dev into master: sync development changes $(date '+%Y-%m-%d')"; then
+    echo "   ✅ Successfully merged dev into master"
+    
+    echo "   🔄 Pushing master to origin..."
+    if git push origin master 2>&1; then
+        echo "   ✅ Successfully pushed to origin/master"
+    else
+        echo "   ⚠️  Failed to push to origin/master"
+    fi
+else
+    echo "   ⚠️  Merge conflicts detected!"
+    echo "   📝 Manual resolution needed:"
+    echo "      1. Resolve conflicts in the files listed above"
+    echo "      2. Run: git add <resolved-files>"
+    echo "      3. Run: git commit"
+    echo "      4. Run: git push origin master"
+    echo "   ⏭️  Skipping master branch sync..."
+    git merge --abort 2>/dev/null || true
+fi
+echo ""
 
-# Switch back to dev branch
-git checkout dev 2>&1
+# Push to organization repo (if configured)
+echo "   🔄 Step 3/4: Pushing to organization repo (org)..."
+if git remote | grep -q "^org$"; then
+    # Push dev branch
+    if git checkout dev 2>/dev/null && git push org dev 2>&1; then
+        echo "   ✅ Successfully pushed dev to org/dev"
+    else
+        echo "   ⚠️  Failed to push to org/dev"
+    fi
+    
+    # Push master branch
+    if git checkout master 2>/dev/null && git push org master 2>&1; then
+        echo "   ✅ Successfully pushed master to org/master"
+    else
+        echo "   ⚠️  Failed to push to org/master"
+    fi
+else
+    echo "   ℹ️  Organization remote 'org' not configured"
+    echo "   📝 To add: git remote add org <org-repo-url>"
+fi
+echo ""
+
+# Return to original branch
+echo "   🔄 Step 4/4: Returning to '$CURRENT_BRANCH' branch..."
+git checkout "$CURRENT_BRANCH" 2>&1
+echo "   ✅ Back on $CURRENT_BRANCH branch"
+echo ""
+
+echo "=================================================="
+echo "📤 GitHub Sync Complete"
+echo "=================================================="
+echo ""
+echo "   ✅ Changes committed and pushed"
+echo ""
+echo "   🌿 Branch Status:"
+echo "   • dev: Pushed to origin $(git remote -v | grep origin | head -1 | awk '{print $2}')"
+echo "   • master: Merged from dev and pushed to origin"
+if git remote | grep -q "^org$"; then
+echo "   • org: Pushed to organization repo"
+fi
+echo ""
+echo "   💡 Quick Commands:"
+echo "   • View commit history: git log --oneline -10"
+echo "   • Check remote status: git remote -v"
+echo "   • See what was pushed: git log origin/dev..dev"
 echo ""
 
 # Sync cc-pap-core to cc-pap-pro-tenant
@@ -138,23 +209,47 @@ echo ""
 
 # Final summary
 echo "=================================================="
-echo "✅ All services stopped and codebase synced"
+echo "✅ Shutdown Complete - Ready for Next Session"
 echo "=================================================="
 echo ""
-echo "📊 Summary:"
+echo "📊 Summary of Actions:"
 echo ""
-echo "   🐳 Docker: All containers stopped and cleaned"
-echo "   📦 Volumes: Unused volumes removed"
-echo "   💻 Services: All dev servers stopped"
+echo "   🐳 Docker Services:"
+echo "   • All Control Core containers stopped"
+echo "   • Stopped containers cleaned up"
+echo "   • Unused volumes removed"
+echo "   • Network resources freed"
 echo ""
-echo "   🔄 Git Sync:"
-echo "   • dev branch → pushed to rakeshcontrolcore"
+echo "   💻 Development Servers:"
+echo "   • cc-docs (Node.js) stopped"
+echo "   • All background processes terminated"
+echo ""
+echo "   📤 Git Synchronization:"
+echo "   • All changes committed with timestamp"
+echo "   • dev branch → pushed to origin"
 echo "   • master branch → merged from dev and pushed"
-echo "   • dev branch → pushed to controlcoreio organization"
-echo "   • master branch → pushed to controlcoreio organization"
+if git remote | grep -q "^org$"; then
+echo "   • dev & master → pushed to organization repo"
+fi
 echo ""
-echo "   🔗 cc-pap-pro-tenant: Synced with cc-pap-core"
+echo "   🔗 Service Sync:"
+echo "   • cc-pap-pro-tenant synced with cc-pap-core"
 echo ""
-echo "🎯 Ready for next development session!"
-echo "   Run './start-all-services.sh' to start again"
+echo "=================================================="
+echo ""
+echo "🎯 Ready for Next Development Session!"
+echo ""
+echo "   ▶️  Start services: ./start-all-services.sh"
+echo ""
+echo "   📚 Documentation:"
+echo "   • Main README: README.md"
+echo "   • Getting Started: 00_START_HERE.md"
+echo "   • Deployment Guides: cc-infra/client-deployments/"
+echo ""
+echo "   🔍 Check Status:"
+echo "   • Git status: git status"
+echo "   • Git log: git log --oneline -5"
+echo "   • Docker status: docker ps -a"
+echo ""
+echo "=================================================="
 echo ""

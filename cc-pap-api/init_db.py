@@ -5,7 +5,7 @@ Populate Control Core PAP database with initial data.
 
 from sqlalchemy.orm import Session
 from app.database import engine, SessionLocal
-from app.models import Base, User, Policy, ProtectedResource, PEP, Environment, AuditLog, Integration, PolicyTemplate, DecisionRequest, AIAgent, ContentInjection, RAGSystem, ContextRule, AIPolicyTemplate, StripeProduct, StripePrice, Subscription, PaymentMethod, Auth0User, MagicLink, Passkey, SAMLProvider, SAMLUser, PIPConnection, AttributeMapping, PIPSyncLog, MCPConnection, MCPTool, MCPResource, IntegrationTemplate
+from app.models import Base, User, Policy, ProtectedResource, PEP, Environment, AuditLog, Integration, PolicyTemplate, DecisionRequest, AIAgent, ContentInjection, RAGSystem, ContextRule, AIPolicyTemplate, StripeProduct, StripePrice, Subscription, PaymentMethod, Auth0User, MagicLink, Passkey, SAMLProvider, SAMLUser, PIPConnection, AttributeMapping, PIPSyncLog, MCPConnection, MCPTool, MCPResource, IntegrationTemplate, NotificationSettings, NotificationCredentials, GitHubConfiguration, OPALConfiguration, BouncerOPALConfiguration
 from datetime import datetime, timedelta
 import random
 import os

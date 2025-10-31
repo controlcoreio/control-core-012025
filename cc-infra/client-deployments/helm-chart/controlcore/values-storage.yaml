@@ -1,0 +1,272 @@
+# Storage Configuration for Control Core
+# This file defines configurable storage paths for customer deployments
+# All storage paths are configurable to meet customer requirements
+
+# Global storage configuration
+global:
+  # Base storage path - customers can override this
+  storage:
+    basePath: "/opt/control-core"
+    # Alternative common paths customers might prefer:
+    # basePath: "/var/lib/control-core"    # System data directory
+    # basePath: "/data/control-core"       # Custom data directory
+    # basePath: "/opt/control-core"        # Application directory (default)
+    # basePath: "/usr/local/control-core"  # Local installation
+
+# Persistent Volume Claims configuration
+persistence:
+  # Enable persistent storage (required for production)
+  enabled: true
+  
+  # Storage class for dynamic provisioning
+  # Customers can override based on their infrastructure:
+  # - AWS: "gp2", "gp3", "io1", "io2"
+  # - GCP: "standard", "ssd", "premium-rwo"
+  # - Azure: "default", "managed-premium"
+  # - Local: "local-path", "hostpath"
+  storageClass: ""
+  
+  # Access modes
+  accessModes:
+    - ReadWriteOnce  # Single node access
+    # - ReadWriteMany  # Multi-node access (if supported by storage class)
+  
+  # Storage paths configuration
+  paths:
+    # OPAL Server Data
+    # Contains: OPAL server configuration, policy cache, data synchronization state
+    # Purpose: Persistent storage for OPAL server state and policy synchronization
+    # Size: Typically 1-10GB depending on policy complexity
+    opal:
+      enabled: true
+      path: "/opt/control-core/data/opal"
+      size: "5Gi"
+      description: "OPAL server data and policy synchronization state"
+      
+    # PostgreSQL Database Data
+    # Contains: All application data, user accounts, policies, audit logs
+    # Purpose: Primary database storage for Control Core
+    # Size: Varies greatly (10GB to 1TB+) based on usage
+    postgresql:
+      enabled: true
+      path: "/opt/control-core/data/postgresql"
+      size: "50Gi"
+      description: "PostgreSQL database storage for all Control Core data"
+      
+    # Redis Cache Data
+    # Contains: Session data, temporary cache, rate limiting counters
+    # Purpose: High-performance caching and session storage
+    # Size: Typically 1-5GB for cache data
+    redis:
+      enabled: true
+      path: "/opt/control-core/data/redis"
+      size: "2Gi"
+      description: "Redis cache storage for sessions and temporary data"
+      
+    # Application Logs
+    # Contains: Application logs, audit logs, error logs
+    # Purpose: Centralized logging for troubleshooting and compliance
+    # Size: Varies (5GB to 100GB+) based on retention policy
+    logs:
+      enabled: true
+      path: "/opt/control-core/logs"
+      size: "20Gi"
+      description: "Application logs and audit trails"
+      
+    # Backup Storage
+    # Contains: Database backups, configuration backups
+    # Purpose: Disaster recovery and configuration management
+    # Size: 2-3x the size of primary data
+    backups:
+      enabled: true
+      path: "/opt/control-core/backups"
+      size: "100Gi"
+      description: "Backup storage for disaster recovery"
+      
+    # Temporary Storage
+    # Contains: Temporary files, uploads, processing queues
+    # Purpose: Temporary data processing and file uploads
+    # Size: Typically 5-20GB
+    temp:
+      enabled: true
+      path: "/opt/control-core/temp"
+      size: "10Gi"
+      description: "Temporary storage for file processing and uploads"
+
+# Storage configuration per component
+components:
+  # Database storage configuration
+  database:
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: "50Gi"
+      mountPath: "/var/lib/postgresql/data"
+      # Custom annotations for storage class
+      annotations: {}
+      # Node selector for storage placement
+      nodeSelector: {}
+      # Tolerations for storage nodes
+      tolerations: []
+      
+  # Redis storage configuration  
+  redis:
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: "2Gi"
+      mountPath: "/data"
+      annotations: {}
+      nodeSelector: {}
+      tolerations: []
+      
+  # OPAL server storage configuration
+  opal:
+    persistence:
+      enabled: true
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: "5Gi"
+      mountPath: "/app/data"
+      annotations: {}
+      nodeSelector: {}
+      tolerations: []
+      
+  # Frontend storage configuration (for uploads, temp files)
+  frontend:
+    persistence:
+      enabled: false  # Usually not needed for frontend
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: "1Gi"
+      mountPath: "/app/uploads"
+      annotations: {}
+      nodeSelector: {}
+      tolerations: []
+
+# Backup configuration
+backup:
+  enabled: true
+  
+  # Backup schedule (cron format)
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  
+  # Retention policy
+  retention:
+    days: 30
+    weeks: 4
+    months: 6
+    
+  # Backup storage
+  storage:
+    size: "100Gi"
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    mountPath: "/backups"
+    
+  # Backup destinations
+  destinations:
+    # Local backup
+    local:
+      enabled: true
+      path: "/backups/local"
+      
+    # S3 backup (if configured)
+    s3:
+      enabled: false
+      bucket: "control-core-backups"
+      region: "us-east-1"
+      prefix: "backups/"
+      
+    # Azure Blob backup (if configured)
+    azure:
+      enabled: false
+      container: "control-core-backups"
+      account: ""
+      
+    # GCP Cloud Storage backup (if configured)
+    gcp:
+      enabled: false
+      bucket: "control-core-backups"
+      prefix: "backups/"
+
+# Logging configuration
+logging:
+  # Log retention policy
+  retention:
+    days: 30
+    maxSize: "1Gi"
+    
+  # Log levels
+  levels:
+    frontend: "info"
+    pap-api: "info"
+    bouncer: "info"
+    pdp: "info"
+    opal: "info"
+    database: "warning"
+    
+  # Log aggregation (if enabled)
+  aggregation:
+    enabled: false
+    type: "elasticsearch"  # elasticsearch, splunk, fluentd
+    endpoint: ""
+    index: "control-core-logs"
+
+# Security configuration for storage
+security:
+  # File permissions
+  permissions:
+    owner: "1000:1000"  # User:Group ID
+    mode: "0755"        # Directory permissions
+    fileMode: "0644"    # File permissions
+    
+  # SELinux context (if applicable)
+  selinux:
+    enabled: false
+    context: "system_u:object_r:container_file_t:s0"
+    
+  # Encryption at rest
+  encryption:
+    enabled: false
+    algorithm: "AES-256"
+    keyManagement: "kubernetes"  # kubernetes, external
+    
+# Performance tuning
+performance:
+  # I/O optimization
+  io:
+    scheduler: "mq-deadline"  # mq-deadline, bfq, none
+    readAhead: "4096"
+    
+  # Memory optimization
+  memory:
+    sharedBuffers: "256MB"      # PostgreSQL
+    effectiveCacheSize: "1GB"   # PostgreSQL
+    maxConnections: "100"       # PostgreSQL
+    
+# Monitoring configuration
+monitoring:
+  # Storage monitoring
+  storage:
+    enabled: true
+    metrics:
+      - disk_usage
+      - disk_io
+      - file_count
+      
+  # Alerting thresholds
+  alerts:
+    diskUsage:
+      warning: 80    # Percentage
+      critical: 90   # Percentage
+    diskIO:
+      warning: 1000  # IOPS
+      critical: 2000 # IOPS

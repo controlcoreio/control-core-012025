@@ -38,8 +38,8 @@ export function AzureADOAuthFields({ config, onChange, tenantId }: AzureADOAuthF
   }, [tenantId, config, onChange]);
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white border-blue-200">
-      <h5 className="text-sm font-semibold text-blue-800">Azure AD OAuth 2.0 Configuration</h5>
+    <div className="space-y-4 p-4 border rounded-lg bg-background border-blue-200 dark:border-blue-800">
+      <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-200">Azure AD OAuth 2.0 Configuration</h5>
       
       <div className="space-y-4">
         <div className="space-y-2">
@@ -58,7 +58,7 @@ export function AzureADOAuthFields({ config, onChange, tenantId }: AzureADOAuthF
             }}
             className="w-full"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Find your Tenant ID in Azure Portal → Azure Active Directory → Overview
           </p>
         </div>

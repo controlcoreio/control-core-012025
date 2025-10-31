@@ -1962,6 +1962,804 @@ visible_rows[row] if {
 
 ---
 
-**You're now equipped to write powerful, secure, and efficient Rego policies!** Start with simple patterns and gradually incorporate more advanced techniques as needed.
+## Advanced Rego Features
+
+This section covers advanced Rego capabilities for building sophisticated policies that go beyond basic conditions.
+
+### Advanced Conditions & Logic
+
+#### Nested Conditions with some/every
+
+The `some` and `every` keywords enable powerful iteration and validation patterns:
+
+**Using `some` for iteration**:
+```rego
+# Check if ANY user has admin role
+has_admin_user if {
+    some user in data.users
+    user.role == "admin"
+}
+
+# Find admin user with specific permission
+admin_with_permission(permission) if {
+    some user in data.users
+    user.role == "admin"
+    permission in user.permissions
+}
+```
+
+**Using `every` for validation**:
+```rego
+# ALL users must have MFA enabled
+all_users_have_mfa if {
+    every user in data.users {
+        user.mfa_enabled == true
+    }
+}
+
+# All transactions must be under limit
+transactions_valid if {
+    every txn in input.transactions {
+        txn.amount < data.limits.max_transaction
+    }
+}
+```
+
+**Complex boolean logic**:
+```rego
+# Multi-level approval workflow
+allow if {
+    # Manager approval required
+    some approval in input.approvals
+    approval.role == "manager"
+    approval.status == "approved"
+    
+    # AND either VP approval OR amount under threshold
+    {
+        some vp_approval in input.approvals
+        vp_approval.role == "vp"
+        vp_approval.status == "approved"
+    } or {
+        input.transaction.amount < 10000
+    }
+}
+```
+
+#### Nested Rule Structures
+
+```rego
+# Hierarchical permission checking
+allow if {
+    resource_accessible
+    action_permitted
+}
+
+resource_accessible if {
+    input.resource.type == "document"
+    document_access_granted
+}
+
+document_access_granted if {
+    input.resource.classification == "public"
+}
+
+document_access_granted if {
+    input.resource.classification == "internal"
+    employee_access
+}
+
+document_access_granted if {
+    input.resource.classification == "confidential"
+    manager_access
+}
+
+employee_access if {
+    input.user.employee_id != ""
+}
+
+manager_access if {
+    input.user.role in ["manager", "director", "vp"]
+}
+
+action_permitted if {
+    input.action in allowed_actions
+}
+
+allowed_actions contains "read" if { employee_access }
+allowed_actions contains "write" if { manager_access }
+allowed_actions contains "delete" if { input.user.role == "admin" }
+```
+
+### Comprehensions
+
+Comprehensions are powerful tools for transforming and filtering data.
+
+#### Array Comprehensions
+
+**Filtering**:
+```rego
+# Get all admin users
+admin_users := [user |
+    some user in data.users
+    user.role == "admin"
+]
+
+# Get user IDs with high clearance
+high_clearance_ids := [user.id |
+    some user in data.users
+    user.clearance_level >= 5
+]
+
+# Complex filtering with multiple conditions
+eligible_approvers := [user |
+    some user in data.users
+    user.role in ["manager", "director"]
+    user.department == input.resource.department
+    user.active == true
+]
+```
+
+**Transformation**:
+```rego
+# Extract just the names
+user_names := [user.name | some user in data.users]
+
+# Create structured list
+user_summaries := [{"id": user.id, "name": user.name} |
+    some user in data.users
+]
+
+# Permission aggregation
+all_user_permissions := [perm |
+    some user in data.users
+    some perm in user.permissions
+]
+```
+
+#### Object Comprehensions
+
+**Creating mappings**:
+```rego
+# Map user ID to role
+user_roles := {user.id: user.role |
+    some user in data.users
+}
+
+# Build permission matrix
+permission_matrix := {user.id: user.permissions |
+    some user in data.users
+    user.active == true
+}
+
+# Department user count
+dept_counts := {dept: count(users) |
+    some dept in department_list
+    users := [u | some u in data.users; u.department == dept]
+}
+```
+
+**Data transformation**:
+```rego
+# Transform array to lookup object
+resource_by_id := {resource.id: resource |
+    some resource in input.resources
+}
+
+# Index by multiple keys
+users_by_email := {user.email: user |
+    some user in data.users
+}
+```
+
+#### Set Comprehensions
+
+**Creating unique sets**:
+```rego
+# All unique roles in the system
+all_roles := {user.role |
+    some user in data.users
+}
+
+# All departments with active users
+active_departments := {user.department |
+    some user in data.users
+    user.active == true
+}
+
+# Permissions across all admins
+admin_permissions := {perm |
+    some user in data.users
+    user.role == "admin"
+    some perm in user.permissions
+}
+```
+
+### Functions and Helper Rules
+
+Create reusable logic with functions and helper rules.
+
+#### Helper Rules
+
+```rego
+# Reusable validation functions
+is_admin if {
+    input.user.role == "admin"
+}
+
+is_manager if {
+    input.user.role == "manager"
+}
+
+is_employee if {
+    input.user.employee_id != ""
+}
+
+# Composite helpers
+has_elevated_access if { is_admin }
+has_elevated_access if { is_manager }
+
+# Parameterized helpers
+user_has_role(role) if {
+    input.user.roles[_] == role
+}
+
+user_has_permission(permission) if {
+    input.user.permissions[_] == permission
+}
+```
+
+#### Functions with Arguments
+
+```rego
+# Calculate risk score
+risk_score(transaction) := score if {
+    base_score := transaction.amount / 1000
+    multiplier := transaction_type_multiplier(transaction.type)
+    score := base_score * multiplier
+}
+
+transaction_type_multiplier("wire_transfer") := 2.0
+transaction_type_multiplier("ach") := 1.0
+transaction_type_multiplier("check") := 0.5
+transaction_type_multiplier(_) := 1.0  # default
+
+# Permission calculation
+effective_permissions(user) := permissions if {
+    # Direct permissions
+    direct := user.permissions
+    
+    # Role-based permissions
+    role_perms := [perm |
+        some role in user.roles
+        some perm in data.role_permissions[role]
+    ]
+    
+    # Combine and deduplicate
+    permissions := array.concat(direct, role_perms)
+}
+```
+
+#### Custom Validation Functions
+
+```rego
+# Validate email format
+is_valid_email(email) if {
+    regex.match(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`, email)
+}
+
+# Validate phone number
+is_valid_phone(phone) if {
+    regex.match(`^\+?[1-9]\d{1,14}$`, phone)
+}
+
+# Validate credit card (Luhn algorithm)
+is_valid_card(number) if {
+    # Implementation of Luhn algorithm
+    digits := [to_number(d) | some d in split(number, "")]
+    sum := luhn_sum(digits, count(digits) - 1, false)
+    sum % 10 == 0
+}
+
+luhn_sum(digits, index, double) := sum if {
+    index < 0
+    sum := 0
+} else := sum if {
+    digit := digits[index]
+    value := digit * (1 + to_number(double))
+    adjusted := value - (9 * (value > 9))
+    sum := adjusted + luhn_sum(digits, index - 1, not double)
+}
+```
+
+### Data Lookups and External Data
+
+Integrate external data sources into policy decisions.
+
+#### Accessing the Data Document
+
+```rego
+# Direct data access
+allow if {
+    user_role := data.user_roles[input.user.id]
+    user_role == "admin"
+}
+
+# Hierarchical data access
+allow if {
+    dept := data.departments[input.user.department]
+    dept.classification == "secure"
+    input.resource.classification <= dept.max_resource_level
+}
+```
+
+#### PIP Integration Patterns
+
+Policy Information Points (PIPs) provide real-time context:
+
+```rego
+# User data from Auth0 PIP
+allow if {
+    # PIP data available at data.pip.auth0
+    user_profile := data.pip.auth0.users[input.user.id]
+    user_profile.email_verified == true
+    user_profile.mfa_enabled == true
+}
+
+# Location data from IP Geolocation PIP
+allow if {
+    # PIP data available at data.pip.ipgeo
+    location := data.pip.ipgeo.lookup[input.request.ip]
+    location.country in data.allowed_countries
+}
+
+# Real-time risk scoring from custom PIP
+deny if {
+    risk_data := data.pip.risk_engine.score[input.user.id]
+    risk_data.score > data.thresholds.max_risk
+}
+```
+
+#### Dynamic Permission Lookups
+
+```rego
+# Load permissions from external system
+user_permissions contains permission if {
+    # Fetch from PIP at policy evaluation time
+    user_data := data.pip.permissions.users[input.user.id]
+    some permission in user_data.permissions
+}
+
+# Resource-specific permissions
+allow if {
+    resource_acl := data.pip.acls.resources[input.resource.id]
+    input.user.id in resource_acl.allowed_users
+}
+
+# Role hierarchy from LDAP
+user_roles contains role if {
+    ldap_user := data.pip.ldap.users[input.user.dn]
+    some group in ldap_user.groups
+    role := data.role_mappings[group]
+}
+```
+
+### Query Patterns
+
+Advanced query patterns for complex scenarios.
+
+#### Universal Quantification (every)
+
+```rego
+# All team members must approve
+allow if {
+    team := data.teams[input.resource.team_id]
+    every member in team.members {
+        some approval in input.approvals
+        approval.user_id == member.id
+        approval.status == "approved"
+    }
+}
+
+# All documents must be classified
+documents_valid if {
+    every doc in input.documents {
+        doc.classification in ["public", "internal", "confidential", "secret"]
+    }
+}
+
+# All regions must be compliant
+compliant if {
+    every region in input.deployment.regions {
+        region in data.compliant_regions
+        data.region_config[region].encryption_enabled == true
+    }
+}
+```
+
+#### Existential Quantification (some)
+
+```rego
+# At least one admin must approve
+allow if {
+    some approval in input.approvals
+    approval.role == "admin"
+    approval.status == "approved"
+}
+
+# Any developer can read
+allow if {
+    input.action == "read"
+    some role in input.user.roles
+    role == "developer"
+}
+
+# Check if any violation exists
+has_violations if {
+    some check in security_checks
+    not check.passed
+}
+```
+
+#### Combined Patterns
+
+```rego
+# At least 2 managers must approve, and no director can reject
+allow if {
+    # Count manager approvals
+    manager_approvals := count([a |
+        some a in input.approvals
+        a.role == "manager"
+        a.status == "approved"
+    ])
+    manager_approvals >= 2
+    
+    # Check no director rejections
+    not director_rejected
+}
+
+director_rejected if {
+    some approval in input.approvals
+    approval.role == "director"
+    approval.status == "rejected"
+}
+```
+
+### OPA v1.10.0+ Features
+
+Take advantage of the latest OPA capabilities.
+
+#### Enhanced Built-in Functions
+
+```rego
+import rego.v1
+
+# New string functions (OPA 0.60+)
+normalized_email := strings.trim_space(lower(input.user.email))
+
+# Template rendering (OPA 0.58+)
+message := sprintf("User %s attempted %s on %s", [
+    input.user.name,
+    input.action,
+    input.resource.name
+])
+
+# Advanced JSON operations
+filtered_data := json.remove(input.sensitive_data, ["/ssn", "/credit_card"])
+
+# UUID generation for audit trails
+audit_id := uuid.rfc4122()
+```
+
+#### Performance Optimizations
+
+**Partial evaluation** (Enterprise feature):
+```rego
+# Mark rules for partial evaluation
+allow if {
+    # This will be partially evaluated at compile time
+    input.user.department in data.authorized_departments
+}
+```
+
+**Caching strategies**:
+```rego
+# Cache expensive computations
+user_permissions := cached_permissions(input.user.id)
+
+cached_permissions(user_id) := permissions if {
+    # Complex permission calculation
+    permissions := compute_effective_permissions(user_id)
+}
+```
+
+#### API Extensions
+
+**Custom built-in functions** (requires OPA bundle):
+```rego
+# Use custom functions from your bundle
+allow if {
+    # Custom cryptographic verification
+    custom.verify_signature(input.payload, input.signature, data.public_key)
+}
+
+# Custom geospatial functions
+allow if {
+    distance := custom.geo_distance(
+        input.user.location,
+        input.resource.location
+    )
+    distance < data.max_distance_km
+}
+```
+
+---
+
+## Real-World Advanced Examples
+
+### Financial Compliance (FINTRAC, OSFI)
+
+```rego
+package controlcore.compliance.fintrac
+
+import rego.v1
+
+# FINTRAC: Large cash transaction reporting
+reportable_transaction if {
+    input.transaction.type == "cash"
+    input.transaction.amount >= 10000  # CAD
+    input.transaction.currency == "CAD"
+}
+
+# FINTRAC: Suspicious transaction monitoring
+suspicious_transaction if {
+    # Multiple transactions just below reporting threshold
+    recent_transactions := [t |
+        some t in data.transactions[input.user.id]
+        t.timestamp > time.now_ns() - (24 * 3600 * 1000000000)  # 24 hours
+        t.amount >= 9000
+        t.amount < 10000
+    ]
+    count(recent_transactions) >= 3
+}
+
+# OSFI: Know Your Client validation
+allow if {
+    input.action == "high_risk_transaction"
+    kyc_complete(input.user.id)
+    risk_assessment_current(input.user.id)
+}
+
+kyc_complete(user_id) if {
+    kyc := data.kyc_records[user_id]
+    kyc.identity_verified == true
+    kyc.address_verified == true
+    kyc.documents_valid == true
+}
+
+risk_assessment_current(user_id) if {
+    assessment := data.risk_assessments[user_id]
+    age_days := (time.now_ns() - assessment.timestamp) / (24 * 3600 * 1000000000)
+    age_days <= 365  # Annual refresh required
+}
+```
+
+### Healthcare (HIPAA)
+
+```rego
+package controlcore.compliance.hipaa
+
+import rego.v1
+
+# HIPAA: Minimum necessary standard
+allow if {
+    input.action == "read"
+    input.resource.type == "patient_record"
+    
+    # Only necessary fields for user's role
+    requested_fields := input.query.fields
+    necessary_fields := minimum_necessary_fields(input.user.role)
+    
+    every field in requested_fields {
+        field in necessary_fields
+    }
+}
+
+minimum_necessary_fields("doctor") := [
+    "patient_id", "name", "dob", "diagnosis",
+    "medications", "allergies", "treatments"
+]
+
+minimum_necessary_fields("nurse") := [
+    "patient_id", "name", "medications", "vital_signs"
+]
+
+minimum_necessary_fields("billing") := [
+    "patient_id", "name", "insurance", "procedures"
+]
+
+# Break-the-glass emergency access
+allow if {
+    input.emergency == true
+    input.user.role in ["doctor", "nurse"]
+    
+    # Log emergency access for audit
+    emergency_access_logged
+}
+
+emergency_access_logged if {
+    # Would trigger external logging via PIP
+    data.pip.audit.log_emergency_access(input)
+}
+```
+
+### AI Agent Control with Prompt Filtering
+
+```rego
+package controlcore.ai.prompt_filter
+
+import rego.v1
+
+# Block prompts trying to extract PII
+deny if {
+    prompt := lower(input.prompt)
+    
+    # Check for PII extraction attempts
+    some pattern in pii_extraction_patterns
+    contains(prompt, pattern)
+}
+
+pii_extraction_patterns := [
+    "show me all email addresses",
+    "list all phone numbers",
+    "give me social security",
+    "display credit card",
+    "export user data"
+]
+
+# Block prompt injection attempts
+deny if {
+    prompt := input.prompt
+    
+    # Check for instruction override attempts
+    some pattern in injection_patterns
+    regex.match(pattern, prompt)
+}
+
+injection_patterns := [
+    `(?i)ignore\s+previous\s+instructions`,
+    `(?i)disregard\s+.*\s+above`,
+    `(?i)system\s*:\s*you\s+are`,
+    `(?i)act\s+as\s+if`,
+]
+
+# Content filtering for responses
+filtered_response := response if {
+    response := {
+        "content": mask_sensitive_data(input.ai_response),
+        "metadata": input.metadata
+    }
+}
+
+mask_sensitive_data(text) := masked if {
+    # Mask SSNs
+    step1 := regex.replace(text, `\d{3}-\d{2}-\d{4}`, "***-**-****")
+    
+    # Mask credit cards
+    step2 := regex.replace(step1, `\d{4}\s?\d{4}\s?\d{4}\s?\d{4}`, "**** **** **** ****")
+    
+    # Mask emails
+    masked := regex.replace(step2, `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`, "***@***.***")
+}
+```
+
+### Data Masking Patterns
+
+```rego
+package controlcore.data.masking
+
+import rego.v1
+
+# Field-level masking based on user clearance
+masked_fields contains field if {
+    some field in input.response.fields
+    field_classification := data.field_classifications[field]
+    field_classification > input.user.clearance_level
+}
+
+filtered_response := response if {
+    response := {k: v |
+        some k, v in input.response
+        not k in masked_fields
+    }
+}
+
+# Partial masking for different user types
+mask_value(field, value, user_role) := masked if {
+    field == "ssn"
+    user_role == "customer_service"
+    masked := concat("", ["***-**-", substring(value, 7, -1)])
+} else := masked if {
+    field == "credit_card"
+    masked := concat("", ["**** **** **** ", substring(value, 15, -1)])
+} else := value  # No masking needed
+```
+
+### Time-Based Access Control
+
+```rego
+package controlcore.temporal
+
+import rego.v1
+
+# Business hours check
+is_business_hours if {
+    [hour, _, _] := time.clock([time.now_ns(), "America/New_York"])
+    [_, _, weekday] := time.date([time.now_ns()])
+    
+    weekday >= 1  # Monday
+    weekday <= 5  # Friday
+    hour >= 9
+    hour < 17
+}
+
+# Maintenance window check
+is_maintenance_window if {
+    now := time.now_ns()
+    some window in data.maintenance_windows
+    now >= window.start_time
+    now <= window.end_time
+}
+
+# Time-limited permissions
+allow if {
+    input.action == "write"
+    temp_access := data.temporary_access[input.user.id]
+    time.now_ns() <= temp_access.expires_at
+}
+```
+
+### Location-Based Restrictions
+
+```rego
+package controlcore.geo
+
+import rego.v1
+
+# Allowed countries
+allow if {
+    input.action == "access"
+    
+    location := data.pip.ipgeo.lookup[input.request.ip]
+    location.country in data.allowed_countries
+}
+
+# Distance-based access
+allow if {
+    user_location := input.user.location
+    resource_location := data.resources[input.resource.id].location
+    
+    distance_km := geo_distance(user_location, resource_location)
+    distance_km <= data.max_distance_km
+}
+
+# Calculate distance between coordinates
+geo_distance(loc1, loc2) := distance_km if {
+    # Haversine formula
+    lat1 := loc1.lat * 3.14159265359 / 180
+    lat2 := loc2.lat * 3.14159265359 / 180
+    dlat := lat2 - lat1
+    dlon := (loc2.lon - loc1.lon) * 3.14159265359 / 180
+    
+    a := (sin(dlat/2) * sin(dlat/2)) + 
+         (cos(lat1) * cos(lat2) * sin(dlon/2) * sin(dlon/2))
+    c := 2 * atan2(sqrt(a), sqrt(1-a))
+    
+    distance_km := 6371 * c  # Earth's radius in km
+}
+```
+
+---
+
+**You're now equipped to write powerful, secure, and efficient Rego policies!** Start with simple patterns and gradually incorporate more advanced techniques as needed. The no-code policy builder is great for basic policies, but use the code editor when you need these advanced features.
 
 For hands-on practice, use the [OPA Playground](https://play.openpolicyagent.org/) or the Control Core policy editor with live testing.

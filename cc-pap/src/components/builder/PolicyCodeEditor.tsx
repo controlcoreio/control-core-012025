@@ -7,7 +7,9 @@ import {
   Code, 
   AlertCircle, 
   CheckCircle, 
-  RefreshCw
+  RefreshCw,
+  FileCode,
+  ExternalLink
 } from "lucide-react";
 import { MonacoRegoEditor } from "@/components/editor/MonacoRegoEditor";
 import { useToast } from "@/hooks/use-toast";
@@ -235,6 +237,17 @@ deny {
         <Button variant="outline" size="sm" onClick={() => validateWithRegal(code)}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Validate
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => window.open('https://docs.controlcore.io/guides/rego-guidelines#advanced-rego-features', '_blank')}
+          title="View advanced Rego patterns and examples"
+        >
+          <FileCode className="h-4 w-4 mr-2" />
+          Advanced Guide
+          <ExternalLink className="h-3 w-3 ml-1" />
         </Button>
       </div>
 

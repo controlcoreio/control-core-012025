@@ -1,3 +1,16 @@
+# Control Core OPAL Library
+
+> **ℹ️ NOTE FOR CONTROL CORE USERS**: This directory contains Control Core's fork/customization of the OPAL (Open Policy Administration Layer) library. OPAL is integrated into `cc-bouncer` and is **not deployed as a standalone service**. 
+>
+> **For Control Core deployments**:
+> - OPAL functionality is built into each cc-bouncer instance
+> - No separate OPAL deployment is required
+> - Includes Cedar agent support and Control Core-specific customizations
+>
+> **This is a library/dependency, not a deployment component.**
+
+---
+
 <p  align="center">
  <img src="https://github.com/permitio/opal/assets/4082578/4e21f85f-30ab-43e2-92de-b82f78888c71" height=170 alt="opal" border="0" />
 </p>

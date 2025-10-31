@@ -1,0 +1,20 @@
+{{- if .Values.opal.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.opal.name }}
+  labels:
+    app: {{ .Values.opal.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.opal.service.type }}
+  ports:
+    - port: {{ .Values.opal.service.port }}
+      targetPort: {{ .Values.opal.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.opal.name }}
+    stack: {{ .Values.global.stack }}
+    env: {{ .Values.global.environment }}
+{{- end }}

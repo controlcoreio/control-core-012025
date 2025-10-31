@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,10 @@ import { useToast } from "@/hooks/use-toast";
 import { UnifiedBouncerDownload } from "@/components/shared/UnifiedBouncerDownload";
 import { usePEPs } from "@/hooks/use-peps";
 import { Link } from "react-router-dom";
+import { BouncerOPALConfig } from "./BouncerOPALConfig";
+import { BouncerGitHubTab } from "./BouncerGitHubTab";
+import { pepApi, PEPConfigData, IndividualPEPConfigData, GlobalPEPConfigData } from "@/services/pepApi";
+import { Loader2 } from "lucide-react";
 
 interface DeployedPEP {
   id: string;
@@ -150,7 +154,25 @@ export function PEPManagementPage() {
   const [selectedBouncer, setSelectedBouncer] = useState<string | null>(null);
   const [bouncerConfig, setBouncerConfig] = useState<BouncerConfiguration | null>(null);
   const [activeTab, setActiveTab] = useState<string>("status");
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isSavingGlobal, setIsSavingGlobal] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [globalConfig, setGlobalConfig] = useState<GlobalPEPConfigData>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  
+  // Warn user about unsaved changes before leaving page
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
   
   if (isLoading) {
     return (
@@ -230,16 +252,178 @@ export function PEPManagementPage() {
     }
   };
 
-  const handleSaveConfiguration = () => {
-    if (bouncerConfig) {
+  // Validation functions
+  const validateURL = (url: string): boolean => {
+    if (!url) return true; // Empty is valid (optional field)
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const validatePositiveNumber = (value: number): boolean => {
+    return value > 0;
+  };
+
+  const validateConfiguration = (config: BouncerConfiguration): Record<string, string> => {
+    const errors: Record<string, string> = {};
+
+    // Validate name
+    if (!config.name || config.name.trim() === '') {
+      errors.name = 'Bouncer name is required';
+    }
+
+    // Validate URLs
+    if (config.targetUrl && !validateURL(config.targetUrl)) {
+      errors.targetUrl = 'Invalid target URL format';
+    }
+    if (config.proxyUrl && !validateURL(config.proxyUrl)) {
+      errors.proxyUrl = 'Invalid proxy URL format';
+    }
+
+    // Validate traffic configuration
+    if (!validatePositiveNumber(config.trafficConfig.rateLimitPerMinute)) {
+      errors.rateLimitPerMinute = 'Rate limit must be a positive number';
+    }
+    if (!validatePositiveNumber(config.trafficConfig.maxConnections)) {
+      errors.maxConnections = 'Max connections must be a positive number';
+    }
+    if (!validatePositiveNumber(config.trafficConfig.timeoutSeconds)) {
+      errors.timeoutSeconds = 'Timeout must be a positive number';
+    }
+    if (config.trafficConfig.retryAttempts < 0) {
+      errors.retryAttempts = 'Retry attempts cannot be negative';
+    }
+
+    return errors;
+  };
+
+  const handleSaveConfiguration = async () => {
+    if (!bouncerConfig || !selectedBouncer) return;
+
+    // Validate configuration
+    const errors = validateConfiguration(bouncerConfig);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors before saving",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSavingConfig(true);
+    setValidationErrors({});
+
+    try {
+      const pep = deployedPEPs.find(p => p.id === selectedBouncer);
+      if (!pep) throw new Error("Bouncer not found");
+
+      // Prepare basic configuration
+      const basicConfig: PEPConfigData = {
+        name: bouncerConfig.name,
+        deployment_mode: bouncerConfig.deploymentMode,
+        target_url: bouncerConfig.targetUrl || undefined,
+        proxy_url: bouncerConfig.proxyUrl || undefined,
+        dns_domain: bouncerConfig.dnsConfig.domain || undefined,
+        dns_subdomain: bouncerConfig.dnsConfig.subdomain || undefined,
+        dns_provider: bouncerConfig.dnsConfig.dnsProvider,
+        dns_ttl: bouncerConfig.dnsConfig.ttl,
+        ssl_enabled: bouncerConfig.sslConfig.enabled,
+        ssl_certificate_type: bouncerConfig.sslConfig.certificateType,
+        ssl_auto_renew: bouncerConfig.sslConfig.autoRenew,
+        ingress_enabled: bouncerConfig.trafficConfig.ingressEnabled,
+        egress_enabled: bouncerConfig.trafficConfig.egressEnabled,
+        rate_limit_per_minute: bouncerConfig.trafficConfig.rateLimitPerMinute,
+        max_connections: bouncerConfig.trafficConfig.maxConnections,
+        timeout_seconds: bouncerConfig.trafficConfig.timeoutSeconds,
+        retry_attempts: bouncerConfig.trafficConfig.retryAttempts,
+      };
+
+      // Prepare advanced configuration
+      const advancedConfig: IndividualPEPConfigData = {
+        assigned_policy_bundles: bouncerConfig.policies,
+        upstream_target_url: bouncerConfig.targetUrl || undefined,
+        public_proxy_url: bouncerConfig.proxyUrl || undefined,
+      };
+
+      // Save both configurations
+      await pepApi.saveCompletePEPConfiguration(
+        parseInt(selectedBouncer),
+        basicConfig,
+        advancedConfig
+      );
+
       toast({
         title: "Configuration saved",
-        description: "Bouncer configuration has been updated successfully",
+        description: `Bouncer "${bouncerConfig.name}" has been updated successfully`,
       });
+
+      setHasUnsavedChanges(false);
       setIsConfiguring(false);
       setSelectedBouncer(null);
       setBouncerConfig(null);
+
+      // Optimistic update: Refresh PEP list without full page reload
+      try {
+        const updatedPEPs = await pepApi.fetchPEPs();
+        // The usePEPs hook will automatically update on next render
+        // or we can manually trigger a refresh if the hook supports it
+        window.location.reload(); // TODO: Remove this when setPEPs from usePEPs is used
+      } catch (error) {
+        console.error('Error refreshing PEPs:', error);
+        // Still show success since save succeeded
+      }
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save bouncer configuration",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingConfig(false);
     }
+  };
+
+  const handleSaveGlobalSettings = async () => {
+    setIsSavingGlobal(true);
+
+    try {
+      await pepApi.saveGlobalConfiguration(globalConfig);
+
+      toast({
+        title: "Global settings saved",
+        description: "Global PEP configuration has been updated successfully",
+      });
+
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Error saving global configuration:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save global configuration",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingGlobal(false);
+    }
+  };
+
+  const handleCancelConfiguration = () => {
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm('You have unsaved changes. Are you sure you want to cancel?');
+      if (!confirmed) return;
+    }
+    
+    setIsConfiguring(false);
+    setSelectedBouncer(null);
+    setBouncerConfig(null);
+    setHasUnsavedChanges(false);
+    setValidationErrors({});
   };
 
   const getDeploymentModeIcon = (mode: 'reverse-proxy' | 'sidecar') => {
@@ -375,8 +559,9 @@ export function PEPManagementPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="status">Deployment Status</TabsTrigger>
+          <TabsTrigger value="github">GitHub Sync</TabsTrigger>
           <TabsTrigger value="configuration">Configuration & Settings</TabsTrigger>
           <TabsTrigger value="download">Download Center</TabsTrigger>
         </TabsList>
@@ -783,9 +968,18 @@ export function PEPManagementPage() {
 
               {/* Save Button */}
               <div className="flex justify-end pt-4 border-t">
-                <Button>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Global Settings
+                <Button onClick={handleSaveGlobalSettings} disabled={isSavingGlobal}>
+                  {isSavingGlobal ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Global Settings
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
@@ -838,6 +1032,7 @@ export function PEPManagementPage() {
 
           {/* Individual Bouncer Advanced Configuration */}
           {isConfiguring && bouncerConfig ? (
+            <>
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -845,19 +1040,34 @@ export function PEPManagementPage() {
                     <CardTitle className="flex items-center gap-2">
                       <Settings className="h-5 w-5" />
                       Configure Bouncer: {bouncerConfig.name}
+                      {hasUnsavedChanges && (
+                        <Badge variant="outline" className="text-orange-600">
+                          Unsaved Changes
+                        </Badge>
+                      )}
                     </CardTitle>
                     <CardDescription>
                       Configure deployment mode, URLs, DNS, SSL, and traffic settings
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={handleSaveConfiguration}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Configuration
+                    <Button onClick={handleSaveConfiguration} disabled={isSavingConfig}>
+                      {isSavingConfig ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save Configuration
+                        </>
+                      )}
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => setIsConfiguring(false)}
+                      onClick={handleCancelConfiguration}
+                      disabled={isSavingConfig}
                     >
                       <X className="h-4 w-4 mr-2" />
                       Cancel
@@ -912,12 +1122,23 @@ export function PEPManagementPage() {
                       <Input
                         id="bouncerName"
                         value={bouncerConfig.name}
-                        onChange={(e) => setBouncerConfig({
-                          ...bouncerConfig,
-                          name: e.target.value
-                        })}
+                        onChange={(e) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            name: e.target.value
+                          });
+                          setHasUnsavedChanges(true);
+                          // Clear name validation error if exists
+                          if (validationErrors.name) {
+                            setValidationErrors({...validationErrors, name: ''});
+                          }
+                        }}
                         placeholder="Production API Bouncer East-1"
+                        className={validationErrors.name ? 'border-red-500' : ''}
                       />
+                      {validationErrors.name && (
+                        <p className="text-xs text-red-500">{validationErrors.name}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         User-friendly name for monitoring and visualization
                       </p>
@@ -1000,12 +1221,22 @@ export function PEPManagementPage() {
                       <Input
                         id="upstream-url"
                         value={bouncerConfig.targetUrl || ""}
-                        onChange={(e) => setBouncerConfig({
-                          ...bouncerConfig,
-                          targetUrl: e.target.value
-                        })}
+                        onChange={(e) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            targetUrl: e.target.value
+                          });
+                          setHasUnsavedChanges(true);
+                          if (validationErrors.targetUrl) {
+                            setValidationErrors({...validationErrors, targetUrl: ''});
+                          }
+                        }}
                         placeholder="https://api.yourservice.com"
+                        className={validationErrors.targetUrl ? 'border-red-500' : ''}
                       />
+                      {validationErrors.targetUrl && (
+                        <p className="text-xs text-red-500">{validationErrors.targetUrl}</p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Protected service URL that PEP forwards allowed requests to
                       </p>
@@ -1035,12 +1266,22 @@ export function PEPManagementPage() {
                     <Input
                       id="proxy-url"
                       value={bouncerConfig.proxyUrl || ""}
-                      onChange={(e) => setBouncerConfig({
-                        ...bouncerConfig,
-                        proxyUrl: e.target.value
-                      })}
+                      onChange={(e) => {
+                        setBouncerConfig({
+                          ...bouncerConfig,
+                          proxyUrl: e.target.value
+                        });
+                        setHasUnsavedChanges(true);
+                        if (validationErrors.proxyUrl) {
+                          setValidationErrors({...validationErrors, proxyUrl: ''});
+                        }
+                      }}
                       placeholder="https://bouncer-prod.yourcompany.com"
+                      className={validationErrors.proxyUrl ? 'border-red-500' : ''}
                     />
+                    {validationErrors.proxyUrl && (
+                      <p className="text-xs text-red-500">{validationErrors.proxyUrl}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Public URL where this bouncer is accessible to clients
                     </p>
@@ -1209,13 +1450,16 @@ export function PEPManagementPage() {
                       <Switch
                         id="ingressEnabled"
                         checked={bouncerConfig.trafficConfig.ingressEnabled}
-                        onCheckedChange={(checked) => setBouncerConfig({
-                          ...bouncerConfig,
-                          trafficConfig: {
-                            ...bouncerConfig.trafficConfig,
-                            ingressEnabled: checked
-                          }
-                        })}
+                        onCheckedChange={(checked) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            trafficConfig: {
+                              ...bouncerConfig.trafficConfig,
+                              ingressEnabled: checked
+                            }
+                          });
+                          setHasUnsavedChanges(true);
+                        }}
                       />
                       <Label htmlFor="ingressEnabled">Enable Ingress Traffic</Label>
                     </div>
@@ -1223,13 +1467,16 @@ export function PEPManagementPage() {
                       <Switch
                         id="egressEnabled"
                         checked={bouncerConfig.trafficConfig.egressEnabled}
-                        onCheckedChange={(checked) => setBouncerConfig({
-                          ...bouncerConfig,
-                          trafficConfig: {
-                            ...bouncerConfig.trafficConfig,
-                            egressEnabled: checked
-                          }
-                        })}
+                        onCheckedChange={(checked) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            trafficConfig: {
+                              ...bouncerConfig.trafficConfig,
+                              egressEnabled: checked
+                            }
+                          });
+                          setHasUnsavedChanges(true);
+                        }}
                       />
                       <Label htmlFor="egressEnabled">Enable Egress Traffic</Label>
                     </div>
@@ -1239,15 +1486,25 @@ export function PEPManagementPage() {
                         id="rateLimit"
                         type="number"
                         value={bouncerConfig.trafficConfig.rateLimitPerMinute}
-                        onChange={(e) => setBouncerConfig({
-                          ...bouncerConfig,
-                          trafficConfig: {
-                            ...bouncerConfig.trafficConfig,
-                            rateLimitPerMinute: parseInt(e.target.value)
+                        onChange={(e) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            trafficConfig: {
+                              ...bouncerConfig.trafficConfig,
+                              rateLimitPerMinute: parseInt(e.target.value) || 0
+                            }
+                          });
+                          setHasUnsavedChanges(true);
+                          if (validationErrors.rateLimitPerMinute) {
+                            setValidationErrors({...validationErrors, rateLimitPerMinute: ''});
                           }
-                        })}
+                        }}
                         placeholder="1000"
+                        className={validationErrors.rateLimitPerMinute ? 'border-red-500' : ''}
                       />
+                      {validationErrors.rateLimitPerMinute && (
+                        <p className="text-xs text-red-500">{validationErrors.rateLimitPerMinute}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="maxConnections">Max Connections</Label>
@@ -1255,15 +1512,25 @@ export function PEPManagementPage() {
                         id="maxConnections"
                         type="number"
                         value={bouncerConfig.trafficConfig.maxConnections}
-                        onChange={(e) => setBouncerConfig({
-                          ...bouncerConfig,
-                          trafficConfig: {
-                            ...bouncerConfig.trafficConfig,
-                            maxConnections: parseInt(e.target.value)
+                        onChange={(e) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            trafficConfig: {
+                              ...bouncerConfig.trafficConfig,
+                              maxConnections: parseInt(e.target.value) || 0
+                            }
+                          });
+                          setHasUnsavedChanges(true);
+                          if (validationErrors.maxConnections) {
+                            setValidationErrors({...validationErrors, maxConnections: ''});
                           }
-                        })}
+                        }}
                         placeholder="500"
+                        className={validationErrors.maxConnections ? 'border-red-500' : ''}
                       />
+                      {validationErrors.maxConnections && (
+                        <p className="text-xs text-red-500">{validationErrors.maxConnections}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="timeout">Timeout (seconds)</Label>
@@ -1271,15 +1538,25 @@ export function PEPManagementPage() {
                         id="timeout"
                         type="number"
                         value={bouncerConfig.trafficConfig.timeoutSeconds}
-                        onChange={(e) => setBouncerConfig({
-                          ...bouncerConfig,
-                          trafficConfig: {
-                            ...bouncerConfig.trafficConfig,
-                            timeoutSeconds: parseInt(e.target.value)
+                        onChange={(e) => {
+                          setBouncerConfig({
+                            ...bouncerConfig,
+                            trafficConfig: {
+                              ...bouncerConfig.trafficConfig,
+                              timeoutSeconds: parseInt(e.target.value) || 0
+                            }
+                          });
+                          setHasUnsavedChanges(true);
+                          if (validationErrors.timeoutSeconds) {
+                            setValidationErrors({...validationErrors, timeoutSeconds: ''});
                           }
-                        })}
+                        }}
                         placeholder="30"
+                        className={validationErrors.timeoutSeconds ? 'border-red-500' : ''}
                       />
+                      {validationErrors.timeoutSeconds && (
+                        <p className="text-xs text-red-500">{validationErrors.timeoutSeconds}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="retryAttempts">Retry Attempts</Label>
@@ -1301,6 +1578,14 @@ export function PEPManagementPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* OPAL Configuration for this Bouncer */}
+            <BouncerOPALConfig 
+              pepId={parseInt(selectedBouncer || '0')}
+              bouncerId={bouncerConfig.id}
+              environment={deployedPEPs.find(p => p.id === selectedBouncer)?.environment || 'sandbox'}
+            />
+            </>
           ) : (
             <div className="text-center py-8">
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -1312,6 +1597,50 @@ export function PEPManagementPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh Status
               </Button>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="github" className="space-y-4">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Manage GitHub synchronization for each bouncer. Each bouncer's built-in OPAL Server pulls policies from its designated GitHub folder.
+            </AlertDescription>
+          </Alert>
+
+          {deployedPEPs.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Shield className="h-16 w-16 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium mb-2">No Bouncers Deployed</p>
+                <p className="text-muted-foreground text-center mb-4">
+                  Deploy a bouncer to configure GitHub synchronization
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {deployedPEPs.map((pep) => (
+                <Card key={pep.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>{pep.name}</CardTitle>
+                        <CardDescription>
+                          Environment: {pep.environment}
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <BouncerGitHubTab 
+                      bouncerId={parseInt(pep.id)} 
+                      bouncerName={pep.name}
+                    />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </TabsContent>

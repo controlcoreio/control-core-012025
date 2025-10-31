@@ -42,8 +42,8 @@ export function APIKeyFields({
     : "API Key Configuration";
   
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white border-green-200">
-      <h5 className="text-sm font-semibold text-green-800 flex items-center gap-2">
+    <div className="space-y-4 p-4 border rounded-lg bg-background border-green-200 dark:border-green-800">
+      <h5 className="text-sm font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
         <Key className="h-4 w-4" />
         {configTitle}
       </h5>
@@ -61,7 +61,7 @@ export function APIKeyFields({
               onChange={(e) => onEndpointChange?.(e.target.value)}
               className="w-full"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               The base URL for making API requests to this data source
             </p>
           </div>
@@ -79,14 +79,14 @@ export function APIKeyFields({
             onChange={(e) => onChange(e.target.value)}
             className="w-full"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Your {authMethod === "bearer-token" ? "token" : "API key"} will be encrypted and stored securely
           </p>
         </div>
         
-        <Alert className="border-green-200 bg-green-50">
-          <AlertCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
+        <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+          <AlertCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+          <AlertDescription className="text-green-800 dark:text-green-200">
             <p className="text-sm">
               <strong>Security Note:</strong> {authMethod === "bearer-token" ? "Bearer tokens" : "API keys"} provide direct access to your data. 
               Consider using OAuth 2.0 for production environments when available.

@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import get_db
 from app.models import PEP, User, AuditLog, ProtectedResource, BouncerOPALConfiguration
-from app.schemas import PEPCreate, PEPUpdate, PEPResponse, BouncerRegistrationRequest
+from app.schemas import PEPCreate, PEPUpdate, PEPResponse, BouncerRegistrationRequest, BouncerOPALConfigUpdate
 from app.routers.auth import get_current_user
 from app.services.opal_distribution import get_opal_distribution_service
 import logging
@@ -371,7 +371,15 @@ async def sync_policies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Sync policies to a PEP (Bouncer)."""
+    """Trigger bouncer to sync policies from GitHub.
+    
+    This sends a signal to the bouncer's OPAL Server to pull from its GitHub folder.
+    The bouncer has OPAL Server built-in that watches its specific folder.
+    """
+    from datetime import datetime
+    from app.models import BouncerSyncHistory, BouncerOPALConfiguration
+    import httpx
+    
     pep = db.query(PEP).filter(PEP.id == pep_id).first()
     if not pep:
         raise HTTPException(
@@ -379,15 +387,316 @@ async def sync_policies(
             detail="PEP (Bouncer) not found"
         )
     
-    # Simulate policy sync
+    # Get bouncer's OPAL configuration
+    opal_config = db.query(BouncerOPALConfiguration).filter(
+        BouncerOPALConfiguration.bouncer_id == pep.bouncer_id
+    ).first()
+    
+    if not opal_config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bouncer OPAL configuration not found - bouncer may not be properly registered"
+        )
+    
+    # Call bouncer's OPAL management endpoint to trigger sync
+    sync_triggered = False
+    sync_error = None
+    
+    if pep.proxy_url:
+        try:
+            # Bouncer should have OPAL management API at /opal/sync
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{pep.proxy_url}/opal/sync",
+                    headers={
+                        "Authorization": f"Bearer {pep.api_key or 'default-key'}",
+                        "Content-Type": "application/json"
+                    }
+                )
+                
+                if response.status_code == 200:
+                    sync_triggered = True
+                    logger.info(f"Successfully triggered sync for bouncer {pep.bouncer_id}")
+                else:
+                    sync_error = f"Bouncer returned status {response.status_code}"
+                    logger.warning(f"Bouncer sync trigger failed: {sync_error}")
+                    
+        except Exception as e:
+            sync_error = str(e)
+            logger.error(f"Failed to trigger bouncer sync: {e}")
+    else:
+        sync_error = "Bouncer proxy URL not configured"
+        logger.warning(f"Cannot trigger sync for {pep.bouncer_id}: {sync_error}")
+    
+    # Record sync history
+    sync_history = BouncerSyncHistory(
+        bouncer_id=pep.bouncer_id,
+        sync_type="manual",
+        status="triggered" if sync_triggered else "failed",
+        triggered_by=current_user.username,
+        error_message=sync_error
+    )
+    db.add(sync_history)
+    
+    # Update OPAL config status
+    if sync_triggered:
+        opal_config.last_sync_time = datetime.utcnow()
+        opal_config.last_sync_status = "in_progress"
+    else:
+        opal_config.last_sync_status = "failed"
+        opal_config.last_sync_error = sync_error
+    
+    db.commit()
+    
+    # Audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        user=current_user.username,
+        action=f"Triggered policy sync for bouncer {pep.name}",
+        resource=f"Bouncer #{pep.id}",
+        resource_type="bouncer",
+        result="success" if sync_triggered else "failed",
+        event_type="CONFIG_CHANGE",
+        outcome="SUCCESS" if sync_triggered else "FAILURE",
+        environment=pep.environment,
+        reason=f"Manual sync triggered for {pep.name}" + (f" - {sync_error}" if sync_error else "")
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    if sync_triggered:
+        return {
+            "success": True,
+            "pep_id": pep_id,
+            "name": pep.name,
+            "sync_status": "triggered",
+            "message": "Bouncer's OPAL Server will pull policies from GitHub",
+            "environment": pep.environment,
+            "folder_path": opal_config.folder_path
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger sync: {sync_error}"
+        )
+
+@router.get("/{pep_id}/sync-status")
+async def get_bouncer_sync_status(
+    pep_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get current GitHub sync status for a bouncer."""
+    from app.models import BouncerOPALConfiguration
+    
+    pep = db.query(PEP).filter(PEP.id == pep_id).first()
+    if not pep:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PEP (Bouncer) not found"
+        )
+    
+    opal_config = db.query(BouncerOPALConfiguration).filter(
+        BouncerOPALConfiguration.bouncer_id == pep.bouncer_id
+    ).first()
+    
+    if not opal_config:
+        return {
+            "bouncer_id": pep.bouncer_id,
+            "configured": False,
+            "message": "Bouncer OPAL not configured"
+        }
+    
     return {
-        "pep_id": pep_id,
-        "name": pep.name,
-        "sync_status": "completed",
-        "policies_synced": 12,
-        "sync_time": "2024-01-15T10:30:00Z",
-        "environment": pep.environment
+        "bouncer_id": pep.bouncer_id,
+        "bouncer_name": pep.name,
+        "configured": True,
+        "folder_path": opal_config.folder_path,
+        "last_sync_time": opal_config.last_sync_time.isoformat() if opal_config.last_sync_time else None,
+        "last_sync_status": opal_config.last_sync_status,
+        "last_sync_error": opal_config.last_sync_error,
+        "policies_count": opal_config.policies_count,
+        "next_sync_time": opal_config.next_sync_time.isoformat() if opal_config.next_sync_time else None,
+        "polling_interval": opal_config.polling_interval,
+        "webhook_enabled": opal_config.webhook_enabled,
+        "use_tenant_default": opal_config.use_tenant_default
     }
+
+
+@router.get("/{pep_id}/sync-history")
+async def get_bouncer_sync_history(
+    pep_id: int,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get sync history for a bouncer."""
+    from app.models import BouncerSyncHistory
+    
+    pep = db.query(PEP).filter(PEP.id == pep_id).first()
+    if not pep:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PEP (Bouncer) not found"
+        )
+    
+    # Get sync history records
+    history = db.query(BouncerSyncHistory).filter(
+        BouncerSyncHistory.bouncer_id == pep.bouncer_id
+    ).order_by(
+        BouncerSyncHistory.sync_time.desc()
+    ).limit(limit).all()
+    
+    return {
+        "bouncer_id": pep.bouncer_id,
+        "bouncer_name": pep.name,
+        "total_records": len(history),
+        "history": [
+            {
+                "id": h.id,
+                "sync_time": h.sync_time.isoformat() if h.sync_time else None,
+                "sync_type": h.sync_type,
+                "status": h.status,
+                "policies_synced": h.policies_synced,
+                "policies_added": h.policies_added,
+                "policies_updated": h.policies_updated,
+                "policies_deleted": h.policies_deleted,
+                "error_message": h.error_message,
+                "duration_ms": h.duration_ms,
+                "triggered_by": h.triggered_by,
+                "commit_sha": h.commit_sha
+            }
+            for h in history
+        ]
+    }
+
+
+@router.post("/sync-all")
+async def sync_all_bouncers(
+    environment: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Trigger sync for all active bouncers (or filtered by environment).
+    
+    This is useful for bulk operations like "sync all sandbox bouncers"
+    after making configuration changes.
+    """
+    from app.models import BouncerSyncHistory, BouncerOPALConfiguration
+    import httpx
+    from datetime import datetime
+    
+    # Get all active bouncers
+    query = db.query(PEP).filter(PEP.status == "active")
+    if environment:
+        query = query.filter(PEP.environment == environment)
+    
+    bouncers = query.all()
+    
+    results = []
+    success_count = 0
+    failed_count = 0
+    
+    for pep in bouncers:
+        try:
+            # Get OPAL config
+            opal_config = db.query(BouncerOPALConfiguration).filter(
+                BouncerOPALConfiguration.bouncer_id == pep.bouncer_id
+            ).first()
+            
+            if not opal_config:
+                results.append({
+                    "bouncer_id": pep.bouncer_id,
+                    "success": False,
+                    "error": "OPAL not configured"
+                })
+                failed_count += 1
+                continue
+            
+            # Trigger sync
+            sync_triggered = False
+            sync_error = None
+            
+            if pep.proxy_url:
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        response = await client.post(
+                            f"{pep.proxy_url}/opal/sync",
+                            headers={
+                                "Authorization": f"Bearer {pep.api_key or 'default-key'}",
+                                "Content-Type": "application/json"
+                            }
+                        )
+                        sync_triggered = response.status_code == 200
+                        if not sync_triggered:
+                            sync_error = f"Status {response.status_code}"
+                except Exception as e:
+                    sync_error = str(e)
+            else:
+                sync_error = "Proxy URL not configured"
+            
+            # Record sync history
+            sync_history = BouncerSyncHistory(
+                bouncer_id=pep.bouncer_id,
+                sync_type="manual",
+                status="triggered" if sync_triggered else "failed",
+                triggered_by=current_user.username,
+                error_message=sync_error
+            )
+            db.add(sync_history)
+            
+            # Update OPAL config
+            if sync_triggered:
+                opal_config.last_sync_time = datetime.utcnow()
+                opal_config.last_sync_status = "in_progress"
+                success_count += 1
+            else:
+                opal_config.last_sync_status = "failed"
+                opal_config.last_sync_error = sync_error
+                failed_count += 1
+            
+            results.append({
+                "bouncer_id": pep.bouncer_id,
+                "bouncer_name": pep.name,
+                "success": sync_triggered,
+                "error": sync_error
+            })
+            
+        except Exception as e:
+            logger.error(f"Error syncing bouncer {pep.bouncer_id}: {e}")
+            results.append({
+                "bouncer_id": pep.bouncer_id,
+                "success": False,
+                "error": str(e)
+            })
+            failed_count += 1
+    
+    db.commit()
+    
+    # Audit log
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        user=current_user.username,
+        action=f"Bulk sync triggered for {len(bouncers)} bouncers",
+        resource="bulk_sync",
+        resource_type="system",
+        result="success" if failed_count == 0 else "partial",
+        event_type="CONFIG_CHANGE",
+        outcome="SUCCESS" if failed_count == 0 else "PARTIAL",
+        environment=environment or "all",
+        reason=f"Bulk sync: {success_count} succeeded, {failed_count} failed"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    return {
+        "total_bouncers": len(bouncers),
+        "success_count": success_count,
+        "failed_count": failed_count,
+        "environment": environment or "all",
+        "results": results
+    }
+
 
 @router.get("/{pep_id}/logs")
 async def get_pep_logs(
@@ -484,11 +793,7 @@ async def get_bouncer_opal_config(
 @router.put("/{pep_id}/opal-config")
 async def update_bouncer_opal_config(
     pep_id: int,
-    cache_enabled: bool = None,
-    cache_ttl: int = None,
-    cache_max_size: str = None,
-    rate_limit_rps: int = None,
-    rate_limit_burst: int = None,
+    config_update: BouncerOPALConfigUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -516,16 +821,16 @@ async def update_bouncer_opal_config(
         db.add(config)
     
     # Update provided fields
-    if cache_enabled is not None:
-        config.cache_enabled = cache_enabled
-    if cache_ttl is not None:
-        config.cache_ttl = cache_ttl
-    if cache_max_size is not None:
-        config.cache_max_size = cache_max_size
-    if rate_limit_rps is not None:
-        config.rate_limit_rps = rate_limit_rps
-    if rate_limit_burst is not None:
-        config.rate_limit_burst = rate_limit_burst
+    if config_update.cache_enabled is not None:
+        config.cache_enabled = config_update.cache_enabled
+    if config_update.cache_ttl is not None:
+        config.cache_ttl = config_update.cache_ttl
+    if config_update.cache_max_size is not None:
+        config.cache_max_size = config_update.cache_max_size
+    if config_update.rate_limit_rps is not None:
+        config.rate_limit_rps = config_update.rate_limit_rps
+    if config_update.rate_limit_burst is not None:
+        config.rate_limit_burst = config_update.rate_limit_burst
     
     config.auto_configured = False  # Mark as manually configured
     

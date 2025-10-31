@@ -50,8 +50,8 @@ export function CertificateFields({
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white border-purple-200">
-      <h5 className="text-sm font-semibold text-purple-800 flex items-center gap-2">
+    <div className="space-y-4 p-4 border rounded-lg bg-background border-purple-200 dark:border-purple-800">
+      <h5 className="text-sm font-semibold text-purple-800 dark:text-purple-200 flex items-center gap-2">
         <Shield className="h-4 w-4" />
         Client Certificate Configuration
       </h5>
@@ -83,7 +83,7 @@ export function CertificateFields({
               <Upload className="h-3 w-3 mr-1" />
               Upload Certificate
             </Button>
-            <p className="text-xs text-gray-500">or paste certificate content above</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">or paste certificate content above</p>
           </div>
         </div>
         
@@ -113,7 +113,7 @@ export function CertificateFields({
               <Upload className="h-3 w-3 mr-1" />
               Upload Private Key
             </Button>
-            <p className="text-xs text-gray-500">or paste private key content above</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">or paste private key content above</p>
           </div>
         </div>
         
@@ -128,15 +128,15 @@ export function CertificateFields({
               onChange={(e) => onPassphraseChange?.(e.target.value)}
               className="w-full"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Required only if your private key is encrypted
             </p>
           </div>
         )}
         
-        <Alert className="border-purple-200 bg-purple-50">
-          <AlertCircle className="h-4 w-4 text-purple-600" />
-          <AlertDescription className="text-purple-800">
+        <Alert className="border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/20">
+          <AlertCircle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+          <AlertDescription className="text-purple-800 dark:text-purple-200">
             <div className="space-y-1">
               <p className="text-sm"><strong>Certificate Security:</strong></p>
               <ul className="text-xs list-disc list-inside space-y-1">

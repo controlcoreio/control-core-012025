@@ -42,6 +42,8 @@ export function PolicyTemplatesPage() {
   const handleCopyTemplate = (templateId: number) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
+      console.log('[PolicyTemplatesPage] Copy Control clicked for template:', template);
+      
       // Prepare template data with full metadata
       const templateConfig = {
         name: template.name,
@@ -55,8 +57,24 @@ export function PolicyTemplatesPage() {
         sandbox_status: 'enabled'
       };
       
+      console.log('[PolicyTemplatesPage] Template config prepared:', templateConfig);
+      
+      // Set template data first, then open builder after a small delay
+      // This ensures state is updated before the builder opens
       setTemplateDataForBuilder(templateConfig);
-      setShowPolicyBuilder(true);
+      
+      // Use setTimeout to ensure React has processed the state update
+      setTimeout(() => {
+        console.log('[PolicyTemplatesPage] Opening Policy Builder with template data');
+        setShowPolicyBuilder(true);
+      }, 50);
+    } else {
+      console.error('[PolicyTemplatesPage] Template not found with ID:', templateId);
+      toast({
+        title: "Template Not Found",
+        description: "Could not load the selected template. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -181,18 +199,25 @@ export function PolicyTemplatesPage() {
       <UnifiedPolicyBuilder
         open={showPolicyBuilder}
         onClose={() => {
+          console.log('[PolicyTemplatesPage] Closing Policy Builder');
           setShowPolicyBuilder(false);
-          setTemplateDataForBuilder(null);
+          // Add a delay before clearing template data to ensure proper cleanup
+          setTimeout(() => {
+            setTemplateDataForBuilder(null);
+          }, 100);
         }}
         mode="create"
         templateData={templateDataForBuilder}
         onPolicyCreate={(policyData) => {
+          console.log('[PolicyTemplatesPage] Policy created:', policyData);
           toast({
             title: "Policy Created",
             description: `Policy "${policyData.name}" has been created from template.`,
           });
           setShowPolicyBuilder(false);
-          setTemplateDataForBuilder(null);
+          setTimeout(() => {
+            setTemplateDataForBuilder(null);
+          }, 100);
         }}
       />
     </div>

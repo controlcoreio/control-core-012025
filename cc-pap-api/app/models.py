@@ -729,17 +729,75 @@ class BouncerOPALConfiguration(Base):
     id = Column(Integer, primary_key=True, index=True)
     bouncer_id = Column(String, nullable=False, unique=True)
     environment = Column(String, nullable=False, index=True)  # Auto-set from bouncer registration
+    resource_name = Column(String)  # Auto-set from bouncer resource
+    
+    # GitHub Configuration (per bouncer's OPAL Server)
+    use_tenant_default = Column(Boolean, default=True)  # Use tenant-wide GitHub config
+    custom_repo_url = Column(String)  # Custom repo (if not using tenant default)
+    custom_branch = Column(String)  # Custom branch (if not using tenant default)
+    custom_access_token = Column(String)  # Custom token (encrypted, if not using tenant default)
+    folder_path = Column(String)  # e.g., "policies/api-gateway/sandbox" - auto-generated
+    
+    # OPAL Server Settings (built into bouncer)
+    polling_interval = Column(Integer, default=30)  # seconds - how often OPAL polls GitHub
+    webhook_enabled = Column(Boolean, default=False)  # Use webhooks instead of polling
+    webhook_secret = Column(String)  # Webhook secret (encrypted)
+    
+    # Policy & Data Filters (auto-populated)
     policy_filters = Column(JSON, default=list)  # Auto-populated based on environment
     data_filters = Column(JSON, default=list)  # Auto-populated based on environment
-    resource_name = Column(String)  # Auto-set from bouncer resource
+    
+    # Sync Status Tracking (updated by bouncer heartbeats)
+    last_sync_time = Column(DateTime)  # Last time bouncer's OPAL synced from GitHub
+    last_sync_status = Column(String)  # success, failed, in_progress
+    last_sync_error = Column(Text)  # Error message if sync failed
+    policies_count = Column(Integer, default=0)  # Number of policies currently loaded
+    next_sync_time = Column(DateTime)  # Next scheduled sync time
+    
+    # Cache & Performance
     cache_enabled = Column(Boolean, default=True)
     cache_ttl = Column(Integer, default=300)  # seconds
     cache_max_size = Column(String, default="100MB")
     rate_limit_rps = Column(Integer, default=100)  # requests per second
     rate_limit_burst = Column(Integer, default=200)
+    
+    # Metadata
     auto_configured = Column(Boolean, default=True)  # Automatically configured by Control Core
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+# Bouncer Sync History - tracks each sync operation
+class BouncerSyncHistory(Base):
+    __tablename__ = "bouncer_sync_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    bouncer_id = Column(String, ForeignKey('peps.bouncer_id'), nullable=False, index=True)
+    
+    # Sync details
+    sync_time = Column(DateTime, default=func.now(), index=True)
+    sync_type = Column(String, nullable=False)  # auto, manual, webhook
+    status = Column(String, nullable=False)  # success, failed, partial
+    policies_synced = Column(Integer, default=0)
+    policies_added = Column(Integer, default=0)
+    policies_updated = Column(Integer, default=0)
+    policies_deleted = Column(Integer, default=0)
+    
+    # Error tracking
+    error_message = Column(Text)
+    error_code = Column(String)
+    
+    # Performance metrics
+    duration_ms = Column(Integer)  # Sync duration in milliseconds
+    github_api_calls = Column(Integer, default=0)
+    
+    # Metadata
+    triggered_by = Column(String)  # username, system, webhook
+    commit_sha = Column(String)  # Latest GitHub commit SHA synced
+    branch = Column(String)  # Branch synced from
+    
+    # Relationship
+    bouncer = relationship("PEP", foreign_keys=[bouncer_id])
 
 
 # Notification Settings (Environment-specific)

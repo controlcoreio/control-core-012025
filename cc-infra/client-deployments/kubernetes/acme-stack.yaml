@@ -1,0 +1,278 @@
+# Control Core Demo App - CC Demo App Stack (Incoming Request Logging)
+# This file contains the complete CC demo application stack
+# with the sidecar configured to log INCOMING requests to the API
+# 
+# Usage:
+#   kubectl apply -f cc-demoapp-stack.yaml
+#   
+# Access:
+#   Frontend: http://localhost:30300
+#   API:      http://localhost:30800 (routes through sidecar)
+
+---
+# Database Storage
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv-local
+  labels:
+    env: local-dev
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/postgres-data-local
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc-local
+  labels:
+    env: local-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# PostgreSQL Database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-db-local
+  labels:
+    app: postgres-db
+    env: local-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-db
+      env: local-dev
+  template:
+    metadata:
+      labels:
+        app: postgres-db
+        env: local-dev
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: client_data
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: password
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 30
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc-local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-db-local
+  labels:
+    env: local-dev
+spec:
+  selector:
+    app: postgres-db
+    env: local-dev
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+# API Backend with HTTP Sidecar (Reverse Proxy Mode)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acme-api-local
+  labels:
+    app: acme-api
+    env: local-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: acme-api
+      env: local-dev
+  template:
+    metadata:
+      labels:
+        app: acme-api
+        env: local-dev
+    spec:
+      containers:
+        # Control Core Bouncer Sidecar container (now handles incoming traffic)
+        - name: cc-bouncer-sidecar
+          image: cc-bouncer:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: BOUNCER_PORT
+              value: "8080"
+            - name: TARGET_HOST
+              value: "localhost:8000"
+            - name: PAP_API_URL
+              value: "http://cc-pap:8082"
+            - name: OPAL_SERVER_URL
+              value: "http://cc-opal:7000"
+            - name: TENANT_ID
+              value: "acme-demo"
+            - name: API_KEY
+              value: "demo-api-key"
+            - name: LOG_ENABLED
+              value: "true"
+            - name: CACHE_ENABLED
+              value: "true"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+          # Health check
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 300
+            timeoutSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 300
+            timeoutSeconds: 30
+        
+        # Main API application container (now only receives traffic from sidecar)
+        - name: api
+          image: acme-consulting-demo-api-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: postgresql://postgres:password@client-db-local:5432/client_data
+            - name: PORT
+              value: "8000"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 300
+            timeoutSeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 300
+            timeoutSeconds: 30
+      
+      # Share network namespace between containers so sidecar can reach API on localhost
+      shareProcessNamespace: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: acme-api-local
+  labels:
+    env: local-dev
+spec:
+  selector:
+    app: acme-api
+    env: local-dev
+  ports:
+    # External traffic goes to sidecar, which forwards to API
+    - name: api
+      port: 8000
+      targetPort: 8080  # Route to sidecar instead of API directly
+      nodePort: 30800
+    # Optional: Direct access to sidecar for debugging
+    - name: sidecar
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808
+  type: NodePort
+---
+# Frontend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acme-frontend-local
+  labels:
+    app: acme-frontend
+    env: local-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: acme-frontend
+      env: local-dev
+  template:
+    metadata:
+      labels:
+        app: acme-frontend
+        env: local-dev
+    spec:
+      containers:
+        - name: frontend
+          image: acme-consulting-demo-frontend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_BASE_URL
+              value: http://acme-api-local:8000
+            - name: PORT
+              value: "3000"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 300
+            timeoutSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: acme-frontend-local
+  labels:
+    env: local-dev
+spec:
+  selector:
+    app: acme-frontend
+    env: local-dev
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30300
+  type: NodePort
+ 

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # ControlCore PDP Service
+  # Connects to existing OPAL stack in Kubernetes cluster
+  cc-pdp:
+    build: .
+    image: cc-pdp:latest
+    ports:
+      - "8081:8081"
+    environment:
+      # Connect to Kind cluster NodePorts
+      - OPA_URL=http://localhost:30181
+      - PAP_URL=http://localhost:30901
+      - PORT=8081
+      
+      # Optional configuration
+      - GIN_MODE=release
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    network_mode: host  # Use host network to access Kind cluster NodePorts 

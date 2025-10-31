@@ -1,0 +1,20 @@
+{{- if .Values.bouncer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.bouncer.name }}
+  labels:
+    app: {{ .Values.bouncer.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.bouncer.service.type }}
+  ports:
+    - port: {{ .Values.bouncer.service.port }}
+      targetPort: {{ .Values.bouncer.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ .Values.bouncer.name }}
+    stack: {{ .Values.global.stack }}
+    env: {{ .Values.global.environment }}
+{{- end }}

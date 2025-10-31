@@ -42,8 +42,8 @@ export function BasicAuthFields({
   loginUrlLabel = "Login URL"
 }: BasicAuthFieldsProps) {
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white border-gray-200">
-      <h5 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+    <div className="space-y-4 p-4 border rounded-lg bg-background border-gray-200 dark:border-gray-700">
+      <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
         <UserCheck className="h-4 w-4" />
         Username/Password Configuration
       </h5>
@@ -59,7 +59,7 @@ export function BasicAuthFields({
               onChange={(e) => onLoginUrlChange?.(e.target.value)}
               className="w-full"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               The authentication endpoint where credentials are validated
             </p>
           </div>
@@ -75,7 +75,7 @@ export function BasicAuthFields({
               onChange={(e) => onEndpointChange?.(e.target.value)}
               className="w-full"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               The base URL for making authenticated API requests after login (optional if same as login URL)
             </p>
           </div>
@@ -107,9 +107,9 @@ export function BasicAuthFields({
           </div>
         </div>
         
-        <Alert className="border-amber-200 bg-amber-50">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800">
+        <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
             <p className="text-sm">
               <strong>Security Note:</strong> Credentials will be encrypted and stored securely. 
               Consider using OAuth 2.0 for enhanced security in production environments.

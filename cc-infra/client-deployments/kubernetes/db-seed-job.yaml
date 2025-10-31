@@ -1,0 +1,161 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-seed-job
+  labels:
+    env: local-dev
+spec:
+  template:
+    metadata:
+      labels:
+        env: local-dev
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15
+          command: ['sh', '-c']
+          args:
+            - |
+              until pg_isready -h client-db-local -p 5432 -U postgres; do
+                echo "Waiting for database to be ready..."
+                sleep 2
+              done
+              echo "Database is ready!"
+      containers:
+        - name: db-seeder
+          image: acme-consulting-demo-api-api:latest
+          imagePullPolicy: Never
+          command: ['python', '-c']
+          args:
+            - |
+              from datetime import datetime
+              from sqlalchemy import Column, Integer, String, Float, DateTime
+              from sqlalchemy.orm import declarative_base, Session
+              from app.database import engine, SessionLocal
+              
+              Base = declarative_base()
+              
+              class ClientData(Base):
+                  __tablename__ = "client_data"
+              
+                  id = Column(Integer, primary_key=True, index=True)
+                  name = Column(String, nullable=False)
+                  email = Column(String, nullable=False)
+                  phone = Column(String, nullable=False)
+                  company = Column(String)
+                  industry = Column(String)
+                  sin = Column(String)
+                  bank_account_number = Column(String)
+                  income = Column(Float)
+                  assets_under_management = Column(Float)
+                  created_at = Column(DateTime, default=datetime.utcnow)
+                  updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+              
+              def populate_client_data():
+                  Base.metadata.drop_all(bind=engine)
+                  Base.metadata.create_all(bind=engine)
+              
+                  session = SessionLocal()
+                  try:
+                      clients = [
+                          ClientData(
+                              name="Alice Johnson",
+                              email="alice@example.com",
+                              phone="416-555-1234",
+                              company="Johnson Holdings",
+                              industry="Real Estate",
+                              sin="123-456-789",
+                              bank_account_number="1111222233334444",
+                              income=850000.0,
+                              assets_under_management=4200000.0
+                          ),
+                          ClientData(
+                              name="Michael Smith",
+                              email="michael@finco.com",
+                              phone="647-555-9876",
+                              company="Smith Capital",
+                              industry="Private Equity",
+                              sin="234-567-890",
+                              income=950000.0,
+                              assets_under_management=7500000.0
+                          ),
+                          ClientData(
+                              name="Sophia Lee",
+                              email="sophia.lee@elitewealth.ca",
+                              phone="778-555-3311",
+                              company="Lee Ventures",
+                              industry="Technology",
+                              sin="345-678-901",
+                              bank_account_number="3333444455556666",
+                              income=1250000.0,
+                              assets_under_management=9800000.0
+                          ),
+                          ClientData(
+                              name="David Nguyen",
+                              email="dnguyen@privateinvest.com",
+                              phone="587-555-8822",
+                              company="Nguyen Family Office",
+                              industry="Investments",
+                              sin="456-789-012",
+                              bank_account_number="4444555566667777",
+                              income=1320000.0,
+                              assets_under_management=11200000.0
+                          ),
+                          ClientData(
+                              name="Emily Chen",
+                              email="emchen@luxeadvisors.com",
+                              phone="905-555-5544",
+                              company="Chen Advisory Group",
+                              industry="Legal Services",
+                              sin="567-890-123",
+                              income=910000.0,
+                              assets_under_management=3800000.0
+                          ),
+                          ClientData(
+                              name="Marcus Brown",
+                              email="marcus.brown@canwealth.ca",
+                              phone="514-555-1010",
+                              company="Brown Asset Management",
+                              industry="Finance",
+                              sin="678-901-234",
+                              income=880000.0,
+                              assets_under_management=5100000.0
+                          ),
+                          ClientData(
+                              name="Isabelle Tremblay",
+                              email="isabelle.t@montwealth.com",
+                              phone="438-555-2020",
+                              company="Tremblay Trust",
+                              industry="Luxury Goods",
+                              sin="789-012-345",
+                              income=1100000.0,
+                              assets_under_management=8900000.0
+                          ),
+                          ClientData(
+                              name="Liam O'Connor",
+                              email="liam.oconnor@estateplan.ca",
+                              phone="403-555-3030",
+                              company="O'Connor Estates",
+                              industry="Agriculture",
+                              sin="890-123-456",
+                              bank_account_number="8888999900001111",
+                              income=970000.0,
+                              assets_under_management=6300000.0
+                          )
+                      ]
+                      session.add_all(clients)
+                      session.commit()
+                      print("ClientData table populated with 8 high-net-worth clients.")
+                  except Exception as e:
+                      session.rollback()
+                      print(f"Error: {e}")
+                      raise
+                  finally:
+                      session.close()
+              
+              if __name__ == "__main__":
+                  populate_client_data()
+          env:
+            - name: DATABASE_URL
+              value: postgresql://postgres:password@client-db-local:5432/client_data 

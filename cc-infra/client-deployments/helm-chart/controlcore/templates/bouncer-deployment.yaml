@@ -1,0 +1,55 @@
+{{- if .Values.bouncer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.bouncer.name }}
+  labels:
+    app: {{ .Values.bouncer.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.bouncer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.bouncer.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.bouncer.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+      annotations:
+        # Force pod restart when config changes
+        kubectl.kubernetes.io/restartedAt: "{{ now | date "2006-01-02T15:04:05Z07:00" }}"
+    spec:
+      containers:
+        - name: {{ .Values.bouncer.name }}
+          image: "{{ .Values.bouncer.image.repository }}:{{ .Values.bouncer.image.tag }}"
+          imagePullPolicy: {{ .Values.bouncer.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.bouncer.service.port }}
+          env:
+            {{- range .Values.bouncer.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.bouncer.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.bouncer.probes.readiness.path }}
+              port: {{ .Values.bouncer.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.bouncer.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.bouncer.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.bouncer.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.bouncer.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.bouncer.probes.liveness.path }}
+              port: {{ .Values.bouncer.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.bouncer.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.bouncer.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.bouncer.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.bouncer.probes.liveness.failureThreshold }}
+{{- end }}

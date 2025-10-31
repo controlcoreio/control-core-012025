@@ -4,15 +4,42 @@ Welcome to the comprehensive documentation for Control Core - the centralized au
 
 ## What is Control Core?
 
-Control Core solves the core problem of securing the dynamic, real-time interactions between new AI initiatives and legacy technology. By enforcing business, security, and compliance rules with dynamic context management, Control Core eliminates the need for brittle, custom-coded access logic, turning a major security liability into a strategic advantage.
+Control Core is the centralized authorization and compliance platform designed for organizations navigating the complexities of AI adoption, regulatory compliance, and modern security challenges.
 
-**Key Benefits:**
-- **Centralized Authorization**: Single source of truth for all access control policies
-- **Real-Time Enforcement**: Sub-100ms policy evaluation with intelligent caching
-- **Dynamic Context Management**: Context-aware policies with real-time data enrichment
-- **AI Security**: Advanced protection for AI agents, LLMs, and RAG systems
-- **Compliance**: Built-in support for GDPR, HIPAA, SOC2, and PCI-DSS
-- **Scalability**: Horizontally scalable architecture for enterprise workloads
+### Why Organizations Choose Control Core
+
+**1. Regulatory Compliance Made Simple**
+
+Automatically enforce GDPR, HIPAA, SOC2, PCI-DSS, FINTRAC, and OSFI requirements with policy-as-code. Built-in audit logging and compliance reporting ensure consistency and traceability across your entire infrastructure.
+
+*Example*: Automatically enforce data residency rules for GDPR compliance - policies ensure EU citizen data never leaves approved regions, with automatic audit trails for regulatory reporting.
+
+**2. Prevent Data Leakage to AI Systems**
+
+Control what data AI agents, LLMs, and RAG systems can access with dynamic content filtering and prompt injection protection. Real-time data masking based on user context prevents sensitive information from reaching external AI services.
+
+*Example*: Block PII from being sent to external LLMs while allowing non-sensitive queries - Control Core masks social security numbers, credit cards, and personal data before AI processing, maintaining utility while protecting privacy.
+
+**3. Enforce Business Context Dynamically**
+
+Context-aware policies adapt to user role, location, time, and business state. Connect any data source as a Policy Information Point (PIP) for real-time policy decisions with sub-100ms latency.
+
+*Example*: Allow financial transactions only during business hours from approved locations - policies automatically factor in time zones, user location, transaction amounts, and approval workflows.
+
+**4. Centrally Manage All Permissions**
+
+Single source of truth for authorization across all systems. Policy-Based Access Control (PBAC) eliminates scattered permission logic. Version control and GitOps workflow for policy changes ensure consistency and enable rapid deployment.
+
+*Example*: Update access rules once, enforce everywhere automatically - change a role definition in Control Core, and all systems (APIs, databases, applications) immediately reflect the new permissions without code changes.
+
+### Key Benefits
+
+- **Centralized Authorization**: Single platform for all access control decisions across your infrastructure
+- **Real-Time Enforcement**: Sub-100ms policy evaluation at the edge with intelligent caching
+- **Dynamic Context**: Policies that adapt to real-time business conditions and user attributes
+- **AI Security**: Advanced protection for AI agents and autonomous systems with prompt filtering
+- **Compliance**: Automated enforcement of regulatory requirements with audit trails
+- **Scalability**: Enterprise-grade architecture for mission-critical workloads
 
 ## 🚀 Quick Start
 

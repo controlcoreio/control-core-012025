@@ -1,0 +1,40 @@
+# Customer-Safe Docker Ignore
+# Prevents accidental inclusion of internal artifacts in customer deployments
+
+# Internal development artifacts
+**/internal/**
+**/BOM.json
+**/INTERNAL_CHANGELOG.md
+**/test-*
+**/.git/**
+**/node_modules/**
+**/logs/**
+**/data/**
+**/temp/**
+**/tmp/**
+**/*.log
+**/*.tmp
+**/*.bak
+**/*.swp
+**/*.swo
+**/.*
+**/README.md
+**/CHANGELOG.md
+**/LICENSE
+**/Makefile
+**/package*.json
+**/requirements.txt
+**/go.mod
+**/go.sum
+**/Dockerfile.dev
+**/docker-compose*.yml
+**/k8s/**
+**/scripts/test-*
+
+# Keep only customer-safe files
+!values.yaml
+!values-*.yaml
+!Chart.yaml
+!templates/**
+!_helpers.tpl
+!.customer-safe

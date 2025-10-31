@@ -39,8 +39,8 @@ export function Auth0OAuthFields({ config, onChange, domain }: Auth0OAuthFieldsP
   }, [domain, config, onChange]);
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white border-blue-200">
-      <h5 className="text-sm font-semibold text-blue-800">Auth0 OAuth 2.0 Configuration</h5>
+    <div className="space-y-4 p-4 border rounded-lg bg-background border-blue-200 dark:border-blue-800">
+      <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-200">Auth0 OAuth 2.0 Configuration</h5>
       
       <div className="space-y-4">
         <div className="space-y-2">

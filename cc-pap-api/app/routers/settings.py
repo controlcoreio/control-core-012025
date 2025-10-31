@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.database import get_db
-from app.models import User, AuditLog, GitHubConfiguration, OPALConfiguration
+from app.models import User, AuditLog, GitHubConfiguration, OPALConfiguration, Policy, ProtectedResource
 from app.routers.auth import get_current_user
 import logging
 
@@ -506,7 +506,14 @@ async def sync_github_policies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Manually trigger synchronization of policies with GitHub repository."""
+    """Manually trigger synchronization of policies with GitHub repository.
+    
+    This endpoint:
+    1. Validates folder structure integrity
+    2. Detects unauthorized changes made directly to GitHub
+    3. Syncs all policies (drafts, sandbox, production) to GitHub
+    4. Reports issues via audit logs
+    """
     from datetime import datetime
     from app.services.github_service import GitHubService
     
@@ -535,20 +542,90 @@ async def sync_github_policies(
                 "error": "GitHub service initialization failed. Check your access token and repository URL."
             }
         
-        # Get all policies from database
+        # Step 1: Validate folder structure
+        logger.info("Validating GitHub folder structure...")
+        folder_validation = github_service.validate_folder_structure()
+        
+        warnings = []
+        security_alerts = []
+        
+        if not folder_validation.get("valid"):
+            # Try to create missing folders
+            if "missing_folders" in folder_validation and folder_validation["missing_folders"]:
+                logger.warning(f"Missing folders detected: {folder_validation['missing_folders']}")
+                warnings.append(f"Missing folders detected and created: {', '.join(folder_validation['missing_folders'])}")
+                
+                # Create folder structure
+                if github_service.create_folder_structure():
+                    logger.info("Successfully created missing folder structure")
+                    warnings.append("Folder structure was incomplete and has been repaired")
+                else:
+                    return {
+                        "success": False,
+                        "error": "Failed to create required folder structure in GitHub repository"
+                    }
+        
+        # Step 2: Get all policies from database
         from app.models import Policy
         policies = db.query(Policy).filter(
             Policy.rego_code.isnot(None),  # Only sync policies with Rego code
             Policy.status != 'archived'     # Don't sync archived policies
         ).all()
         
+        policy_ids = [p.id for p in policies]
+        
+        # Step 3: Detect unauthorized changes
+        logger.info("Checking for unauthorized changes in GitHub...")
+        unauthorized_check = github_service.detect_unauthorized_changes(policy_ids)
+        
+        if unauthorized_check.get("has_unauthorized_changes"):
+            unauthorized_files = unauthorized_check.get("unauthorized_files", [])
+            security_alerts.append(f"⚠️ Detected {len(unauthorized_files)} unauthorized file(s) in GitHub repository")
+            
+            # Log detailed security audit for each unauthorized file
+            for unauth_file in unauthorized_files:
+                audit_log = AuditLog(
+                    user_id=current_user.id,
+                    user=current_user.username,
+                    action=f"Unauthorized GitHub change detected: {unauth_file['name']}",
+                    resource="github_repository",
+                    resource_type="security",
+                    result="warning",
+                    event_type="CONFIG_CHANGE",
+                    outcome="WARNING",
+                    environment="both",
+                    reason=f"Unauthorized file detected in {unauth_file['folder']}: {unauth_file['reason']}"
+                )
+                db.add(audit_log)
+            
+            db.commit()
+            logger.warning(f"Unauthorized changes detected: {unauthorized_check['message']}")
+        
+        # Step 4: Sync all policies to GitHub
         synced_count = 0
         failed_count = 0
+        synced_by_environment = {
+            "draft": 0,
+            "sandbox": 0,
+            "production": 0
+        }
         
         for policy in policies:
             try:
-                # Use the folder field from policy or determine from status
-                folder = policy.folder or ("enabled" if policy.status == "enabled" else "disabled")
+                # Determine folder based on policy status and environment
+                if policy.status == "draft":
+                    folder = "policies/drafts"
+                    env_key = "draft"
+                elif policy.environment == "sandbox":
+                    folder = f"policies/sandbox/{'enabled' if policy.status == 'enabled' else 'disabled'}"
+                    env_key = "sandbox"
+                elif policy.environment == "production":
+                    folder = f"policies/production/{'enabled' if policy.status == 'enabled' else 'disabled'}"
+                    env_key = "production"
+                else:
+                    # Default fallback
+                    folder = "policies/drafts"
+                    env_key = "draft"
                 
                 # Sync policy to GitHub
                 success = github_service.save_policy_to_github(
@@ -560,6 +637,7 @@ async def sync_github_policies(
                 
                 if success:
                     synced_count += 1
+                    synced_by_environment[env_key] += 1
                 else:
                     failed_count += 1
                     
@@ -571,18 +649,19 @@ async def sync_github_policies(
         config.last_sync_time = datetime.utcnow()
         db.commit()
         
-        # Log sync action
+        # Log sync action with details
+        sync_status = "success" if failed_count == 0 else "partial"
         audit_log = AuditLog(
             user_id=current_user.id,
             user=current_user.username,
-            action=f"Manual GitHub sync: {synced_count} policies synced, {failed_count} failed",
+            action=f"Manual GitHub sync: {synced_count} synced, {failed_count} failed",
             resource="github_sync",
             resource_type="system",
-            result="success" if failed_count == 0 else "partial",
-            event_type="GITHUB_SYNC",
+            result=sync_status,
+            event_type="CONFIG_CHANGE",
             outcome="SUCCESS" if failed_count == 0 else "PARTIAL",
             environment="both",
-            reason=f"Manual sync triggered by {current_user.username}"
+            reason=f"Manual sync: {synced_by_environment['draft']} drafts, {synced_by_environment['sandbox']} sandbox, {synced_by_environment['production']} production"
         )
         db.add(audit_log)
         db.commit()
@@ -595,17 +674,139 @@ async def sync_github_policies(
             "synced_count": synced_count,
             "failed_count": failed_count,
             "total_policies": len(policies),
-            "last_sync_time": config.last_sync_time.isoformat() if config.last_sync_time else None
+            "synced_by_environment": synced_by_environment,
+            "last_sync_time": config.last_sync_time.isoformat() if config.last_sync_time else None,
+            "warnings": warnings,
+            "security_alerts": security_alerts,
+            "unauthorized_files": unauthorized_check.get("unauthorized_files", []) if unauthorized_check.get("has_unauthorized_changes") else [],
+            "folder_validation": {
+                "valid": folder_validation.get("valid", False),
+                "missing_folders": folder_validation.get("missing_folders", [])
+            }
         }
         
     except Exception as e:
         error_msg = f"Sync failed: {str(e)}"
         logger.error(error_msg)
         
+        # Log error to audit log
+        audit_log = AuditLog(
+            user_id=current_user.id,
+            user=current_user.username,
+            action=f"GitHub sync failed",
+            resource="github_sync",
+            resource_type="system",
+            result="error",
+            event_type="CONFIG_CHANGE",
+            outcome="FAILURE",
+            environment="both",
+            reason=error_msg
+        )
+        db.add(audit_log)
+        db.commit()
+        
         return {
             "success": False,
             "error": error_msg
         }
+
+
+@router.get("/github-config/tamper-check")
+async def check_github_tampering(
+    resource_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Detect unauthorized modifications to policy files in GitHub.
+    
+    SOC2 Security Control: Ensures policies are only modified through Control Plane.
+    
+    Args:
+        resource_id: Optional - check specific resource, or all if not provided
+        
+    Returns:
+        Tamper detection results with unauthorized files
+    """
+    from app.services.github_validator import get_github_validator_from_db
+    
+    github_validator = get_github_validator_from_db(db)
+    
+    if not github_validator:
+        return {
+            "configured": False,
+            "error": "GitHub not configured"
+        }
+    
+    # Get resources to check
+    if resource_id:
+        resources = [db.query(ProtectedResource).get(resource_id)]
+        if not resources[0]:
+            raise HTTPException(404, "Resource not found")
+    else:
+        resources = db.query(ProtectedResource).all()
+    
+    all_unauthorized_files = []
+    resources_checked = 0
+    
+    for resource in resources:
+        if not resource:
+            continue
+        
+        # Get all policy IDs for this resource
+        policies = db.query(Policy).filter(
+            Policy.resource_id == resource.id
+        ).all()
+        known_policy_ids = {p.id for p in policies}
+        
+        # Check for unauthorized files
+        result = github_validator.detect_unauthorized_files(
+            resource_name=resource.name,
+            known_policy_ids=known_policy_ids
+        )
+        
+        if result.get("has_unauthorized_files"):
+            for file in result.get("unauthorized_files", []):
+                file["resource_name"] = resource.name
+                all_unauthorized_files.append(file)
+                
+                # Log each unauthorized file to audit trail
+                audit_log = AuditLog(
+                    user_id=current_user.id,
+                    user=current_user.username,
+                    action=f"Tamper detected: {file['name']} in {file['folder']}",
+                    resource="github_repository",
+                    resource_type="security",
+                    result="warning",
+                    event_type="CONFIG_CHANGE",
+                    outcome="WARNING",
+                    environment="both",
+                    reason=f"Unauthorized file: {file['reason']} (Severity: {file['severity']})"
+                )
+                db.add(audit_log)
+        
+        resources_checked += 1
+    
+    db.commit()
+    
+    # Summary
+    has_violations = len(all_unauthorized_files) > 0
+    
+    logger.info(f"Tamper check completed: {resources_checked} resources checked, {len(all_unauthorized_files)} violations")
+    
+    return {
+        "has_violations": has_violations,
+        "resources_checked": resources_checked,
+        "total_unauthorized_files": len(all_unauthorized_files),
+        "unauthorized_files": all_unauthorized_files,
+        "severity_summary": {
+            "critical": sum(1 for f in all_unauthorized_files if f.get("severity") == "CRITICAL"),
+            "high": sum(1 for f in all_unauthorized_files if f.get("severity") == "HIGH"),
+            "medium": sum(1 for f in all_unauthorized_files if f.get("severity") == "MEDIUM")
+        },
+        "message": f"Found {len(all_unauthorized_files)} unauthorized file(s)" 
+                  if has_violations 
+                  else "No unauthorized files detected"
+    }
 
 
 @router.get("/opal")

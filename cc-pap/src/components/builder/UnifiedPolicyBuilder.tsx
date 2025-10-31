@@ -108,8 +108,19 @@ export function UnifiedPolicyBuilder({
   const [bouncerName, setBouncerName] = useState<string>('');
   const [resourceMetadata, setResourceMetadata] = useState<any>(null);
   const [isLoadingPolicy, setIsLoadingPolicy] = useState(false);
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
+  const [templateLoadCounter, setTemplateLoadCounter] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Compute form validation state for button enablement
+  const isFormValid = useMemo(() => {
+    return (
+      policyData.name.trim().length > 0 &&
+      policyData.resourceId.trim().length > 0 &&
+      policyData.bouncerId.trim().length > 0
+    );
+  }, [policyData.name, policyData.resourceId, policyData.bouncerId]);
 
   // Recovery for unsaved work
   const { hasUnsavedWork, restoreWork, discardWork } = useUnsavedWorkRecovery<PolicyData>({
@@ -135,71 +146,120 @@ export function UnifiedPolicyBuilder({
     }
   );
 
-  // Load template data when provided
+  // Reset states when modal closes
   useEffect(() => {
-    if (open && templateData && mode === 'create') {
-      console.log('[Policy Builder] Loading template data:', templateData);
-      
-      // Convert template metadata conditions to PolicyCondition format
-      const templateConditions: PolicyCondition[] = [];
-      if (templateData.metadata?.conditions && Array.isArray(templateData.metadata.conditions)) {
-        templateData.metadata.conditions.forEach((condition: any, index: number) => {
-          // Determine operator based on condition type and example values
-          let operator = '==';
-          let value = '';
-          
-          if (condition.type === 'array' || (condition.example_values && condition.example_values.length > 1)) {
-            operator = 'in';
-            value = condition.example_values ? condition.example_values.join(',') : '';
-          } else if (condition.type === 'boolean') {
-            operator = '==';
-            value = 'true';
-          } else if (condition.type === 'number' || condition.type === 'integer') {
-            operator = '>=';
-            value = condition.example_values?.[0]?.toString() || '0';
-          } else if (condition.example_values && condition.example_values.length > 0) {
-            operator = '==';
-            value = condition.example_values[0].toString();
-          }
-          
-          templateConditions.push({
-            id: `condition-${index + 1}`,
-            attribute: condition.name || `attribute_${index}`,
-            operator: operator,
-            value: value,
-            enabled: condition.required !== false // Enable by default if required is not explicitly false
-          });
+    if (!open) {
+      setIsLoadingTemplate(false);
+      // Reset to initial state when closing
+      if (mode === 'create') {
+        setPolicyData({
+          name: '',
+          description: '',
+          resourceId: resourceId || '',
+          bouncerId: '',
+          effect: 'allow',
+          conditions: [],
+          regoCode: '',
+          status: 'draft',
+          folder: 'drafts'
         });
       }
+    }
+  }, [open, mode, resourceId]);
+
+  // Load template data when provided - PERMANENT FIX for template loading
+  useEffect(() => {
+    // Reset template loading state when dialog is opened
+    if (open && !templateData) {
+      setIsLoadingTemplate(false);
+    }
+    
+    if (open && templateData && mode === 'create') {
+      console.log('[UnifiedPolicyBuilder] Starting template load:', templateData);
+      setIsLoadingTemplate(true);
       
-      // Extract effect from metadata
-      let templateEffect: 'allow' | 'deny' | 'mask' | 'log' = 'allow';
-      if (templateData.metadata?.effect) {
-        templateEffect = templateData.metadata.effect;
-      } else if (templateData.effect) {
-        templateEffect = templateData.effect;
-      }
-      
-      const newPolicyData = {
-        name: templateData.name || '',
-        description: templateData.description || '',
-        resourceId: resourceId || '',
-        bouncerId: '',
-        effect: templateEffect,  // Use extracted effect instead of hardcoded
-        conditions: templateConditions,
-        regoCode: templateData.template_content || '',
-        status: 'draft' as const,
-        folder: 'drafts' as const
-      };
-      
-      console.log('[UnifiedPolicyBuilder] Setting policyData to:', newPolicyData);
-      console.log('[UnifiedPolicyBuilder] Template data was:', templateData);
-      setPolicyData(newPolicyData);
-      
-      toast({
-        title: "Template Loaded",
-        description: `Loaded template "${templateData.name}". Review and customize as needed.`,
-      });
+      // Use setTimeout to ensure state updates are batched properly
+      // This prevents the race condition where the builder renders before data is set
+      setTimeout(() => {
+        try {
+          // Convert template metadata conditions to PolicyCondition format
+          const templateConditions: PolicyCondition[] = [];
+          if (templateData.metadata?.conditions && Array.isArray(templateData.metadata.conditions)) {
+            templateData.metadata.conditions.forEach((condition: any, index: number) => {
+              // Determine operator based on condition type and example values
+              let operator = '==';
+              let value = '';
+              
+              if (condition.type === 'array' || (condition.example_values && condition.example_values.length > 1)) {
+                operator = 'in';
+                value = condition.example_values ? condition.example_values.join(',') : '';
+              } else if (condition.type === 'boolean') {
+                operator = '==';
+                value = 'true';
+              } else if (condition.type === 'number' || condition.type === 'integer') {
+                operator = '>=';
+                value = condition.example_values?.[0]?.toString() || '0';
+              } else if (condition.example_values && condition.example_values.length > 0) {
+                operator = '==';
+                value = condition.example_values[0].toString();
+              }
+              
+              templateConditions.push({
+                id: `condition-${index + 1}`,
+                attribute: condition.name || `attribute_${index}`,
+                operator: operator,
+                value: value,
+                enabled: condition.required !== false // Enable by default if required is not explicitly false
+              });
+            });
+          }
+          
+          // Extract effect from metadata
+          let templateEffect: 'allow' | 'deny' | 'mask' | 'log' = 'allow';
+          if (templateData.metadata?.effect) {
+            templateEffect = templateData.metadata.effect;
+          } else if (templateData.effect) {
+            templateEffect = templateData.effect;
+          }
+          
+          const newPolicyData = {
+            name: templateData.name || '',
+            description: templateData.description || '',
+            resourceId: resourceId || '',
+            bouncerId: '',
+            effect: templateEffect,
+            conditions: templateConditions,
+            regoCode: templateData.template_content || '',
+            status: 'draft' as const,
+            folder: 'drafts' as const
+          };
+          
+          console.log('[UnifiedPolicyBuilder] Setting policyData to:', newPolicyData);
+          console.log('[UnifiedPolicyBuilder] Template data was:', templateData);
+          
+          // Set policy data and wait for next tick to set loading to false
+          setPolicyData(newPolicyData);
+          
+          // Use another setTimeout to ensure React has processed the setPolicyData update
+          setTimeout(() => {
+            setIsLoadingTemplate(false);
+            setTemplateLoadCounter(prev => prev + 1); // Increment to force re-render
+            toast({
+              title: "Template Loaded",
+              description: `Loaded template "${templateData.name}". Review and customize as needed.`,
+            });
+          }, 50);
+          
+        } catch (error) {
+          console.error('[UnifiedPolicyBuilder] Error loading template:', error);
+          setIsLoadingTemplate(false);
+          toast({
+            title: "Template Load Error",
+            description: "Failed to load template data. Please try again.",
+            variant: "destructive"
+          });
+        }
+      }, 100); // Small delay to ensure proper state initialization
     }
   }, [open, templateData, mode, resourceId]);
 
@@ -814,12 +874,14 @@ allow {
           </div>
         )}
 
-        {/* Loading state for edit mode */}
-        {isLoadingPolicy ? (
+        {/* Loading state for edit mode or template loading */}
+        {isLoadingPolicy || isLoadingTemplate ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p className="text-sm font-medium">Loading policy data...</p>
+              <p className="text-sm font-medium">
+                {isLoadingPolicy ? 'Loading policy data...' : 'Loading template data...'}
+              </p>
             </div>
           </div>
         ) : (
@@ -852,16 +914,17 @@ allow {
               <div className="flex-1 overflow-hidden min-h-0">
                 <TabsContent value="builder" className="h-full m-0">
                   <IntelligentPolicyBuilder
-                    key={`${policyData.name}-${policyData.description}`} // Force re-render when template data changes
+                    key={`builder-${templateLoadCounter}-${policyData.name}-${policyData.description.substring(0, 20)}`}
                     policyData={policyData}
                     setPolicyData={setPolicyData}
                     onNext={() => setActiveTab('preview')}
+                    onSwitchToCodeEditor={() => setActiveTab('code')}
                   />
                 </TabsContent>
 
                 <TabsContent value="code" className="h-full m-0">
                   <PolicyCodeEditor
-                    key={`${policyData.name}-${policyData.regoCode?.substring(0, 50)}`} // Force re-render when template content changes
+                    key={`code-${templateLoadCounter}-${policyData.name}-${policyData.regoCode?.substring(0, 30)}`}
                     policyData={policyData}
                     setPolicyData={setPolicyData}
                     onNext={() => setActiveTab('preview')}
@@ -880,24 +943,38 @@ allow {
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-between border-t pt-4 flex-shrink-0 bg-background">
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            {activeTab !== 'builder' && (
-              <Button variant="outline" onClick={() => setActiveTab('builder')}>
-                <Target className="h-4 w-4 mr-2" />
-                Back to Builder
-              </Button>
-            )}
-          </div>
+        <div className="border-t pt-4 flex-shrink-0 bg-background space-y-2">
+          {/* Validation Warning */}
+          {!isFormValid && !isLoadingPolicy && !isLoadingTemplate && (
+            <Alert variant="default" className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200 text-sm">
+                <strong>Required fields missing:</strong> 
+                {!policyData.name.trim() && <span className="ml-2">• Control Name</span>}
+                {!policyData.resourceId.trim() && <span className="ml-2">• Resource</span>}
+                {!policyData.bouncerId.trim() && <span className="ml-2">• Bouncer/PEP</span>}
+              </AlertDescription>
+            </Alert>
+          )}
           
-          <div className="flex gap-2">
+          <div className="flex justify-between">
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              {activeTab !== 'builder' && (
+                <Button variant="outline" onClick={() => setActiveTab('builder')}>
+                  <Target className="h-4 w-4 mr-2" />
+                  Back to Builder
+                </Button>
+              )}
+            </div>
+            
+            <div className="flex gap-2">
             <Button 
               variant="outline" 
               onClick={handleTestPolicy}
-              disabled={gitHubError || isGenerating}
+              disabled={!isFormValid || gitHubError || isGenerating}
             >
               <Play className="h-4 w-4 mr-2" />
               Test Control
@@ -905,18 +982,19 @@ allow {
             <Button 
               variant="outline" 
               onClick={handleSaveDraft}
-              disabled={gitHubError || isGenerating}
+              disabled={!isFormValid || gitHubError || isGenerating}
             >
               <Save className="h-4 w-4 mr-2" />
               Save Draft
             </Button>
             <Button 
               onClick={handleDeployClick}
-              disabled={gitHubError || isGenerating || isLoadingPolicy}
+              disabled={!isFormValid || gitHubError || isGenerating || isLoadingPolicy}
             >
               <Zap className="h-4 w-4 mr-2" />
               {isGenerating ? (mode === 'edit' ? 'Updating...' : 'Deploying...') : (mode === 'edit' ? 'Update Control' : 'Deploy Control')}
             </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

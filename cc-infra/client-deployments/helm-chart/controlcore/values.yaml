@@ -1,0 +1,680 @@
+# Default values for controlcore Helm chart
+
+# Global settings
+global:
+  environment: local-dev
+  stack: controlcore-stack
+  # GitHub token for accessing private repositories
+  githubToken: ""
+  # Control Core deployment mode
+  deploymentMode: "standalone" # standalone, hybrid
+  # Tenant configuration
+  tenantId: "default"
+  # Dual Environment API Keys (generate in Settings > Environments)
+  sandboxApiKey: "your-sandbox-api-key-here"  # sk_test_... for sandbox bouncers
+  productionApiKey: "your-production-api-key-here"  # sk_live_... for production bouncers
+  # Legacy apiKey (deprecated - use sandboxApiKey and productionApiKey)
+  apiKey: "your-api-key-here"
+
+# Frontend service configuration with auto-scaling
+frontend:
+  name: cc-frontend
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-frontend
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  # Auto-scaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    - name: POLICY_SERVICE_URL
+      value: "http://cc-pap:8082/api/v1"
+    - name: REGAL_LSP_URL
+      value: "ws://cc-regal-service:4389"
+  probes:
+    readiness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /api/health
+      port: 3000
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# Policy Admin Server configuration
+policyAdminServer:
+  name: cc-policy-admin-server
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin-server
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 7002
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  env:
+    - name: OPAL_POLICY_SOURCE_TYPE
+      value: "GIT"
+    - name: OPAL_POLICY_REPO_URL
+      value: "https://${GITHUB_TOKEN}@github.com/controlcoreio/staging-policies-repo.git"
+    - name: OPAL_POLICY_REPO_CLONE_PATH
+      value: "/tmp/staging-policies-repo"
+    - name: OPAL_POLICY_REPO_MAIN_BRANCH
+      value: "main"
+    - name: OPAL_POLICY_REPO_POLLING_INTERVAL
+      value: "30"
+    - name: OPAL_DATA_CONFIG_SOURCES
+      value: '{"config":{"entries":[{"url":"http://cc-policy-admin-server:7002/policy-data","topics":["policy_data"],"dst_path":"/static"}]}}'
+    - name: OPAL_LOG_FORMAT_INCLUDE_PID
+      value: "true"
+  probes:
+    readiness:
+      port: 7002
+      initialDelaySeconds: 10
+      periodSeconds: 300
+    liveness:
+      port: 7002
+      initialDelaySeconds: 30
+      periodSeconds: 300
+
+# Policy Admin Client configuration
+policyAdminClient:
+  name: cc-policy-admin-client
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/policy-admin-client
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    ports:
+      - name: client
+        port: 8083
+        targetPort: 8083
+      - name: opa
+        port: 8181
+        targetPort: 8181
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: OPAL_CLIENT_API_SERVER_PORT
+      value: "8083"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-policy-admin-server:7002"
+    - name: OPAL_LOG_FORMAT_INCLUDE_PID
+      value: "true"
+    - name: OPAL_INLINE_OPA_LOG_FORMAT
+      value: "http"
+  probes:
+    readiness:
+      path: /v1/policies
+      port: 8181
+      initialDelaySeconds: 15
+      periodSeconds: 300
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /v1/policies
+      port: 8181
+      initialDelaySeconds: 30
+      periodSeconds: 300
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# Policy Admin API configuration with auto-scaling
+policyAdminApi:
+  name: cc-policy-admin-api
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-pap-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    name: cc-pap
+    type: ClusterIP
+    port: 8082
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  # Auto-scaling configuration
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+  env:
+    - name: PORT
+      value: "8082"
+    - name: DATABASE_URL
+      value: "postgresql://postgres:password@cc-db:5432/control_core_db"
+    - name: OPA_URL
+      value: "http://cc-opal:7000"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-opal:7000"
+    - name: METRICS_ENABLED
+      value: "true"
+    - name: METRICS_PORT
+      value: "9090"
+  probes:
+    startup:
+      path: /api/v1/policies
+      port: 8082
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 10
+      failureThreshold: 12
+      successThreshold: 1
+    readiness:
+      path: /api/v1/policies
+      port: 8082
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+    liveness:
+      path: /api/v1/policies
+      port: 8082
+      initialDelaySeconds: 30
+      periodSeconds: 60
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+
+# Bouncer Service configuration (includes integrated PDP)
+bouncer:
+  name: cc-bouncer
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8081
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: PORT
+      value: "8081"
+    - name: OPA_URL
+      value: "http://cc-policy-admin-client:8181"
+    - name: PAP_URL
+      value: "http://cc-pap:8082"
+    - name: GIN_MODE
+      value: "release"
+    - name: LOG_LEVEL
+      value: "info"
+  probes:
+    startup:
+      path: /healthz
+      port: 8081
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 10
+      failureThreshold: 30
+      successThreshold: 1
+    readiness:
+      path: /healthz
+      port: 8081
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+    liveness:
+      path: /healthz
+      port: 8081
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 10
+      failureThreshold: 3
+      successThreshold: 1
+
+# Control Core Bouncer (PEP) - Default Sandbox Bouncer
+# This is the REQUIRED first bouncer for any Control Core deployment
+# All policy development happens in Sandbox before promotion to Production
+bouncerSandbox:
+  name: cc-bouncer-sandbox
+  enabled: true  # Always enabled - this is the required sandbox bouncer
+  replicaCount: 1
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+    tag: latest
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  # Sandbox auto-scaling (smaller scale)
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3  # Sandbox doesn't need as many replicas
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  env:
+    - name: BOUNCER_PORT
+      value: "8080"
+    - name: TARGET_HOST
+      value: "localhost:8000"  # Update to your test API
+    - name: PAP_API_URL
+      value: "http://cc-pap:8082"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-opal:7000"
+    - name: TENANT_ID
+      value: "{{ .Values.global.tenantId }}"
+    - name: API_KEY
+      value: "{{ .Values.global.sandboxApiKey }}"  # Use sandbox API key
+    
+    # CRITICAL: This bouncer is for Sandbox environment
+    - name: ENVIRONMENT
+      value: "sandbox"  # REQUIRED - tells PAP this is sandbox
+    
+    # Resource Auto-Discovery Configuration
+    - name: BOUNCER_ID
+      value: "bouncer-main-sandbox"
+    - name: BOUNCER_NAME
+      value: "Main API Bouncer (Sandbox)"
+    - name: BOUNCER_TYPE
+      value: "reverse-proxy"
+    - name: RESOURCE_NAME
+      value: "Customer API"  # This links to production bouncer
+    - name: RESOURCE_TYPE
+      value: "api"
+    - name: ORIGINAL_HOST_URL
+      value: "https://test-api.company.com"  # Test environment URL
+    - name: SECURITY_POSTURE
+      value: "deny-all"
+    - name: DEPLOYMENT_PLATFORM
+      value: "kubernetes"
+    
+    - name: LOG_ENABLED
+      value: "true"
+    - name: CACHE_ENABLED
+      value: "true"
+    - name: METRICS_ENABLED
+      value: "true"
+  probes:
+    readiness:
+      path: /health
+      port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /health
+      port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# Control Core Bouncer (PEP) - Production Bouncer (Optional)
+# Deploy this ONLY after you have tested policies in Sandbox
+# This bouncer is PAIRED with the Sandbox bouncer above (same RESOURCE_NAME)
+bouncerProduction:
+  name: cc-bouncer-production
+  enabled: false  # Set to true when ready to deploy production
+  replicaCount: 3  # More replicas for production
+  image:
+    repository: 061730756658.dkr.ecr.ca-central-1.amazonaws.com/controlcoreio/cc-bouncer
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+  # Production auto-scaling (larger scale for HA)
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+  env:
+    - name: BOUNCER_PORT
+      value: "8080"
+    - name: TARGET_HOST
+      value: "localhost:8000"  # Update to your production API
+    - name: PAP_API_URL
+      value: "http://cc-pap:8082"
+    - name: OPAL_SERVER_URL
+      value: "http://cc-opal:7000"
+    - name: TENANT_ID
+      value: "{{ .Values.global.tenantId }}"
+    - name: API_KEY
+      value: "{{ .Values.global.productionApiKey }}"  # Use production API key
+    
+    # CRITICAL: This bouncer is for Production environment
+    - name: ENVIRONMENT
+      value: "production"  # REQUIRED - tells PAP this is production
+    
+    # Resource Auto-Discovery Configuration
+    # IMPORTANT: Use SAME resource name as sandbox to create a pair
+    - name: BOUNCER_ID
+      value: "bouncer-main-production"
+    - name: BOUNCER_NAME
+      value: "Main API Bouncer (Production)"
+    - name: BOUNCER_TYPE
+      value: "reverse-proxy"
+    - name: RESOURCE_NAME
+      value: "Customer API"  # SAME as sandbox - creates a pair
+    - name: RESOURCE_TYPE
+      value: "api"
+    - name: ORIGINAL_HOST_URL
+      value: "https://api.company.com"  # Production URL
+    - name: SECURITY_POSTURE
+      value: "deny-all"
+    - name: DEPLOYMENT_PLATFORM
+      value: "kubernetes"
+    
+    - name: LOG_ENABLED
+      value: "true"
+    - name: CACHE_ENABLED
+      value: "true"
+    - name: METRICS_ENABLED
+      value: "true"
+  probes:
+    readiness:
+      path: /health
+      port: 8080
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    liveness:
+      path: /health
+      port: 8080
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# OPAL Server for Policy Synchronization
+opal:
+  name: cc-opal
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: permitio/opal-server
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 7000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+  env:
+    - name: OPAL_POLICY_REPO_URL
+      value: "https://{{ .Values.global.githubToken }}@github.com/controlcoreio/staging-policies-repo.git"
+    - name: OPAL_DATA_SOURCES_CONFIG
+      value: "./config/data-sources.json"
+    - name: PAP_API_URL
+      value: "http://cc-pap:8082"
+  probes:
+    readiness:
+      port: 7000
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    liveness:
+      port: 7000
+      initialDelaySeconds: 30
+      periodSeconds: 30
+
+# Control Core Database
+database:
+  name: cc-db
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 5432
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  env:
+    - name: POSTGRES_DB
+      value: "control_core_db"
+    - name: POSTGRES_USER
+      value: "postgres"
+    - name: POSTGRES_PASSWORD
+      value: "password"
+  persistence:
+    enabled: true
+    size: 10Gi
+  probes:
+    readiness:
+      port: 5432
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    liveness:
+      port: 5432
+      initialDelaySeconds: 30
+      periodSeconds: 30
+
+# Multiple Bouncer deployments for different resources
+bouncers:
+  # Default Bouncer for demo
+  default:
+    enabled: true
+    name: cc-bouncer-default
+    resourceType: "demo"
+    targetHost: "localhost:8000"
+    port: 8080
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+  
+  # AI Agent Bouncer
+  ai-agent:
+    enabled: false
+    name: cc-bouncer-ai-agent
+    resourceType: "ai_agent"
+    targetHost: "your-ai-agent:8000"
+    port: 8081
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 60
+  
+  # API Gateway Bouncer
+  api-gateway:
+    enabled: false
+    name: cc-bouncer-api-gateway
+    resourceType: "api"
+    targetHost: "your-api-gateway:8000"
+    port: 8082
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 70
+  
+  # LLM Service Bouncer
+  llm-service:
+    enabled: false
+    name: cc-bouncer-llm-service
+    resourceType: "llm"
+    targetHost: "your-llm-service:8000"
+    port: 8083
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 15
+      targetCPUUtilizationPercentage: 65
+  
+  # RAG Tool Bouncer
+  rag-tool:
+    enabled: false
+    name: cc-bouncer-rag-tool
+    resourceType: "rag"
+    targetHost: "your-rag-tool:8000"
+    port: 8084
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 6
+      targetCPUUtilizationPercentage: 75
+  
+  # Git Repository Bouncer
+  git-repo:
+    enabled: false
+    name: cc-bouncer-git-repo
+    resourceType: "git"
+    targetHost: "your-git-server:8000"
+    port: 8085
+    replicaCount: 1
+    autoscaling:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 80
+
+# Ingress configuration for frontend and bouncers
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: cc-frontend
+          servicePort: 3000
+        - path: /bouncer/default
+          pathType: Prefix
+          serviceName: cc-bouncer-default
+          servicePort: 8080
+        - path: /bouncer/ai-agent
+          pathType: Prefix
+          serviceName: cc-bouncer-ai-agent
+          servicePort: 8081
+        - path: /bouncer/api-gateway
+          pathType: Prefix
+          serviceName: cc-bouncer-api-gateway
+          servicePort: 8082
+        - path: /bouncer/llm-service
+          pathType: Prefix
+          serviceName: cc-bouncer-llm-service
+          servicePort: 8083
+        - path: /bouncer/rag-tool
+          pathType: Prefix
+          serviceName: cc-bouncer-rag-tool
+          servicePort: 8084
+        - path: /bouncer/git-repo
+          pathType: Prefix
+          serviceName: cc-bouncer-git-repo
+          servicePort: 8085

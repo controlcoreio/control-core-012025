@@ -1,0 +1,54 @@
+{{- if .Values.opal.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.opal.name }}
+  labels:
+    app: {{ .Values.opal.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.opal.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.opal.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.opal.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+      annotations:
+        # Force pod restart when config changes
+        kubectl.kubernetes.io/restartedAt: "{{ now | date "2006-01-02T15:04:05Z07:00" }}"
+    spec:
+      containers:
+        - name: {{ .Values.opal.name }}
+          image: "{{ .Values.opal.image.repository }}:{{ .Values.opal.image.tag }}"
+          imagePullPolicy: {{ .Values.opal.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.opal.service.port }}
+          env:
+            {{- range .Values.opal.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cc-opal-github-token
+                  key: token
+          resources:
+            {{- toYaml .Values.opal.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.opal.service.port }}
+            initialDelaySeconds: {{ .Values.opal.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.opal.probes.readiness.periodSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.opal.service.port }}
+            initialDelaySeconds: {{ .Values.opal.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.opal.probes.liveness.periodSeconds }}
+{{- end }}

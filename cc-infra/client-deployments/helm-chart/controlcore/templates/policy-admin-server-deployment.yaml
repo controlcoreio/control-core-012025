@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.policyAdminServer.name }}
+  labels:
+    app: {{ .Values.policyAdminServer.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.policyAdminServer.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.policyAdminServer.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.policyAdminServer.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+      annotations:
+        secret-hash: "{{ .Files.Get (print $.Template.BasePath "/policy-admin-server-secret.yaml") | sha256sum }}"
+        checksum/config: {{ include (print $.Template.BasePath "/policy-admin-server-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: {{ .Values.policyAdminServer.name }}
+          image: "{{ .Values.policyAdminServer.image.repository }}:{{ .Values.policyAdminServer.image.tag }}"
+          imagePullPolicy: {{ .Values.policyAdminServer.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.policyAdminServer.service.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.policyAdminServer.name }}-config
+          env:
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: cc-pap-github-token
+                  key: token
+          resources:
+            {{- toYaml .Values.policyAdminServer.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.policyAdminServer.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.policyAdminServer.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminServer.probes.readiness.periodSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.policyAdminServer.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.policyAdminServer.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.policyAdminServer.probes.liveness.periodSeconds }}

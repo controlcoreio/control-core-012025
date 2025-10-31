@@ -1,0 +1,314 @@
+# Helm values template for Pro tenant deployments
+# This template is used by cc-signup-service to generate tenant-specific values
+
+global:
+  tenant:
+    id: "{{ .Values.tenant.id }}"
+    name: "{{ .Values.tenant.name }}"
+    subdomain: "{{ .Values.tenant.subdomain }}"
+    tier: "{{ .Values.tenant.tier }}"
+    stripe_customer_id: "{{ .Values.tenant.stripe_customer_id }}"
+    stripe_subscription_id: "{{ .Values.tenant.stripe_subscription_id }}"
+  
+  telemetry:
+    enabled: true
+    endpoint: "{{ .Values.telemetry.endpoint }}"
+    api_key: "{{ .Values.telemetry.api_key }}"
+
+# Control Plane (cc-pap-pro-tenant)
+cc-pap-pro-tenant:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: controlcore/cc-pap-pro-tenant
+    tag: "{{ .Values.image.tag | default "latest" }}"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "1000"
+      nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    hosts:
+      - host: "{{ .Values.tenant.subdomain }}"
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: "{{ .Values.tenant.id }}-tls"
+        hosts:
+          - "{{ .Values.tenant.subdomain }}"
+  
+  env:
+    TENANT_ID: "{{ .Values.tenant.id }}"
+    TENANT_NAME: "{{ .Values.tenant.name }}"
+    TIER: "{{ .Values.tenant.tier }}"
+    STRIPE_CUSTOMER_ID: "{{ .Values.tenant.stripe_customer_id }}"
+    STRIPE_SUBSCRIPTION_ID: "{{ .Values.tenant.stripe_subscription_id }}"
+    DATABASE_URL: "postgresql://{{ .Values.database.username }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+    REDIS_URL: "redis://:{{ .Values.redis.password }}@{{ .Values.redis.host }}:{{ .Values.redis.port }}"
+    OPA_URL: "http://{{ .Values.opa.host }}:{{ .Values.opa.port }}"
+    OPAL_URL: "http://{{ .Values.opal.host }}:{{ .Values.opal.port }}"
+    TELEMETRY_ENDPOINT: "{{ .Values.telemetry.endpoint }}"
+    TELEMETRY_API_KEY: "{{ .Values.telemetry.api_key }}"
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Policy Admin API (cc-pap-api)
+cc-pap-api:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: controlcore/cc-pap-api
+    tag: "{{ .Values.image.tag | default "latest" }}"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  env:
+    TENANT_ID: "{{ .Values.tenant.id }}"
+    DATABASE_URL: "postgresql://{{ .Values.database.username }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+    REDIS_URL: "redis://:{{ .Values.redis.password }}@{{ .Values.redis.host }}:{{ .Values.redis.port }}"
+    OPA_URL: "http://{{ .Values.opa.host }}:{{ .Values.opa.port }}"
+    OPAL_URL: "http://{{ .Values.opal.host }}:{{ .Values.opal.port }}"
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Database (PostgreSQL)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "{{ .Values.database.postgres_password }}"
+    username: "{{ .Values.database.username }}"
+    password: "{{ .Values.database.password }}"
+    database: "{{ .Values.database.name }}"
+  
+  primary:
+    persistence:
+      enabled: true
+      size: "20Gi"
+      storageClass: "fast-ssd"
+    
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    
+    initdb:
+      scripts:
+        init-tenant.sql: |
+          -- Initialize tenant-specific database schema
+          CREATE SCHEMA IF NOT EXISTS tenant_{{ .Values.tenant.id | replace "-" "_" }};
+          GRANT ALL PRIVILEGES ON SCHEMA tenant_{{ .Values.tenant.id | replace "-" "_" }} TO {{ .Values.database.username }};
+          
+          -- Create tenant-specific tables
+          CREATE TABLE IF NOT EXISTS tenant_{{ .Values.tenant.id | replace "-" "_" }}.policies (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            rego_code TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS tenant_{{ .Values.tenant.id | replace "-" "_" }}.resources (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(100) NOT NULL,
+            config JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+          
+          CREATE TABLE IF NOT EXISTS tenant_{{ .Values.tenant.id | replace "-" "_" }}.bouncers (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(100) NOT NULL,
+            config JSONB,
+            status VARCHAR(50) DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+
+# Redis
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "{{ .Values.redis.password }}"
+  
+  master:
+    persistence:
+      enabled: true
+      size: "5Gi"
+      storageClass: "fast-ssd"
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# OPA (Open Policy Agent)
+opa:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: openpolicyagent/opa
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8181
+    targetPort: 8181
+  
+  env:
+    TENANT_ID: "{{ .Values.tenant.id }}"
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
+
+# OPAL (Open Policy Administration Layer)
+opal:
+  enabled: true
+  replicaCount: 2
+  
+  image:
+    repository: authorizon/opal-server
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 7002
+    targetPort: 7002
+  
+  env:
+    TENANT_ID: "{{ .Values.tenant.id }}"
+    OPA_SERVER_URL: "http://{{ .Values.opa.host }}:{{ .Values.opa.port }}"
+    DATABASE_URL: "postgresql://{{ .Values.database.username }}:{{ .Values.database.password }}@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "250m"
+
+# Monitoring
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+  
+  grafana:
+    enabled: true
+    dashboards:
+      - name: "Control Core Pro Tenant"
+        configMap: "cc-pro-tenant-dashboard"
+
+# Backup
+backup:
+  enabled: true
+  
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  
+  s3:
+    bucket: "controlcore-backups"
+    prefix: "tenants/{{ .Values.tenant.id }}/"
+  
+  resources:
+    - name: "database"
+      type: "postgresql"
+      schedule: "0 2 * * *"
+    - name: "redis"
+      type: "redis"
+      schedule: "0 3 * * *"
+
+# Security
+security:
+  networkPolicy:
+    enabled: true
+    ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              name: controlcore
+        ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8000
+  
+  podSecurityPolicy:
+    enabled: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  
+  serviceAccount:
+    create: true
+    name: "{{ .Values.tenant.id }}-sa"
+    annotations: {}
+
+# Resource limits based on tier
+tierLimits:
+  pro:
+    maxPolicies: 1000
+    maxResources: 500
+    maxBouncers: 50
+    maxUsers: 100
+    apiCallsPerHour: 100000
+    policyEvaluationsPerHour: 500000
+    storageGB: 100
+    backupRetentionDays: 30

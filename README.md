@@ -245,11 +245,11 @@ cd control-core-012025
 
 ### 2. Start Core Services
 ```bash
-cd cc-infra
-docker compose -f controlcore-local-dev.yml up -d
+cd cc-infra/local-development
+docker compose up -d
 
 # Wait for services to be healthy (30-60 seconds)
-docker compose -f controlcore-local-dev.yml ps
+docker compose ps
 ```
 
 ### 3. Access Control Core
@@ -279,42 +279,42 @@ curl http://localhost:8000/policies/templates/ | jq 'length'
 
 #### Rebuild Specific Service
 ```bash
-cd cc-infra
-docker compose -f controlcore-local-dev.yml build cc-pap-api
-docker compose -f controlcore-local-dev.yml up -d cc-pap-api
+cd cc-infra/local-development
+docker compose build cc-pap-api
+docker compose up -d cc-pap-api
 ```
 
 #### Rebuild All Services
 ```bash
-cd cc-infra
-docker compose -f controlcore-local-dev.yml down
-docker compose -f controlcore-local-dev.yml build
-docker compose -f controlcore-local-dev.yml up -d
+cd cc-infra/local-development
+docker compose down
+docker compose build
+docker compose up -d
 ```
 
 #### Clean Rebuild (removes volumes)
 ```bash
-cd cc-infra
-docker compose -f controlcore-local-dev.yml down -v
-docker compose -f controlcore-local-dev.yml build --no-cache
-docker compose -f controlcore-local-dev.yml up -d
+cd cc-infra/local-development
+docker compose down -v
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ### View Logs
 ```bash
 # All services
-docker compose -f controlcore-local-dev.yml logs -f
+docker compose logs -f
 
 # Specific service
-docker compose -f controlcore-local-dev.yml logs -f cc-pap-api
+docker compose logs -f cc-pap-api
 
 # Last 100 lines
-docker compose -f controlcore-local-dev.yml logs --tail=100 cc-pap-api
+docker compose logs --tail=100 cc-pap-api
 ```
 
 ### Check Service Status
 ```bash
-docker compose -f controlcore-local-dev.yml ps
+docker compose ps
 
 # Health check
 docker ps --format "table {{.Names}}\t{{.Status}}"
@@ -331,7 +331,7 @@ control-core-012025/
 │   │   ├── components/       # UI components
 │   │   ├── pages/            # Page components
 │   │   ├── hooks/            # Custom React hooks
-│   │   └── services/         # API services
+│   │   └── services/         # API services & language server
 │   └── package.json
 ├── cc-pap-api/               # Backend API (FastAPI)
 │   ├── app/
@@ -348,26 +348,52 @@ control-core-012025/
 │       ├── ai-security/      # 15 AI security templates
 │       ├── security-controls/ # Security templates
 │       └── data-governance/  # Data governance templates
-├── cc-bouncer/               # PEP (Go)
+├── cc-bouncer/               # PEP with integrated PDP + OPAL
 │   ├── main.go
 │   ├── handlers/
 │   └── services/
+├── cc-bouncer-sidecar/       # Sidecar PEP for Kubernetes
 ├── cc-pap-pro-tenant/        # Multi-tenant control plane
-├── cc-opal/                  # Policy & data distribution
+├── cc-opal/                  # OPAL library (not deployed standalone)
 ├── cc-signup-service/        # Customer onboarding
 ├── cc-business-admin/        # Business admin dashboard
+├── cc-docs/                  # Documentation website (Next.js)
 ├── cc-infra/                 # Infrastructure configs
-│   ├── controlcore-local-dev.yml  # Local dev compose
-│   ├── helm-chart/           # Kubernetes Helm charts
-│   └── k8s/                  # Kubernetes manifests
+│   ├── local-development/    # Local dev Docker Compose
+│   ├── client-deployments/   # Production deployment options
+│   │   ├── helm-chart/       # Kubernetes Helm charts
+│   │   ├── docker-compose/   # Docker Compose (Control Plane + Bouncer)
+│   │   └── kubernetes/       # Raw K8s manifests
+│   └── README.md
 ├── cc-demoapp/               # Demo application
 ├── cc-demoapp-api/           # Demo API
+├── cc-demoapp-policies-repo/ # Sample policies for demo
+├── demos/                    # Demo index and guides
+├── archived/                 # Deprecated components
+│   ├── legacy/              # Legacy services
+│   └── deprecated-frontend/ # Deprecated UI components
 └── README.md                 # This file
 ```
 
 ---
 
-## 🎯 Recent Updates & Features
+## 🎯 Recent Updates & Features (2025-10-31)
+
+### Codebase Cleanup & Reorganization
+- ✅ **Removed Obsolete Folders**: `cc-template-repo`, `cc-language-server`, `cc-data`, `cc-logs`
+- ✅ **Archived Legacy Components**: Moved to `/archived/legacy/` for reference
+- ✅ **Restructured Infrastructure**: Separated local dev from client deployments
+- ✅ **Production Deployment Options**: Helm, Docker Compose, and Kubernetes YAML
+- ✅ **Deprecated Code Cleanup**: Removed old frontend components and documented backend deprecations
+- ✅ **Demo Organization**: Added `/demos/` index for all demo components
+
+### Architecture Improvements
+- ✅ **Distributed OPAL Model**: OPAL integrated into each bouncer (no standalone deployment)
+- ✅ **Per-Bouncer GitHub Config**: Each bouncer can use different policy repositories
+- ✅ **Language Server Integration**: Moved into cc-pap services
+- ✅ **Clear Component Separation**: Control Plane vs Bouncer deployments
+
+## 🎯 Feature Updates
 
 ### Policy Templates (180 total)
 - ✅ **30 Compliance Templates**: PIPEDA, HIPAA, GDPR, CCPA, SOC 2 with region-specific use cases
@@ -398,23 +424,55 @@ control-core-012025/
 
 ---
 
+## 🚀 Production Deployment
+
+Control Core supports multiple deployment options for production use:
+
+### Deployment Options
+
+1. **Helm Chart** (Recommended for Kubernetes)
+   - Location: `/cc-infra/client-deployments/helm-chart/`
+   - Best for: Production Kubernetes clusters
+   - Features: Auto-scaling, HA, easy updates
+
+2. **Docker Compose** (Recommended for Single Server)
+   - Location: `/cc-infra/client-deployments/docker-compose/`
+   - Best for: Single server or VM deployments
+   - Includes: Control Plane and standalone Bouncer configurations
+
+3. **Kubernetes YAML** (Advanced)
+   - Location: `/cc-infra/client-deployments/kubernetes/`
+   - Best for: Custom Kubernetes deployments
+   - Features: Full control over resources
+
+### Quick Start Guides
+
+See detailed deployment documentation:
+- **Deployment Decision Matrix**: [cc-infra/client-deployments/README.md](cc-infra/client-deployments/README.md)
+- **Control Plane Setup**: [cc-infra/client-deployments/docker-compose/control-plane/README.md](cc-infra/client-deployments/docker-compose/control-plane/README.md)
+- **Bouncer Setup**: [cc-infra/client-deployments/docker-compose/bouncer/README.md](cc-infra/client-deployments/docker-compose/bouncer/README.md)
+
+---
+
 ## 📚 Documentation
 
 ### Platform Documentation
 - **Architecture**: [cc-infra/docs/architecture-overview.md](cc-infra/docs/architecture-overview.md)
-- **Deployment Guides**: [cc-infra/deployment-guides/](cc-infra/deployment-guides/)
+- **Deployment Guides**: [cc-infra/client-deployments/](cc-infra/client-deployments/)
 - **API Documentation**: http://localhost:8000/docs (when running locally)
+- **Getting Started**: [00_START_HERE.md](00_START_HERE.md)
 
 ### Component Documentation
 - **Bouncer**: [cc-bouncer/README.md](cc-bouncer/README.md)
+- **Bouncer Sidecar**: [cc-bouncer-sidecar/README.md](cc-bouncer-sidecar/README.md)
 - **PAP API**: [cc-pap-api/README.md](cc-pap-api/README.md)
-- **Demo App**: [cc-demoapp/README.md](cc-demoapp/README.md)
-- **OPAL Integration**: [cc-opal/README.md](cc-opal/README.md)
+- **Demo Apps**: [demos/README.md](demos/README.md)
+- **OPAL Library**: [cc-opal/README.md](cc-opal/README.md)
 
 ### Integration Guides
 - **PIP Data Sources**: [cc-pap-api/docs/pip-integration.md](cc-pap-api/docs/pip-integration.md)
 - **Policy Templates**: [cc-pap-core/policy-templates/README.md](cc-pap-core/policy-templates/README.md)
-- **OPAL Setup**: [cc-opal/README.md](cc-opal/README.md)
+- **GitHub Integration**: [README_IMPLEMENTATION.md](README_IMPLEMENTATION.md)
 
 ---
 
@@ -577,16 +635,16 @@ docker restart cc-pap-api
 
 # Remove and recreate
 docker rm -f cc-pap-api
-cd cc-infra
-docker compose -f controlcore-local-dev.yml up -d cc-pap-api
+cd cc-infra/local-development
+docker compose up -d cc-pap-api
 ```
 
 ### Database Issues
 ```bash
 # Reset database (WARNING: deletes all data)
-cd cc-infra
-docker compose -f controlcore-local-dev.yml down -v
-docker compose -f controlcore-local-dev.yml up -d
+cd cc-infra/local-development
+docker compose down -v
+docker compose up -d
 ```
 
 ### Frontend Issues

@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.api.name }}-{{ .Values.global.environment }}
+  labels:
+    app: {{ .Values.api.name }}
+    env: {{ .Values.global.environment }}
+    {{- include "acme-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.api.name }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.api.name }}
+        env: {{ .Values.global.environment }}
+    spec:
+      containers:
+        # Main API application container
+        - name: api
+          image: "{{ .Values.api.deployment.image.repository }}:{{ .Values.api.deployment.image.tag }}"
+          imagePullPolicy: {{ .Values.api.deployment.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            {{- range .Values.api.deployment.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.api.deployment.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.api.deployment.probes.readiness.path }}
+              port: {{ .Values.api.deployment.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.api.deployment.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.deployment.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.deployment.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.api.deployment.probes.liveness.path }}
+              port: {{ .Values.api.deployment.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.api.deployment.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.deployment.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.deployment.probes.liveness.timeoutSeconds }}
+
+        # Control Core Bouncer Sidecar container
+        {{- if .Values.api.sidecar.enabled }}
+        - name: {{ .Values.api.sidecar.name }}
+          image: "{{ .Values.api.sidecar.image.repository }}:{{ .Values.api.sidecar.image.tag }}"
+          imagePullPolicy: {{ .Values.api.sidecar.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            {{- range .Values.api.sidecar.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.api.sidecar.resources | nindent 12 }}
+          # Health check
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.api.sidecar.probes.liveness.path }}
+              port: {{ .Values.api.sidecar.probes.liveness.port }}
+            initialDelaySeconds: {{ .Values.api.sidecar.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.sidecar.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.sidecar.probes.liveness.timeoutSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.api.sidecar.probes.readiness.path }}
+              port: {{ .Values.api.sidecar.probes.readiness.port }}
+            initialDelaySeconds: {{ .Values.api.sidecar.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.sidecar.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.sidecar.probes.readiness.timeoutSeconds }}
+        {{- end }}
+
+      # Share network namespace between containers so sidecar can reach API on localhost
+      shareProcessNamespace: true

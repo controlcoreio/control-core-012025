@@ -781,12 +781,12 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
               <p className="text-muted-foreground">Select the type of data source you want to connect</p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
               <div className="flex items-start gap-3">
-                <Lightbulb className="h-5 w-5 text-blue-600 mt-0.5" />
+                <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-blue-900">AI Suggestion</p>
-                  <p className="text-sm text-blue-700">AI suggests integrating your HR system to pull user roles directly for more effective authorization policies.</p>
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">AI Suggestion</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">AI suggests integrating your HR system to pull user roles directly for more effective authorization policies.</p>
                 </div>
               </div>
             </div>
@@ -865,9 +865,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* IAM/Identity Sources */}
               {selectedType === "identity" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-blue-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-blue-900">Identity Provider Configuration</h4>
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Identity Provider Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -926,8 +926,8 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                         />
                       )}
                       {!["okta", "azure_ad", "auth0"].includes(provider) && (
-                        <div className="space-y-4 p-4 border rounded-lg bg-white border-blue-200">
-                          <h5 className="text-sm font-semibold text-blue-800">OAuth 2.0 Configuration</h5>
+                        <div className="space-y-4 p-4 border rounded-lg bg-background border-blue-200 dark:border-blue-800">
+                          <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-200">OAuth 2.0 Configuration</h5>
                           
                           <div className="space-y-4">
                             <div className="space-y-2">
@@ -987,10 +987,10 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                               />
                             </div>
                             
-                            <Alert className="border-blue-200 bg-blue-50">
-                              <AlertCircle className="h-4 w-4 text-blue-600" />
-                              <AlertDescription className="text-blue-800">
-                                Configure your OAuth application with callback URL: <code className="bg-blue-100 px-1 rounded text-blue-900">http://localhost:8000/pip/oauth/callback/{provider}</code>
+                            <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+                              <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                                Configure your OAuth application with callback URL: <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded text-blue-900 dark:text-blue-100">http://localhost:8000/pip/oauth/callback/{provider}</code>
                               </AlertDescription>
                             </Alert>
                           </div>
@@ -1054,9 +1054,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Database Sources */}
               {selectedType === "database" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-green-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-green-50 dark:bg-green-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-green-900">Database Configuration</h4>
+                    <h4 className="text-sm font-semibold text-green-900 dark:text-green-100">Database Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1147,9 +1147,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* OpenAPI Sources */}
               {selectedType === "openapi" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-purple-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-purple-50 dark:bg-purple-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-purple-900">OpenAPI Specification</h4>
+                    <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100">OpenAPI Specification</h4>
                     
                     <div className="space-y-2">
                       <Label htmlFor="spec-url" className="text-sm font-medium">OpenAPI Specification URL</Label>
@@ -1164,18 +1164,18 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                     
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t border-purple-200" />
+                        <span className="w-full border-t border-purple-200 dark:border-purple-800" />
                       </div>
                       <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-purple-50 px-2 text-purple-500">Or</span>
+                        <span className="bg-purple-50 dark:bg-purple-950/20 px-2 text-purple-500 dark:text-purple-400">Or</span>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="spec-file" className="text-sm font-medium">Upload OpenAPI File</Label>
-                      <div className="border-2 border-dashed border-purple-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-purple-400" />
-                        <p className="text-sm text-purple-600 mb-2">Upload .json or .yaml file</p>
+                      <div className="border-2 border-dashed border-purple-300 dark:border-purple-700 rounded-lg p-6 text-center hover:border-purple-400 dark:hover:border-purple-600 transition-colors">
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-purple-400 dark:text-purple-500" />
+                        <p className="text-sm text-purple-600 dark:text-purple-400 mb-2">Upload .json or .yaml file</p>
                         <input
                           type="file"
                           accept=".json,.yaml,.yml"
@@ -1199,9 +1199,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* HR System Configuration */}
               {selectedType === "hr" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-green-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-green-50 dark:bg-green-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-green-900">HR System Configuration</h4>
+                    <h4 className="text-sm font-semibold text-green-900 dark:text-green-100">HR System Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1303,9 +1303,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* CRM System Configuration */}
               {selectedType === "crm" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-purple-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-purple-50 dark:bg-purple-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-purple-900">CRM System Configuration</h4>
+                    <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100">CRM System Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1407,9 +1407,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Cloud Provider Configuration */}
               {selectedType === "cloud" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-blue-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-blue-900">Cloud Provider Configuration</h4>
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Cloud Provider Configuration</h4>
                     
                 <div className="space-y-2">
                       <Label htmlFor="cloud-provider" className="text-sm font-medium">Cloud Provider</Label>
@@ -1466,9 +1466,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* ERP System Configuration */}
               {selectedType === "erp" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-amber-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-amber-50 dark:bg-amber-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-amber-900">ERP System Configuration</h4>
+                    <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">ERP System Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1583,9 +1583,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* CSM/Ticketing System Configuration */}
               {selectedType === "csm" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-pink-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-pink-50 dark:bg-pink-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-pink-900">CSM/Ticketing System Configuration</h4>
+                    <h4 className="text-sm font-semibold text-pink-900 dark:text-pink-100">CSM/Ticketing System Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1687,9 +1687,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Configuration Management DB Configuration */}
               {selectedType === "cmdb" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-slate-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-slate-50 dark:bg-slate-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-slate-900">Configuration Management DB Configuration</h4>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Configuration Management DB Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1790,9 +1790,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Custom API/Webhook Configuration */}
               {selectedType === "api" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-cyan-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-cyan-50 dark:bg-cyan-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-cyan-900">Custom API/Webhook Configuration</h4>
+                    <h4 className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">Custom API/Webhook Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1892,9 +1892,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                   
                   {authType === "none" && (
                     <div className="space-y-4">
-                      <Alert className="border-cyan-200 bg-cyan-50">
-                        <AlertCircle className="h-4 w-4 text-cyan-600" />
-                        <AlertDescription className="text-cyan-800">
+                      <Alert className="border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/20">
+                        <AlertCircle className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                        <AlertDescription className="text-cyan-800 dark:text-cyan-200">
                           <p className="text-sm">No authentication required. The API will be accessed without credentials.</p>
                         </AlertDescription>
                       </Alert>
@@ -1920,9 +1920,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Document/File Storage Configuration */}
               {selectedType === "documents" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-orange-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-orange-900">Document/File Storage Configuration</h4>
+                    <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100">Document/File Storage Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -2025,9 +2025,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Static Data Configuration */}
               {selectedType === "static" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-gray-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-gray-50 dark:bg-gray-900">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-gray-900">Static Data Configuration</h4>
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Static Data Configuration</h4>
                     
                     <div className="space-y-2">
                       <Label htmlFor="static-type" className="text-sm font-medium">Data Type</Label>
@@ -2055,13 +2055,13 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                       />
                     </div>
                     
-                    <div className="text-center text-gray-500">OR</div>
+                    <div className="text-center text-gray-500 dark:text-gray-400">OR</div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="static-file" className="text-sm font-medium">Upload Data File</Label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm text-gray-600 mb-2">Upload .csv, .json, or .xml file</p>
+                      <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center hover:border-gray-400 dark:hover:border-gray-600 transition-colors">
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Upload .csv, .json, or .xml file</p>
                         <input
                           type="file"
                           accept=".csv,.json,.xml"
@@ -2085,9 +2085,9 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Data Warehouse Configuration */}
               {selectedType === "warehouse" && (
-                <div className="space-y-6 p-6 border rounded-lg bg-emerald-50">
+                <div className="space-y-6 p-6 border rounded-lg bg-emerald-50 dark:bg-emerald-950/20">
                   <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-emerald-900">Data Warehouse Configuration</h4>
+                    <h4 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Data Warehouse Configuration</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -2220,15 +2220,15 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
 
               {/* Connection Test Result */}
               {connectionTestResult && (
-                <Alert className={connectionTestResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+                <Alert className={connectionTestResult.success ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20"}>
                   <TestTube className="h-4 w-4" />
                   <AlertDescription>
                     {connectionTestResult.success ? (
-                      <span className="text-green-700">
+                      <span className="text-green-700 dark:text-green-300">
                         Connection successful! Response time: {connectionTestResult.responseTime}s
                       </span>
                     ) : (
-                      <span className="text-red-700">
+                      <span className="text-red-700 dark:text-red-300">
                         Connection failed: {connectionTestResult.error}
                       </span>
                     )}
@@ -2267,12 +2267,12 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
               <p className="text-muted-foreground">Map source data fields to authorization attributes</p>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
               <div className="flex items-start gap-3">
-                <Lightbulb className="h-5 w-5 text-amber-600 mt-0.5" />
+                <Lightbulb className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-amber-900">AI Recommendation</p>
-                  <p className="text-sm text-amber-700">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">AI Recommendation</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
                     {selectedType === "identity" || selectedType === "okta" || selectedType === "azure_ad" || selectedType === "auth0" 
                       ? "AI recommends mapping user attributes like 'email' to 'user.email' and 'groups' to 'user.roles' for effective policy enforcement."
                       : selectedType === "database" || selectedType === "postgresql" || selectedType === "mysql"
@@ -2292,10 +2292,10 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                 <div className="border rounded-lg p-4 bg-muted/30 max-h-64 overflow-y-auto">
                   {connectionTestResult?.success ? (
                     <div className="space-y-2">
-                      <p className="text-sm text-green-600 mb-3">✅ Connection successful! Available fields:</p>
+                      <p className="text-sm text-green-600 dark:text-green-400 mb-3">✅ Connection successful! Available fields:</p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {getAvailableFields().map((field, index) => (
-                          <div key={index} className="flex items-start space-x-2 p-3 bg-white rounded border hover:bg-gray-50">
+                          <div key={index} className="flex items-start space-x-2 p-3 bg-background rounded border hover:bg-muted/30">
                             <div className={`w-2 h-2 rounded-full mt-2 ${
                               field.sensitivity === 'restricted' ? 'bg-red-500' :
                               field.sensitivity === 'confidential' ? 'bg-orange-500' :
@@ -2304,19 +2304,19 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-mono font-medium">{field.name}</span>
-                                <span className="text-xs text-gray-500">({field.type})</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">({field.type})</span>
                                 {field.required && (
-                                  <span className="text-xs bg-red-100 text-red-700 px-1 rounded">Required</span>
+                                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-1 rounded">Required</span>
                                 )}
                               </div>
                               {field.description && (
-                                <p className="text-xs text-gray-600 mt-1">{field.description}</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{field.description}</p>
                               )}
                               {field.example && (
-                                <p className="text-xs text-gray-500 mt-1">Example: {field.example}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Example: {field.example}</p>
                               )}
                               {field.enum_values && (
-                                <p className="text-xs text-gray-500 mt-1">Values: {field.enum_values.join(', ')}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Values: {field.enum_values.join(', ')}</p>
                               )}
                             </div>
                           </div>
@@ -2325,15 +2325,15 @@ export function AddInformationSourceWizard({ isOpen, onClose, onAdd, preselected
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <p className="text-sm text-amber-600 mb-3">⚠️ Test connection first to see available fields</p>
-                      <div className="text-sm text-gray-600">
+                      <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">⚠️ Test connection first to see available fields</p>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         <p>Sample fields that may be available:</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                           {getSampleFields().map((field, index) => (
-                            <div key={index} className="flex items-center space-x-2 p-2 bg-gray-100 rounded border">
-                              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                            <div key={index} className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-gray-800 rounded border">
+                              <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
                               <span className="text-sm font-mono">{field.name}</span>
-                              <span className="text-xs text-gray-500">({field.type})</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">({field.type})</span>
                             </div>
                           ))}
                         </div>

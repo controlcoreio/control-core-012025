@@ -36,8 +36,8 @@ export function OAuthFields({
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white border-blue-200">
-      <h5 className="text-sm font-semibold text-blue-800">OAuth 2.0 / OIDC Configuration</h5>
+    <div className="space-y-4 p-4 border rounded-lg bg-background border-blue-200 dark:border-blue-800">
+      <h5 className="text-sm font-semibold text-blue-800 dark:text-blue-200">OAuth 2.0 / OIDC Configuration</h5>
       
       <div className="space-y-4">
         {showEndpoint && (
@@ -50,7 +50,7 @@ export function OAuthFields({
               onChange={(e) => onEndpointChange?.(e.target.value)}
               className="w-full"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Base URL for making authenticated API calls after OAuth flow completes
             </p>
           </div>
@@ -111,18 +111,18 @@ export function OAuthFields({
             onChange={(e) => handleFieldChange('scopes', e.target.value)}
             className="w-full"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Space-separated list of OAuth scopes (e.g., "openid profile email")
           </p>
         </div>
         
-        <Alert className="border-blue-200 bg-blue-50">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
+        <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+          <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
             <div className="space-y-1">
               <p className="text-sm">Configure your OAuth application with:</p>
-              <div className="bg-blue-100 p-2 rounded text-xs">
-                <p><strong>Callback URL:</strong> <code className="bg-blue-200 px-1 rounded">http://localhost:8000/pip/oauth/callback/{provider}</code></p>
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded text-xs">
+                <p><strong>Callback URL:</strong> <code className="bg-blue-200 dark:bg-blue-800/50 px-1 rounded">http://localhost:8000/pip/oauth/callback/{provider}</code></p>
                 <p><strong>Grant Types:</strong> Authorization Code, Refresh Token</p>
               </div>
             </div>

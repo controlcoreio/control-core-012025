@@ -85,18 +85,47 @@ async def create_policy(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Create a new policy. All new policies are created in sandbox environment only."""
-    # Enforce sandbox-only policy creation
+    """Create a new policy. All new policies are created in sandbox environment only.
+    
+    REQUIRES: resource_id (which resource this policy protects)
+    COMMITS TO: policies/{resource-name}/sandbox/draft/policy_{id}.rego in GitHub
+    """
+    from app.services.github_writer import get_github_writer_for_bouncer
+    
+    # 1. Validate resource_id is provided
+    if not policy_data.resource_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="resource_id is required - must select a resource for this policy"
+        )
+    
+    # 2. Validate resource exists and has bouncer
+    resource = db.query(ProtectedResource).filter(ProtectedResource.id == policy_data.resource_id).first()
+    if not resource:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resource not found"
+        )
+    
+    if not resource.bouncer_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resource has no bouncer deployed - cannot create policy"
+        )
+    
+    # 3. Save policy to database (always starts as sandbox draft)
     db_policy = Policy(
         name=policy_data.name,
         description=policy_data.description,
         scope=policy_data.scope,
         effect=policy_data.effect,
-        resource_id=policy_data.resource_id,
+        resource_id=resource.id,
+        resource_name=resource.name,  # Denormalize for convenience
         environment="sandbox",  # Always create in sandbox
         sandbox_status="draft",
         production_status="not-promoted",
         promoted_from_sandbox=False,
+        rego_code=policy_data.rego_code or "",
         created_by=current_user.username,
         modified_by=current_user.username
     )
@@ -105,24 +134,69 @@ async def create_policy(
     db.commit()
     db.refresh(db_policy)
     
-    # Log policy creation
+    # 4. Commit .rego file to GitHub
+    folder_path = f"policies/{resource.name}/sandbox/draft"
+    github_writer = get_github_writer_for_bouncer(resource.bouncer_id, db)
+    
+    if github_writer:
+        # Generate rego code if not provided
+        rego_code = db_policy.rego_code or generate_basic_rego(db_policy)
+        
+        result = github_writer.commit_policy(
+            policy_id=db_policy.id,
+            rego_code=rego_code,
+            folder_path=folder_path,
+            commit_message=f"Create draft policy: {db_policy.name}",
+            policy_name=db_policy.name
+        )
+        
+        if not result["success"]:
+            # GitHub commit failed - log warning but don't fail policy creation
+            logger.warning(f"GitHub commit failed for policy {db_policy.id}: {result.get('error')}")
+            # Still continue - policy exists in DB, can commit to GitHub later
+    else:
+        logger.warning(f"GitHub not configured for bouncer {resource.bouncer_id}")
+    
+    # 5. Log policy creation
     audit_log = AuditLog(
         user_id=current_user.id,
         user=current_user.username,
-        action=f"Created policy: {db_policy.name}",
+        action=f"Created policy for {resource.name}",
         resource=f"Policy #{db_policy.id}",
         resource_type="policy",
         result="success",
         event_type="POLICY_CREATED",
         outcome="SUCCESS",
-        environment="sandbox",  # Log creation in sandbox
+        environment="sandbox",
         policy_name=db_policy.name,
-        reason=f"Policy '{db_policy.name}' created in sandbox"
+        reason=f"Policy '{db_policy.name}' created in sandbox draft for {resource.name}"
     )
     db.add(audit_log)
     db.commit()
     
+    logger.info(f"Policy {db_policy.id} created for resource {resource.name} - committed to {folder_path}")
+    
     return db_policy
+
+
+def generate_basic_rego(policy: Policy) -> str:
+    """Generate basic Rego code from policy data."""
+    return f"""package controlcore.policies.policy_{policy.id}
+
+import future.keywords.if
+import future.keywords.in
+
+default {policy.effect} = false
+
+{policy.effect} if {{
+    # Policy: {policy.name}
+    # Resource: {policy.resource_name}
+    # Environment: {policy.environment}
+    
+    # Add your policy rules here
+    true
+}}
+"""
 
 @router.put("/{policy_id}", response_model=PolicyResponse)
 async def update_policy(
@@ -209,8 +283,13 @@ async def promote_policy(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Promote a policy from sandbox to production. Can only promote sandbox policies."""
+    """Promote a policy from sandbox to production.
+    
+    COPIES: policies/{resource}/sandbox/enabled/ → policies/{resource}/production/enabled/
+    Bouncer's OPAL will detect change and load policy in production environment.
+    """
     from datetime import datetime
+    from app.services.github_writer import get_github_writer_for_bouncer
     
     policy = db.query(Policy).filter(Policy.id == policy_id).first()
     if not policy:
@@ -226,10 +305,46 @@ async def promote_policy(
             detail="Can only promote policies from sandbox environment"
         )
     
+    # Get resource for folder path
+    resource = db.query(ProtectedResource).filter(ProtectedResource.id == policy.resource_id).first()
+    if not resource:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated resource not found"
+        )
+    
     if policy.promoted_from_sandbox:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Policy has already been promoted to production"
+        )
+    
+    # Commit .rego file to production folder in GitHub
+    production_folder_path = f"policies/{resource.name}/production/enabled"
+    github_writer = get_github_writer_for_bouncer(resource.bouncer_id, db)
+    
+    if not github_writer:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GitHub not configured for this bouncer"
+        )
+    
+    # Generate rego code if not in policy
+    rego_code = policy.rego_code or generate_basic_rego(policy)
+    
+    # Write to production folder (OPAL in production bouncer will detect this)
+    result = github_writer.commit_policy(
+        policy_id=policy.id,
+        rego_code=rego_code,
+        folder_path=production_folder_path,
+        commit_message=f"Promote to production: {policy.name}",
+        policy_name=policy.name
+    )
+    
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to commit to GitHub: {result.get('error')}"
         )
     
     # Mark policy as promoted and available in both environments
@@ -248,7 +363,7 @@ async def promote_policy(
     audit_log = AuditLog(
         user_id=current_user.id,
         user=current_user.username,
-        action=f"Promoted policy to production: {policy.name}",
+        action=f"Promoted policy to production: {policy.name} (Resource: {resource.name})",
         resource=f"Policy #{policy_id}",
         resource_type="policy",
         result="success",
@@ -256,30 +371,233 @@ async def promote_policy(
         outcome="SUCCESS",
         environment="production",
         policy_name=policy.name,
-        reason=f"Policy '{policy.name}' promoted from sandbox to production"
+        reason=f"Policy '{policy.name}' promoted to production - committed to {production_folder_path}"
     )
     db.add(audit_log)
     db.commit()
     
-    # INTELLIGENT OPAL SYNC
-    # Automatically trigger policy sync to production bouncers
-    # Control Core handles the intelligence - no manual configuration needed
-    opal_service = get_opal_distribution_service(db)
-    sync_result = opal_service.trigger_policy_sync_to_environment(
-        environment="production",
-        policy_id=policy_id
-    )
-    
-    logger.info(f"Policy {policy_id} promoted to production by {current_user.username}")
-    logger.info(f"OPAL sync result: {sync_result}")
+    logger.info(f"Policy {policy_id} promoted to production by {current_user.username} - committed to {production_folder_path}")
+    logger.info(f"Production bouncer's OPAL will detect change and load policy")
     
     return {
         "message": "Policy promoted to production successfully",
         "policy_id": policy.id,
         "promoted_at": policy.promoted_at,
         "promoted_by": policy.promoted_by,
-        "opal_sync": sync_result
+        "github_path": f"{production_folder_path}/policy_{policy.id}.rego",
+        "commit_sha": result.get("commit_sha")
     }
+
+@router.post("/{policy_id}/enable")
+async def enable_policy_in_sandbox(
+    policy_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Enable a draft policy in sandbox.
+    
+    MOVES: policies/{resource}/sandbox/draft/ → policies/{resource}/sandbox/enabled/
+    Bouncer's OPAL will detect change and load policy into OPA.
+    """
+    from datetime import datetime
+    from app.services.github_writer import get_github_writer_for_bouncer
+    
+    policy = db.query(Policy).filter(Policy.id == policy_id).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Policy not found"
+        )
+    
+    if policy.sandbox_status != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only draft policies can be enabled"
+        )
+    
+    if policy.environment != "sandbox":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Policy must be in sandbox to enable"
+        )
+    
+    # Get resource for folder path
+    resource = db.query(ProtectedResource).filter(ProtectedResource.id == policy.resource_id).first()
+    if not resource:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated resource not found"
+        )
+    
+    # Get GitHub writer
+    github_writer = get_github_writer_for_bouncer(resource.bouncer_id, db)
+    if not github_writer:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GitHub not configured for this bouncer"
+        )
+    
+    # Move file in GitHub: draft → enabled
+    from_folder = f"policies/{resource.name}/sandbox/draft"
+    to_folder = f"policies/{resource.name}/sandbox/enabled"
+    
+    result = github_writer.move_policy(
+        policy_id=policy.id,
+        from_folder=from_folder,
+        to_folder=to_folder,
+        commit_message=f"Enable policy in sandbox: {policy.name}"
+    )
+    
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to enable policy in GitHub: {result.get('error')}"
+        )
+    
+    # Update database
+    policy.sandbox_status = "enabled"
+    policy.status = "enabled"  # Update main status field too
+    policy.modified_by = current_user.username
+    db.commit()
+    db.refresh(policy)
+    
+    # Log policy enablement
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        user=current_user.username,
+        action=f"Enabled policy in sandbox: {policy.name} (Resource: {resource.name})",
+        resource=f"Policy #{policy_id}",
+        resource_type="policy",
+        result="success",
+        event_type="POLICY_ENABLED",
+        outcome="SUCCESS",
+        environment="sandbox",
+        policy_name=policy.name,
+        reason=f"Policy '{policy.name}' enabled in sandbox - moved to {to_folder}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    logger.info(f"Policy {policy_id} enabled in sandbox - moved from {from_folder} to {to_folder}")
+    
+    return {
+        "success": True,
+        "message": "Policy enabled in sandbox",
+        "policy_id": policy.id,
+        "github_path": f"{to_folder}/policy_{policy.id}.rego"
+    }
+
+
+@router.post("/{policy_id}/disable")
+async def disable_policy(
+    policy_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Disable an enabled policy.
+    
+    MOVES: policies/{resource}/{environment}/enabled/ → policies/{resource}/{environment}/disabled/
+    Bouncer's OPAL will detect change and unload policy from OPA.
+    """
+    from datetime import datetime
+    from app.services.github_writer import get_github_writer_for_bouncer
+    
+    policy = db.query(Policy).filter(Policy.id == policy_id).first()
+    if not policy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Policy not found"
+        )
+    
+    # Check if policy is enabled in either environment
+    if policy.sandbox_status != "enabled" and policy.production_status != "enabled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only enabled policies can be disabled"
+        )
+    
+    # Get resource for folder path
+    resource = db.query(ProtectedResource).filter(ProtectedResource.id == policy.resource_id).first()
+    if not resource:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated resource not found"
+        )
+    
+    # Get GitHub writer
+    github_writer = get_github_writer_for_bouncer(resource.bouncer_id, db)
+    if not github_writer:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GitHub not configured for this bouncer"
+        )
+    
+    # Determine which environment to disable
+    # For "both" environment policies, disable in both
+    environments_to_disable = []
+    if policy.environment == "sandbox" or policy.environment == "both":
+        if policy.sandbox_status == "enabled":
+            environments_to_disable.append("sandbox")
+    if policy.environment == "production" or policy.environment == "both":
+        if policy.production_status == "enabled":
+            environments_to_disable.append("production")
+    
+    # Move files in GitHub for each environment
+    for env in environments_to_disable:
+        from_folder = f"policies/{resource.name}/{env}/enabled"
+        to_folder = f"policies/{resource.name}/{env}/disabled"
+        
+        result = github_writer.move_policy(
+            policy_id=policy.id,
+            from_folder=from_folder,
+            to_folder=to_folder,
+            commit_message=f"Disable policy in {env}: {policy.name}"
+        )
+        
+        if not result["success"]:
+            logger.error(f"Failed to disable policy {policy_id} in {env}: {result.get('error')}")
+            # Continue with other environments
+    
+    # Update database status
+    if "sandbox" in environments_to_disable:
+        policy.sandbox_status = "disabled"
+    if "production" in environments_to_disable:
+        policy.production_status = "disabled"
+    
+    # Update main status if disabled in all environments
+    if policy.sandbox_status == "disabled" and policy.production_status != "enabled":
+        policy.status = "disabled"
+    
+    policy.modified_by = current_user.username
+    db.commit()
+    db.refresh(policy)
+    
+    # Log policy disablement
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        user=current_user.username,
+        action=f"Disabled policy: {policy.name} (Resource: {resource.name})",
+        resource=f"Policy #{policy_id}",
+        resource_type="policy",
+        result="success",
+        event_type="POLICY_DISABLED",
+        outcome="SUCCESS",
+        environment=",".join(environments_to_disable),
+        policy_name=policy.name,
+        reason=f"Policy '{policy.name}' disabled in {', '.join(environments_to_disable)}"
+    )
+    db.add(audit_log)
+    db.commit()
+    
+    logger.info(f"Policy {policy_id} disabled in {', '.join(environments_to_disable)}")
+    
+    return {
+        "success": True,
+        "message": f"Policy disabled in {', '.join(environments_to_disable)}",
+        "policy_id": policy.id,
+        "environments": environments_to_disable
+    }
+
 
 @router.get("/promoted", response_model=List[PolicyResponse])
 async def get_promoted_policies(

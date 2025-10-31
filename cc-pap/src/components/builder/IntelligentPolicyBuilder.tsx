@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ContextManagementStep } from "./ContextManagementStep";
+import { analyzePolicyComplexity, getComplexityMessage } from "@/utils/policyComplexity";
+import { AdvancedFeaturesWarning } from "./AdvancedFeaturesWarning";
 
 interface PolicyData {
   name: string;
@@ -53,6 +55,7 @@ interface IntelligentPolicyBuilderProps {
   policyData: PolicyData;
   setPolicyData: (data: PolicyData) => void;
   onNext: () => void;
+  onSwitchToCodeEditor?: () => void;
 }
 
 interface PIPAttribute {
@@ -83,7 +86,8 @@ interface SmartSuggestion {
 export function IntelligentPolicyBuilder({ 
   policyData, 
   setPolicyData, 
-  onNext 
+  onNext,
+  onSwitchToCodeEditor
 }: IntelligentPolicyBuilderProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [policyName, setPolicyName] = useState(policyData.name || '');
@@ -108,6 +112,7 @@ export function IntelligentPolicyBuilder({
   });
   const [maskFieldInput, setMaskFieldInput] = useState('');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [policyComplexity, setPolicyComplexity] = useState(analyzePolicyComplexity(policyData));
   const { toast } = useToast();
 
   const steps = [
@@ -1323,6 +1328,12 @@ ${effect} {
     });
   }, [policyName, policyDescription, effect, conditions]);
 
+  // Re-analyze policy complexity when policy data changes
+  useEffect(() => {
+    const analysis = analyzePolicyComplexity(policyData);
+    setPolicyComplexity(analysis);
+  }, [policyData.conditions, policyData.regoCode]);
+
   const isStepValid = () => {
     switch (currentStep) {
       case 1:
@@ -1394,8 +1405,28 @@ ${effect} {
           Back
         </Button>
 
-        <div className="text-sm text-muted-foreground">
-          Step {currentStep} of {steps.length}
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted-foreground">
+            Step {currentStep} of {steps.length}
+          </div>
+          
+          {/* Show complexity warning if needed */}
+          {(policyComplexity.level === 'medium' || policyComplexity.level === 'advanced') && (
+            <AdvancedFeaturesWarning
+              analysis={policyComplexity}
+              onSwitchToCodeEditor={() => {
+                if (onSwitchToCodeEditor) {
+                  onSwitchToCodeEditor();
+                } else {
+                  toast({
+                    title: "Code Editor Recommended",
+                    description: "Use the 'Code Editor' tab above to access advanced Rego features.",
+                  });
+                }
+              }}
+              position="tooltip"
+            />
+          )}
         </div>
 
         <Button

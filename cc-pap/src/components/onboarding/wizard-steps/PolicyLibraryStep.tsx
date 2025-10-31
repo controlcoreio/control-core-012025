@@ -42,6 +42,8 @@ export function PolicyLibraryStep({ pepData, onComplete, onNext }: PolicyLibrary
   const handleCopyTemplate = (templateId: number) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
+      console.log('[PolicyLibraryStep] Copy Control clicked for template:', template);
+      
       const templateConfig = {
         name: template.name,
         description: template.template_metadata?.summary || template.metadata?.summary || template.description,
@@ -53,8 +55,24 @@ export function PolicyLibraryStep({ pepData, onComplete, onNext }: PolicyLibrary
         sandbox_status: 'enabled'
       };
       
+      console.log('[PolicyLibraryStep] Template config prepared:', templateConfig);
+      
+      // Set template data first, then open builder after a small delay
+      // This ensures state is updated before the builder opens
       setTemplateDataForBuilder(templateConfig);
-      setShowPolicyBuilder(true);
+      
+      // Use setTimeout to ensure React has processed the state update
+      setTimeout(() => {
+        console.log('[PolicyLibraryStep] Opening Policy Builder with template data');
+        setShowPolicyBuilder(true);
+      }, 50);
+    } else {
+      console.error('[PolicyLibraryStep] Template not found with ID:', templateId);
+      toast({
+        title: "Template Not Found",
+        description: "Could not load the selected template. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -201,15 +219,23 @@ export function PolicyLibraryStep({ pepData, onComplete, onNext }: PolicyLibrary
       <UnifiedPolicyBuilder
         open={showPolicyBuilder}
         onClose={() => {
+          console.log('[PolicyLibraryStep] Closing Policy Builder');
           setShowPolicyBuilder(false);
-          setTemplateDataForBuilder(null);
+          // Add a delay before clearing template data to ensure proper cleanup
+          setTimeout(() => {
+            setTemplateDataForBuilder(null);
+          }, 100);
         }}
         mode="create"
         templateData={templateDataForBuilder}
         onboarding={true}
         onPolicyCreate={(policyData) => {
+          console.log('[PolicyLibraryStep] Policy created:', policyData);
           handlePolicyCreated(policyData);
           setShowPolicyBuilder(false);
+          setTimeout(() => {
+            setTemplateDataForBuilder(null);
+          }, 100);
           toast({
             title: "Policy Created",
             description: `Policy "${policyData.name}" has been created successfully.`,

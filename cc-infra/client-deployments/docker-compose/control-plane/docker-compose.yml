@@ -1,0 +1,139 @@
+# Control Core - Production Control Plane Deployment
+# This docker-compose file deploys the complete Control Plane including:
+# - PAP API (Backend)
+# - PAP UI (Frontend)
+# - PostgreSQL Database
+# - Redis Cache
+# - Signup Service
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  cc-db:
+    image: postgres:15-alpine
+    container_name: cc-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-control_core_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - cc_postgres_data:/var/lib/postgresql/data
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for PIP metadata caching
+  cc-redis:
+    image: redis:7-alpine
+    container_name: cc-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - cc_redis_data:/data
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}"
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Control Core PAP API (Backend)
+  cc-pap-api:
+    image: controlcore/cc-pap-api:${CC_VERSION:-latest}
+    container_name: cc-pap-api
+    ports:
+      - "${PAP_API_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@cc-db:5432/${POSTGRES_DB:-control_core_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-}@cc-redis:6379
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY required}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY required}
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-30}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CC_BUILTIN_ADMIN_USER=${ADMIN_USER:-ccadmin}
+      - CC_BUILTIN_ADMIN_PASS=${ADMIN_PASS:?ADMIN_PASS required}
+      - CC_DROP_TABLES=false
+      - CREDENTIAL_ENCRYPTION_KEY=${CREDENTIAL_ENCRYPTION_KEY:?CREDENTIAL_ENCRYPTION_KEY required}
+    depends_on:
+      cc-db:
+        condition: service_healthy
+      cc-redis:
+        condition: service_healthy
+    volumes:
+      - cc_logs:/var/log/controlcore
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Control Core Frontend (PAP UI)
+  cc-pap:
+    image: controlcore/cc-pap:${CC_VERSION:-latest}
+    container_name: cc-pap
+    ports:
+      - "${PAP_UI_PORT:-80}:80"
+    environment:
+      - VITE_API_URL=${PAP_API_URL:-http://localhost:8000}
+      - NODE_ENV=production
+    depends_on:
+      - cc-pap-api
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Control Core Signup Service
+  cc-signup-service:
+    image: controlcore/cc-signup-service:${CC_VERSION:-latest}
+    container_name: cc-signup-service
+    ports:
+      - "${SIGNUP_PORT:-8002}:8000"
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@cc-db:5432/${POSTGRES_DB:-control_core_db}
+      - PAP_API_URL=http://cc-pap-api:8000
+      - SECRET_KEY=${SIGNUP_SECRET_KEY:?SIGNUP_SECRET_KEY required}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    depends_on:
+      cc-db:
+        condition: service_healthy
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  controlcore-network:
+    driver: bridge
+
+volumes:
+  cc_postgres_data:
+    driver: local
+  cc_redis_data:
+    driver: local
+  cc_logs:
+    driver: local
+

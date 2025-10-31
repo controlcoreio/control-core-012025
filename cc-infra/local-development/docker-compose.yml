@@ -1,0 +1,160 @@
+services:
+  # PostgreSQL Database
+  cc-db:
+    image: postgres:15-alpine
+    container_name: cc-db
+    environment:
+      - POSTGRES_DB=control_core_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - cc_postgres_data:/var/lib/postgresql/data
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for PIP metadata caching
+  cc-redis:
+    image: redis:7-alpine
+    container_name: cc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - cc_redis_data:/data
+    command: redis-server --appendonly yes --requirepass ""
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Control Core PAP API (Backend)
+  cc-pap-api:
+    build:
+      context: ..
+      dockerfile: cc-pap-api/Dockerfile
+    container_name: cc-pap-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@cc-db:5432/control_core_db
+      - REDIS_URL=redis://cc-redis:6379
+      - SECRET_KEY=control-core-secret-key-2025
+      - JWT_SECRET_KEY=jwt-secret-key-2025
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+      - CC_BUILTIN_ADMIN_USER=ccadmin
+      - CC_BUILTIN_ADMIN_PASS=SecurePass2025!
+      - CC_DROP_TABLES=false  # NEVER set to 'true' in production! Only for initial setup.
+    depends_on:
+      cc-db:
+        condition: service_healthy
+      cc-redis:
+        condition: service_healthy
+    volumes:
+      - ../cc-pap-api/app:/home/app/app
+      - ../cc-pap-api/init_db.py:/home/app/init_db.py
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    command: sh -c "python init_db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # Control Core Frontend (PAP UI)
+  cc-pap:
+    build:
+      context: ../cc-pap
+      dockerfile: Dockerfile.dev
+    container_name: cc-pap
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    volumes:
+      - ../cc-pap:/app
+      - /app/node_modules
+    depends_on:
+      - cc-pap-api
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Control Core Bouncer (PEP)
+  cc-bouncer:
+    build:
+      context: ../cc-bouncer
+      dockerfile: Dockerfile
+    container_name: cc-bouncer
+    ports:
+      - "8080:8080"
+    environment:
+      - BOUNCER_PORT=8080
+      - TARGET_HOST=cc-pap-api:8000
+      - PAP_API_URL=http://cc-pap-api:8000
+      - PDP_URL=http://localhost:8181
+      - TENANT_ID=default
+      - API_KEY=bouncer-api-key-2025
+      - LOG_ENABLED=true
+      - CACHE_ENABLED=true
+    depends_on:
+      - cc-pap-api
+    networks:
+      - controlcore-network
+    restart: unless-stopped
+
+  # Control Core Signup Service
+  cc-signup-service:
+    build:
+      context: ../cc-signup-service
+      dockerfile: Dockerfile
+    container_name: cc-signup-service
+    ports:
+      - "8002:8000"
+    environment:
+      - PORT=8000
+      - DATABASE_URL=sqlite:///./test.db
+      - PAP_API_URL=http://cc-pap-api:8000
+      - SECRET_KEY=signup-service-secret-2025
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ENVIRONMENT=development
+    depends_on:
+      cc-db:
+        condition: service_healthy
+    volumes:
+      - ../cc-signup-service/app:/app/app
+    networks:
+      - controlcore-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    command: python run_on_8002.py
+
+networks:
+  controlcore-network:
+    driver: bridge
+
+volumes:
+  cc_postgres_data:
+    driver: local
+  cc_redis_data:
+    driver: local

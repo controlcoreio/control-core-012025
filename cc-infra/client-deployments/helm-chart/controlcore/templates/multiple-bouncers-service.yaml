@@ -1,0 +1,24 @@
+{{- range $name, $config := .Values.bouncers }}
+{{- if $config.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+  labels:
+    app: {{ $config.name }}
+    resource-type: {{ $config.resourceType }}
+    {{- include "controlcore.labels" $ | nindent 4 }}
+spec:
+  type: {{ $.Values.bouncer.service.type }}
+  ports:
+    - port: {{ $config.port }}
+      targetPort: {{ $config.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ $config.name }}
+    stack: {{ $.Values.global.stack }}
+    env: {{ $.Values.global.environment }}
+{{- end }}
+{{- end }}

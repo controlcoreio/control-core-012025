@@ -1,0 +1,63 @@
+{{- if .Values.database.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.database.name }}
+  labels:
+    app: {{ .Values.database.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.database.name }}
+      stack: {{ .Values.global.stack }}
+      env: {{ .Values.global.environment }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.database.name }}
+        stack: {{ .Values.global.stack }}
+        env: {{ .Values.global.environment }}
+    spec:
+      containers:
+        - name: {{ .Values.database.name }}
+          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
+          imagePullPolicy: {{ .Values.database.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.database.service.port }}
+          env:
+            {{- range .Values.database.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.database.resources | nindent 12 }}
+          {{- if .Values.components.database.persistence.enabled }}
+          volumeMounts:
+            - name: database-storage
+              mountPath: {{ .Values.components.database.persistence.mountPath }}
+            - name: storage-config
+              mountPath: /etc/control-core/storage
+              readOnly: true
+          {{- end }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.database.service.port }}
+            initialDelaySeconds: {{ .Values.database.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.database.probes.readiness.periodSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.database.service.port }}
+            initialDelaySeconds: {{ .Values.database.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.database.probes.liveness.periodSeconds }}
+      {{- if .Values.components.database.persistence.enabled }}
+      volumes:
+        - name: database-storage
+          persistentVolumeClaim:
+            claimName: {{ include "controlcore.fullname" . }}-database-pvc
+        - name: storage-config
+          configMap:
+            name: {{ include "controlcore.fullname" . }}-storage-config
+      {{- end }}
+{{- end }}

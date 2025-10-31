@@ -373,6 +373,14 @@ class BouncerRegistrationRequest(BaseModel):
     resource: ResourceInfo
     deployment_info: DeploymentInfo
 
+# Bouncer OPAL Configuration Schema
+class BouncerOPALConfigUpdate(BaseModel):
+    cache_enabled: Optional[bool] = None
+    cache_ttl: Optional[int] = None
+    cache_max_size: Optional[str] = None
+    rate_limit_rps: Optional[int] = None
+    rate_limit_burst: Optional[int] = None
+
 # Environment Management Schemas
 class EnvironmentBase(BaseModel):
     name: str

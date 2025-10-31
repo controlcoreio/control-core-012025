@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.policyAdminClient.name }}
+  labels:
+    app: {{ .Values.policyAdminClient.name }}
+    {{- include "controlcore.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.policyAdminClient.service.type }}
+  ports:
+    {{- range .Values.policyAdminClient.service.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      protocol: TCP
+    {{- end }}
+  selector:
+    app: {{ .Values.policyAdminClient.name }}
+    stack: {{ .Values.global.stack }}
+    env: {{ .Values.global.environment }}
