@@ -19,6 +19,10 @@ from app.schemas_config import (
     PEPCompleteConfigResponse
 )
 from app.routers.auth import get_current_user
+from app.services.pep_config_push_service import config_push_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/pep-config", tags=["pep-config"])
 
@@ -31,18 +35,38 @@ async def get_global_config(
     current_user: User = Depends(get_current_user)
 ):
     """Get global PEP configuration for the current tenant."""
-    config = db.query(GlobalPEPConfig).filter(
-        GlobalPEPConfig.tenant_id == str(current_user.id)
-    ).first()
-    
-    if not config:
-        # Create default config if doesn't exist
-        config = GlobalPEPConfig(tenant_id=str(current_user.id))
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-    
-    return config
+    try:
+        config = db.query(GlobalPEPConfig).filter(
+            GlobalPEPConfig.tenant_id == str(current_user.id)
+        ).first()
+        
+        if not config:
+            # Create default config if doesn't exist
+            config = GlobalPEPConfig(tenant_id=str(current_user.id))
+            db.add(config)
+            db.commit()
+            db.refresh(config)
+        
+        return config
+    except Exception as e:
+        logger.error(f"Error fetching global config: {e}")
+        # If table doesn't exist, create it and return default config
+        try:
+            from app.database import engine, Base
+            Base.metadata.create_all(bind=engine)
+            
+            # Try again after creating tables
+            config = GlobalPEPConfig(tenant_id=str(current_user.id))
+            db.add(config)
+            db.commit()
+            db.refresh(config)
+            return config
+        except Exception as create_error:
+            logger.error(f"Error creating config tables: {create_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to initialize configuration: {str(create_error)}"
+            )
 
 
 @router.put("/global", response_model=GlobalPEPConfigResponse)
@@ -60,12 +84,23 @@ async def update_global_config(
         config = GlobalPEPConfig(tenant_id=str(current_user.id))
         db.add(config)
     
+    # Track changed fields
+    changed_fields = config_update.model_dump(exclude_unset=True)
+    
     # Update fields
-    for field, value in config_update.model_dump(exclude_unset=True).items():
+    for field, value in changed_fields.items():
         setattr(config, field, value)
     
     db.commit()
     db.refresh(config)
+    
+    # Track configuration change and notify affected PEPs
+    config_push_service.track_global_config_change(
+        db=db,
+        tenant_id=str(current_user.id),
+        changed_fields=changed_fields,
+        changed_by=current_user.email if hasattr(current_user, 'email') else str(current_user.id)
+    )
     
     return config
 
@@ -125,12 +160,23 @@ async def update_individual_config(
         config = IndividualPEPConfig(pep_id=pep_id)
         db.add(config)
     
+    # Track changed fields
+    changed_fields = config_update.model_dump(exclude_unset=True)
+    
     # Update fields
-    for field, value in config_update.model_dump(exclude_unset=True).items():
+    for field, value in changed_fields.items():
         setattr(config, field, value)
     
     db.commit()
     db.refresh(config)
+    
+    # Track configuration change for this specific PEP
+    config_push_service.track_individual_config_change(
+        db=db,
+        pep_id=pep_id,
+        changed_fields=changed_fields,
+        changed_by=current_user.email if hasattr(current_user, 'email') else str(current_user.id)
+    )
     
     return config
 
@@ -167,10 +213,37 @@ async def get_complete_config(
     ).first()
     
     # Compute effective configuration (individual overrides global)
+    # Include bouncer-type-specific settings
     effective_config = {
-        # Basic
-        "proxy_domain": global_config.default_proxy_domain,
+        # Common Configuration
         "control_plane_url": global_config.control_plane_url,
+        "deployment_mode": pep.deployment_mode,
+        
+        # Reverse-Proxy Specific (only include if relevant)
+        "proxy_domain": global_config.default_proxy_domain if pep.deployment_mode == "reverse-proxy" else None,
+        
+        # Sidecar Specific (only include if relevant)
+        "sidecar_port": (
+            individual_config.sidecar_port_override 
+            if individual_config and individual_config.sidecar_port_override 
+            else global_config.default_sidecar_port
+        ) if pep.deployment_mode == "sidecar" else None,
+        "sidecar_injection_mode": global_config.sidecar_injection_mode if pep.deployment_mode == "sidecar" else None,
+        "sidecar_namespace_selector": global_config.sidecar_namespace_selector if pep.deployment_mode == "sidecar" else None,
+        "sidecar_resource_limits": {
+            "cpu": (
+                individual_config.sidecar_resource_cpu_override 
+                if individual_config and individual_config.sidecar_resource_cpu_override 
+                else global_config.sidecar_resource_limits_cpu
+            ) if pep.deployment_mode == "sidecar" else None,
+            "memory": (
+                individual_config.sidecar_resource_memory_override 
+                if individual_config and individual_config.sidecar_resource_memory_override 
+                else global_config.sidecar_resource_limits_memory
+            ) if pep.deployment_mode == "sidecar" else None,
+        } if pep.deployment_mode == "sidecar" else None,
+        "sidecar_init_container_enabled": global_config.sidecar_init_container_enabled if pep.deployment_mode == "sidecar" else None,
+        "sidecar_traffic_mode": individual_config.sidecar_traffic_mode if individual_config and pep.deployment_mode == "sidecar" else "iptables",
         
         # Policy Sync
         "policy_update_interval": (

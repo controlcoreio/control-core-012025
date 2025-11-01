@@ -35,9 +35,9 @@ export function MinimalSettingsPage() {
     },
     {
       title: "GitHub Configuration",
-      description: "Configure GitHub repository per bouncer",
+      description: "Configure tenant-level GitHub repository with folder structure",
       icon: "git-branch",
-      href: "/settings/peps",
+      href: "/settings/github",
       color: "text-purple-600",
       bgColor: "bg-purple-50 dark:bg-purple-900/20"
     },

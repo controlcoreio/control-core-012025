@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useResources } from "@/hooks/use-resources";
 import { AddEditResourceModal } from "./pep/AddEditResourceModal";
 import { APP_CONFIG } from "@/config/app";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
+import { useEnvironment } from "@/contexts/EnvironmentContext";
 
 interface ProtectedResource {
   id: string;
@@ -39,6 +41,7 @@ export function EnhancedResourcesPage() {
   const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
+  const { currentEnvironment } = useEnvironment();
   
   // Fetch real resources from backend
   const { resources: backendResources, isLoading, setResources } = useResources();
@@ -184,9 +187,12 @@ export function EnhancedResourcesPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Protected Resources</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold tracking-tight">Protected Resources</h1>
+            <EnvironmentBadge />
+          </div>
           <p className="text-muted-foreground">
-            Manage your protected resources, Bouncer assignments, and proxy URLs
+            Manage your protected resources for {currentEnvironment} environment, Bouncer assignments, and proxy URLs
           </p>
         </div>
         <Button asChild>

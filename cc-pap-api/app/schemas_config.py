@@ -10,9 +10,19 @@ from datetime import datetime
 # Global PEP Configuration Schemas
 
 class GlobalPEPConfigBase(BaseModel):
-    # Basic Configuration
-    default_proxy_domain: str = Field(default="bouncer.controlcore.io", description="Base domain for bouncer proxy URLs")
+    # Basic Configuration (Common)
     control_plane_url: str = Field(default="https://api.controlcore.io", description="Control Plane base URL")
+    
+    # Reverse-Proxy Specific Configuration
+    default_proxy_domain: str = Field(default="bouncer.controlcore.io", description="Base domain for bouncer proxy URLs")
+    
+    # Sidecar Specific Configuration
+    default_sidecar_port: int = Field(default=8080, ge=1, le=65535, description="Default port for sidecar bouncers")
+    sidecar_injection_mode: str = Field(default="automatic", description="Sidecar injection mode: automatic or manual")
+    sidecar_namespace_selector: Optional[str] = Field(None, description="K8s namespace selector for auto-injection")
+    sidecar_resource_limits_cpu: str = Field(default="500m", description="CPU limit for sidecar containers")
+    sidecar_resource_limits_memory: str = Field(default="256Mi", description="Memory limit for sidecar containers")
+    sidecar_init_container_enabled: bool = Field(default=True, description="Use init container for iptables setup")
     
     # Policy Update & Synchronization
     policy_update_interval: int = Field(default=30, ge=10, le=300, description="Policy update interval in seconds")
@@ -44,20 +54,41 @@ class GlobalPEPConfigCreate(GlobalPEPConfigBase):
 
 
 class GlobalPEPConfigUpdate(BaseModel):
-    default_proxy_domain: Optional[str] = None
+    # Common
     control_plane_url: Optional[str] = None
+    
+    # Reverse-Proxy Specific
+    default_proxy_domain: Optional[str] = None
+    
+    # Sidecar Specific
+    default_sidecar_port: Optional[int] = None
+    sidecar_injection_mode: Optional[str] = None
+    sidecar_namespace_selector: Optional[str] = None
+    sidecar_resource_limits_cpu: Optional[str] = None
+    sidecar_resource_limits_memory: Optional[str] = None
+    sidecar_init_container_enabled: Optional[bool] = None
+    
+    # Policy & Synchronization
     policy_update_interval: Optional[int] = None
     bundle_download_timeout: Optional[int] = None
     policy_checksum_validation: Optional[bool] = None
+    
+    # Logging & Metrics
     decision_log_export_enabled: Optional[bool] = None
     decision_log_batch_size: Optional[int] = None
     decision_log_flush_interval: Optional[int] = None
     metrics_export_enabled: Optional[bool] = None
+    
+    # Enforcement
     fail_policy: Optional[str] = None
     default_security_posture: Optional[str] = None
+    
+    # Performance
     default_rate_limit: Optional[int] = None
     default_timeout: Optional[int] = None
     max_connections: Optional[int] = None
+    
+    # Security
     auto_ssl_enabled: Optional[bool] = None
     mutual_tls_required: Optional[bool] = None
 
@@ -88,10 +119,16 @@ class IndividualPEPConfigBase(BaseModel):
     mcp_header_name: str = Field(default="X-Model-Context", description="MCP header name")
     mcp_injection_enabled: bool = Field(default=True, description="Enable MCP injection")
     
-    # Upstream Service Configuration
+    # Upstream Service Configuration (Reverse-Proxy)
     upstream_target_url: Optional[str] = Field(None, description="Target service URL")
     proxy_timeout: int = Field(default=30, ge=5, le=300, description="Proxy timeout in seconds")
     public_proxy_url: Optional[str] = Field(None, description="Public bouncer URL")
+    
+    # Sidecar Specific Configuration
+    sidecar_port_override: Optional[int] = Field(None, ge=1, le=65535, description="Override global sidecar port")
+    sidecar_traffic_mode: str = Field(default="iptables", description="Traffic interception mode: iptables, istio, linkerd")
+    sidecar_resource_cpu_override: Optional[str] = Field(None, description="Override CPU limit for this sidecar")
+    sidecar_resource_memory_override: Optional[str] = Field(None, description="Override memory limit for this sidecar")
     
     # Resource Identification Rules
     resource_identification_rules: List[ResourceIdentificationRule] = Field(default=[], description="Resource ID rules")
@@ -126,9 +163,18 @@ class IndividualPEPConfigUpdate(BaseModel):
     assigned_policy_bundles: Optional[List[str]] = None
     mcp_header_name: Optional[str] = None
     mcp_injection_enabled: Optional[bool] = None
+    
+    # Reverse-Proxy Configuration
     upstream_target_url: Optional[str] = None
     proxy_timeout: Optional[int] = None
     public_proxy_url: Optional[str] = None
+    
+    # Sidecar Configuration
+    sidecar_port_override: Optional[int] = None
+    sidecar_traffic_mode: Optional[str] = None
+    sidecar_resource_cpu_override: Optional[str] = None
+    sidecar_resource_memory_override: Optional[str] = None
+    
     resource_identification_rules: Optional[List[Dict[str, Any]]] = None
     cache_enabled: Optional[bool] = None
     cache_ttl: Optional[int] = None

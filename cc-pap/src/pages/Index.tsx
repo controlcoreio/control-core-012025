@@ -15,6 +15,7 @@ import { PEPManagementPage } from "@/components/settings/pep/PEPManagementPage";
 import UserManagementPage from "@/components/settings/UserManagementPage";
 import { NotificationsPage } from "@/components/settings/NotificationsPage";
 import { SubscriptionPlanPage } from "@/components/settings/SubscriptionPlanPage";
+import { GitHubConfigurationPage } from "@/components/settings/GitHubConfigurationPage";
 import { TestConsole } from "@/components/testing/TestConsole";
 import { KnowledgePage } from "@/components/knowledge/KnowledgePage";
 import { GettingStartedOverview } from "@/components/onboarding/GettingStartedOverview";
@@ -48,8 +49,9 @@ export default function Index() {
         <Route path="/settings/subscription" element={<SafeComponent component={SubscriptionPlanPage} />} />
         <Route path="/settings/general" element={<SafeComponent component={GeneralSettingsPage} />} />
         <Route path="/settings/data-sources" element={<SafeComponent component={DataSourcesPage} />} />
-        {/* Redirect old controls-repository route to PEP management */}
-        <Route path="/settings/controls-repository" element={<Navigate to="/settings/peps" replace />} />
+        <Route path="/settings/github" element={<SafeComponent component={GitHubConfigurationPage} />} />
+        {/* Legacy route - redirect to GitHub configuration */}
+        <Route path="/settings/controls-repository" element={<Navigate to="/settings/github" replace />} />
         <Route path="/test" element={<SafeComponent component={TestConsole} />} />
         <Route path="/knowledge" element={<SafeComponent component={KnowledgePage} />} />
       </Routes>

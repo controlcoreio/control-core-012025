@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,21 +8,48 @@ import { Link, useNavigate } from "react-router-dom";
 import { useOnboardingProgress } from "@/hooks/use-onboarding-progress";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import { useEnvironment } from "@/contexts/EnvironmentContext";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { usePolicies } from "@/hooks/use-policies";
 import { usePIPConnections } from "@/hooks/use-pip-connections";
 import { useAuditLogs } from "@/hooks/use-audit-logs";
+import { AlertTriangle } from "lucide-react";
 
 export function GettingStartedOverview() {
   const { resetOnboarding } = useOnboardingProgress();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === 'dark';
+  const { currentEnvironment, isProduction, canCreatePolicies, canPromotePolicies } = useEnvironment();
   
-  // Fetch real data from backend
-  const { stats, isLoading: statsLoading } = useDashboardStats();
-  const { policies } = usePolicies({ status: 'enabled' });
-  const { connections } = usePIPConnections();
+  // Fetch real data from backend filtered by current environment
+  const { stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats();
+  const { policies, refetch: refetchPolicies } = usePolicies({ 
+    status: 'enabled',
+    environment: currentEnvironment 
+  });
+  const { connections, refetch: refetchConnections } = usePIPConnections();
+  
+  // Listen to environment changes and refetch data
+  useEffect(() => {
+    const handleEnvironmentChange = () => {
+      console.log('[Dashboard] Environment changed, refetching data for:', currentEnvironment);
+      refetchStats?.();
+      refetchPolicies?.();
+      refetchConnections?.();
+    };
+    
+    window.addEventListener('environmentChanged', handleEnvironmentChange);
+    return () => window.removeEventListener('environmentChanged', handleEnvironmentChange);
+  }, [refetchStats, refetchPolicies, refetchConnections]);
+  
+  // Refetch data when environment changes directly
+  useEffect(() => {
+    console.log('[Dashboard] Current environment changed to:', currentEnvironment);
+    refetchStats?.();
+    refetchPolicies?.();
+    refetchConnections?.();
+  }, [currentEnvironment]);
   // Disabled audit logs on login page to prevent console errors
   // const { logs } = useAuditLogs({ limit: 100 });
   const logs: Array<{
@@ -34,32 +61,64 @@ export function GettingStartedOverview() {
     result: string;
   }> = [];
 
-  const quickActions = [
+  // Quick actions - filter based on environment
+  const allQuickActions = [
     {
       title: 'Create New Policy',
       description: 'Quickly define a new authorization policy from scratch',
       icon: "plus",
-      link: '/policies/builder'
+      link: '/policies/builder',
+      showInProduction: false, // Only show in sandbox
+      disabled: !canCreatePolicies,
+      disabledTooltip: 'Policies can only be created in Sandbox environment'
     },
     {
       title: 'Browse Policy Templates',
       description: 'Explore pre-built policy templates for common use cases',
       icon: "document",
-      link: '/policies/templates'
+      link: '/policies/templates',
+      showInProduction: false // Only show in sandbox, hidden in production
+    },
+    {
+      title: 'Promote to Production',
+      description: 'Review and promote tested policies from Sandbox',
+      icon: "arrow-up",
+      link: '/policies',
+      showInProduction: false, // Only in sandbox
+      disabled: !canPromotePolicies
     },
     {
       title: 'Manage Data Sources',
       description: 'Connect and manage your data sources for dynamic policy decisions',
       icon: "database",
-      link: '/pips'
+      link: '/pips',
+      showInProduction: true
+    },
+    {
+      title: 'Monitor Performance',
+      description: 'View real-time metrics and authorization decisions',
+      icon: "activity",
+      link: '/audit',
+      showInProduction: true,
+      productionOnly: true // Only show in production
     },
     {
       title: 'Configure Settings',
       description: 'Customize platform settings, user roles, and access controls',
       icon: "settings",
-      link: '/settings'
+      link: '/settings',
+      showInProduction: true
     }
   ];
+  
+  // Filter quick actions based on environment
+  const quickActions = allQuickActions.filter(action => {
+    if (isProduction) {
+      return action.showInProduction !== false;
+    } else {
+      return action.productionOnly !== true;
+    }
+  });
 
   // Calculate access denials from audit logs
   const deniedCount = logs?.filter(log => log.outcome === 'DENY').length || 0;
@@ -146,26 +205,40 @@ export function GettingStartedOverview() {
           <p className={cn(
             isDark ? "text-gray-300" : "text-[#333652]/70"
           )}>
-            Your authorization platform is ready. Get an overview of your setup and key metrics.
+            {isProduction 
+              ? `Monitoring your production environment. ${stats.totalPolicies} policies actively enforcing authorization.`
+              : "Your authorization platform is ready. Get an overview of your setup and key metrics."
+            }
           </p>
+          {isProduction && (
+            <div className="mt-3 flex items-center gap-2">
+              <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Production Mode: Create policies in Sandbox first
+              </Badge>
+            </div>
+          )}
         </div>
-        <Button onClick={handleGetStarted}>
-          <EnterpriseIcon name="arrow-right" size={16} className="mr-2" />
-          Get Started with Control Core
-        </Button>
+        {!isProduction && (
+          <Button onClick={handleGetStarted}>
+            <EnterpriseIcon name="arrow-right" size={16} className="mr-2" />
+            Get Started with Control Core
+          </Button>
+        )}
       </div>
 
       {/* Quick Actions */}
       <section className="mb-8">
         <h2 className={cn("text-2xl font-semibold mb-4", 
           isDark ? "text-gray-100" : "text-[#333652]")}>
-          Quick Actions
+          {isProduction ? "Production Actions" : "Quick Actions"}
         </h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Card key={action.title} className={cn(
               "cursor-pointer transition-all duration-200 hover:shadow-md",
-              isDark ? "bg-sidebar border-border hover:border-primary/50" : "bg-white border-[#90adc6]/20 hover:border-primary/50"
+              isDark ? "bg-sidebar border-border hover:border-primary/50" : "bg-white border-[#90adc6]/20 hover:border-primary/50",
+              action.disabled && "opacity-60"
             )}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -175,10 +248,19 @@ export function GettingStartedOverview() {
                 <CardDescription>{action.description}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button variant="outline" className="w-full" asChild>
-                  <Link to={action.link}>
-                    Go
-                  </Link>
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  asChild={!action.disabled}
+                  disabled={action.disabled}
+                >
+                  {action.disabled ? (
+                    <span>{action.disabledTooltip || 'Not available'}</span>
+                  ) : (
+                    <Link to={action.link}>
+                      Go
+                    </Link>
+                  )}
                 </Button>
               </CardContent>
             </Card>

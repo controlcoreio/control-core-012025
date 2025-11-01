@@ -36,9 +36,18 @@ interface IndividualPEPConfigData {
   assigned_policy_bundles?: string[];
   mcp_header_name?: string;
   mcp_injection_enabled?: boolean;
+  
+  // Reverse-Proxy Configuration
   upstream_target_url?: string;
   public_proxy_url?: string;
   proxy_timeout?: number;
+  
+  // Sidecar Configuration
+  sidecar_port_override?: number;
+  sidecar_traffic_mode?: string;
+  sidecar_resource_cpu_override?: string;
+  sidecar_resource_memory_override?: string;
+  
   resource_identification_rules?: Array<{
     type: string;
     value: string;
@@ -60,20 +69,41 @@ interface IndividualPEPConfigData {
 }
 
 interface GlobalPEPConfigData {
-  default_proxy_domain?: string;
+  // Common Configuration
   control_plane_url?: string;
+  
+  // Reverse-Proxy Specific
+  default_proxy_domain?: string;
+  
+  // Sidecar Specific
+  default_sidecar_port?: number;
+  sidecar_injection_mode?: string;
+  sidecar_namespace_selector?: string;
+  sidecar_resource_limits_cpu?: string;
+  sidecar_resource_limits_memory?: string;
+  sidecar_init_container_enabled?: boolean;
+  
+  // Policy & Synchronization
   policy_update_interval?: number;
   bundle_download_timeout?: number;
   policy_checksum_validation?: boolean;
+  
+  // Logging & Metrics
   decision_log_export_enabled?: boolean;
   decision_log_batch_size?: number;
   decision_log_flush_interval?: number;
   metrics_export_enabled?: boolean;
+  
+  // Enforcement
   fail_policy?: string;
   default_security_posture?: string;
+  
+  // Performance
   default_rate_limit?: number;
   default_timeout?: number;
   max_connections?: number;
+  
+  // Security
   auto_ssl_enabled?: boolean;
   mutual_tls_required?: boolean;
 }

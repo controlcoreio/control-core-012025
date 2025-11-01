@@ -233,7 +233,7 @@ export function DevOpsIntegrationsTab() {
   }, []);
 
   const integrations = [
-    { name: "GitHub", status: githubStatus, logo: "🐙", configHref: "/settings/peps" },
+    { name: "GitHub", status: githubStatus, logo: "🐙", configHref: "/settings/github" },
     { name: "GitLab", status: "not-configured", logo: "🦊", configHref: null },
     { name: "Azure DevOps", status: "not-configured", logo: "☁️", configHref: null },
     { name: "Bitbucket", status: "not-configured", logo: "🪣", configHref: null }

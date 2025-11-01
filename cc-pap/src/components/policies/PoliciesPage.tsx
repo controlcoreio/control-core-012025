@@ -191,10 +191,12 @@ export function PoliciesPage() {
           )}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/policies/templates')}>
-            <FileText className="mr-2 h-4 w-4" />
-            Templates
-          </Button>
+          {canCreatePolicies && (
+            <Button variant="outline" onClick={() => navigate('/policies/templates')}>
+              <FileText className="mr-2 h-4 w-4" />
+              Templates
+            </Button>
+          )}
           {canCreatePolicies ? (
             <Button onClick={() => setShowPolicyBuilder(true)}>
               <Plus className="mr-2 h-4 w-4" />

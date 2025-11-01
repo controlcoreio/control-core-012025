@@ -7,6 +7,9 @@ from sqlalchemy import Column, String, Integer, Boolean, Float, DateTime, Text, 
 from sqlalchemy.sql import func
 from app.database import Base
 
+# Export Base for convenience
+__all__ = ['Base', 'GlobalPEPConfig', 'IndividualPEPConfig']
+
 class GlobalPEPConfig(Base):
     """Global configuration settings that apply to all PEPs"""
     __tablename__ = "global_pep_config"
@@ -14,9 +17,19 @@ class GlobalPEPConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String, index=True, nullable=False)
     
-    # Basic Configuration
-    default_proxy_domain = Column(String, default="bouncer.controlcore.io")
+    # Basic Configuration (Common)
     control_plane_url = Column(String, default="https://api.controlcore.io")
+    
+    # Reverse-Proxy Specific Configuration
+    default_proxy_domain = Column(String, default="bouncer.controlcore.io")
+    
+    # Sidecar Specific Configuration
+    default_sidecar_port = Column(Integer, default=8080)
+    sidecar_injection_mode = Column(String, default="automatic")  # automatic, manual
+    sidecar_namespace_selector = Column(String, nullable=True)  # K8s namespace selector
+    sidecar_resource_limits_cpu = Column(String, default="500m")
+    sidecar_resource_limits_memory = Column(String, default="256Mi")
+    sidecar_init_container_enabled = Column(Boolean, default=True)
     
     # Policy Update & Synchronization
     policy_update_interval = Column(Integer, default=30)  # seconds
@@ -60,10 +73,16 @@ class IndividualPEPConfig(Base):
     mcp_header_name = Column(String, default="X-Model-Context")
     mcp_injection_enabled = Column(Boolean, default=True)
     
-    # Upstream Service Configuration
+    # Upstream Service Configuration (Reverse-Proxy)
     upstream_target_url = Column(String)
     proxy_timeout = Column(Integer, default=30)  # seconds
     public_proxy_url = Column(String)
+    
+    # Sidecar Specific Configuration
+    sidecar_port_override = Column(Integer, nullable=True)  # Override global sidecar port
+    sidecar_traffic_mode = Column(String, default="iptables")  # iptables, istio, linkerd
+    sidecar_resource_cpu_override = Column(String, nullable=True)  # Override CPU limit
+    sidecar_resource_memory_override = Column(String, nullable=True)  # Override memory limit
     
     # Resource Identification Rules
     resource_identification_rules = Column(JSON, default=list)

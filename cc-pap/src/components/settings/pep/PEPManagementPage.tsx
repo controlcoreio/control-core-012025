@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
+import { useEnvironment } from "@/contexts/EnvironmentContext";
 import { 
   Download, 
   Shield, 
@@ -47,6 +49,7 @@ import { BouncerGitHubTab } from "./BouncerGitHubTab";
 import { pepApi, PEPConfigData, IndividualPEPConfigData, GlobalPEPConfigData } from "@/services/pepApi";
 import { Loader2 } from "lucide-react";
 import { APP_CONFIG } from "@/config/app";
+import { SecureStorage } from "@/utils/secureStorage";
 
 interface DeployedPEP {
   id: string;
@@ -112,6 +115,7 @@ interface BouncerConfiguration {
 export function PEPManagementPage() {
   // Fetch real PEPs from backend
   const { peps: backendPEPs, isLoading, error: pepsError } = usePEPs();
+  const { currentEnvironment } = useEnvironment();
   
   // Map backend PEPs to UI format
   const deployedPEPs: DeployedPEP[] = (backendPEPs || []).map(pep => ({
@@ -160,7 +164,40 @@ export function PEPManagementPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [globalConfig, setGlobalConfig] = useState<GlobalPEPConfigData>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const { toast } = useToast();
+  const { toast} = useToast();
+  
+  // Track which bouncer types are deployed
+  const [hasReverseProxy, setHasReverseProxy] = useState(false);
+  const [hasSidecar, setHasSidecar] = useState(false);
+  
+  // Detect bouncer types from deployedPEPs
+  useEffect(() => {
+    setHasReverseProxy(deployedPEPs.some(p => p.deploymentMode === 'reverse-proxy'));
+    setHasSidecar(deployedPEPs.some(p => p.deploymentMode === 'sidecar'));
+  }, [deployedPEPs]);
+  
+  // Load global configuration from backend
+  useEffect(() => {
+    const loadGlobalConfig = async () => {
+      try {
+        const response = await fetch(`${APP_CONFIG.api.baseUrl}/pep-config/global`, {
+          headers: {
+            'Authorization': `Bearer ${SecureStorage.getItem('access_token')}`,
+          },
+        });
+        
+        if (response.ok) {
+          const config = await response.json();
+          setGlobalConfig(config);
+        }
+      } catch (error) {
+        console.error('Failed to load global configuration:', error);
+        // Use defaults if loading fails
+      }
+    };
+    
+    loadGlobalConfig();
+  }, []);
   
   // Warn user about unsaved changes before leaving page
   useEffect(() => {
@@ -494,9 +531,12 @@ export function PEPManagementPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Bouncer Management</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold">Bouncer Management</h1>
+            <EnvironmentBadge />
+          </div>
           <p className="text-muted-foreground">
-            Manage your Bouncers and monitor deployment status
+            Manage your Bouncers for {currentEnvironment} environment and monitor deployment status
           </p>
         </div>
         <Button onClick={handleRefresh} disabled={refreshing} variant="outline">
@@ -736,34 +776,182 @@ export function PEPManagementPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-8">
-              {/* Basic Global Settings */}
+              {/* Common Configuration (applies to all bouncer types) */}
               <div className="space-y-5">
-                <h4 className="text-sm font-semibold text-foreground">Basic Configuration</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="proxy-domain" className="text-sm font-medium">Default Proxy Domain</Label>
-                    <Input 
-                      id="proxy-domain"
-                      defaultValue="bouncer.controlcore.io" 
-                      placeholder="bouncer.yourcompany.com"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Base domain for all bouncer proxy URLs
-                    </p>
-                  </div>
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Common Configuration
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  These settings apply to all bouncer types (reverse-proxy and sidecar)
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="control-plane-url" className="text-sm font-medium">Control Plane URL</Label>
                     <Input 
                       id="control-plane-url"
-                      defaultValue="https://api.controlcore.io" 
+                      value={globalConfig.control_plane_url || "https://api.controlcore.io"}
+                      onChange={(e) => {
+                        setGlobalConfig({...globalConfig, control_plane_url: e.target.value});
+                        setHasUnsavedChanges(true);
+                      }}
                       placeholder="https://your-control-plane.com"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Base URL for PEP to connect to Control Plane
+                      Base URL for bouncers to connect to Control Plane
                     </p>
                   </div>
                 </div>
               </div>
+
+              {/* Reverse-Proxy Specific Configuration */}
+              {hasReverseProxy && (
+                <div className="space-y-5 border-t pt-6">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Scale className="h-4 w-4 text-blue-600" />
+                    Reverse-Proxy Specific Configuration
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    These settings apply only to reverse-proxy bouncers
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="proxy-domain" className="text-sm font-medium">Default Proxy Domain</Label>
+                      <Input 
+                        id="proxy-domain"
+                        value={globalConfig.default_proxy_domain || "bouncer.controlcore.io"}
+                        onChange={(e) => {
+                          setGlobalConfig({...globalConfig, default_proxy_domain: e.target.value});
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="bouncer.yourcompany.com"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Base domain for all reverse-proxy bouncer URLs
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sidecar Specific Configuration */}
+              {hasSidecar && (
+                <div className="space-y-5 border-t pt-6">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Container className="h-4 w-4 text-green-600" />
+                    Sidecar Specific Configuration
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    These settings apply only to sidecar bouncers
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="sidecar-port" className="text-sm font-medium">Default Sidecar Port</Label>
+                      <Input 
+                        id="sidecar-port"
+                        type="number"
+                        value={globalConfig.default_sidecar_port || 8080}
+                        onChange={(e) => {
+                          setGlobalConfig({...globalConfig, default_sidecar_port: parseInt(e.target.value) || 8080});
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="8080"
+                        min="1"
+                        max="65535"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Default port for sidecar containers (1-65535)
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <Label htmlFor="sidecar-injection-mode" className="text-sm font-medium">Sidecar Injection Mode</Label>
+                      <Select 
+                        value={globalConfig.sidecar_injection_mode || "automatic"}
+                        onValueChange={(value) => {
+                          setGlobalConfig({...globalConfig, sidecar_injection_mode: value});
+                          setHasUnsavedChanges(true);
+                        }}
+                      >
+                        <SelectTrigger id="sidecar-injection-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="automatic">Automatic Injection</SelectItem>
+                          <SelectItem value="manual">Manual Injection</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        How sidecars are injected into pods
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <Label htmlFor="sidecar-namespace-selector" className="text-sm font-medium">Namespace Selector</Label>
+                      <Input 
+                        id="sidecar-namespace-selector"
+                        value={globalConfig.sidecar_namespace_selector || ""}
+                        onChange={(e) => {
+                          setGlobalConfig({...globalConfig, sidecar_namespace_selector: e.target.value});
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="app=myapp"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        K8s namespace selector for auto-injection
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="sidecar-cpu-limit" className="text-sm font-medium">CPU Limit</Label>
+                      <Input 
+                        id="sidecar-cpu-limit"
+                        value={globalConfig.sidecar_resource_limits_cpu || "500m"}
+                        onChange={(e) => {
+                          setGlobalConfig({...globalConfig, sidecar_resource_limits_cpu: e.target.value});
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="500m"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        CPU limit for sidecar containers (e.g., 500m, 1, 2)
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <Label htmlFor="sidecar-memory-limit" className="text-sm font-medium">Memory Limit</Label>
+                      <Input 
+                        id="sidecar-memory-limit"
+                        value={globalConfig.sidecar_resource_limits_memory || "256Mi"}
+                        onChange={(e) => {
+                          setGlobalConfig({...globalConfig, sidecar_resource_limits_memory: e.target.value});
+                          setHasUnsavedChanges(true);
+                        }}
+                        placeholder="256Mi"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Memory limit for sidecar containers (e.g., 256Mi, 512Mi, 1Gi)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="sidecar-init-container"
+                        checked={globalConfig.sidecar_init_container_enabled !== false}
+                        onCheckedChange={(checked) => {
+                          setGlobalConfig({...globalConfig, sidecar_init_container_enabled: checked});
+                          setHasUnsavedChanges(true);
+                        }}
+                      />
+                      <Label htmlFor="sidecar-init-container" className="cursor-pointer text-sm font-medium">
+                        Enable Init Container for iptables Setup
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Use an init container to configure iptables rules for traffic interception
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Policy Update & Synchronization */}
               <div className="space-y-5 border-t pt-6">
@@ -1243,81 +1431,150 @@ export function PEPManagementPage() {
                   </div>
                 </div>
 
-                {/* Upstream Service Configuration */}
-                <div className="space-y-5 border-t pt-6">
-                  <h4 className="text-sm font-semibold text-foreground">Upstream Service Configuration</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Upstream Service Configuration - Reverse-Proxy */}
+                {bouncerConfig.deploymentMode === 'reverse-proxy' && (
+                  <div className="space-y-5 border-t pt-6">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Scale className="h-4 w-4 text-blue-600" />
+                      Upstream Service Configuration (Reverse-Proxy)
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="upstream-url" className="text-sm font-medium">Upstream Target URL</Label>
+                        <Input
+                          id="upstream-url"
+                          value={bouncerConfig.targetUrl || ""}
+                          onChange={(e) => {
+                            setBouncerConfig({
+                              ...bouncerConfig,
+                              targetUrl: e.target.value
+                            });
+                            setHasUnsavedChanges(true);
+                            if (validationErrors.targetUrl) {
+                              setValidationErrors({...validationErrors, targetUrl: ''});
+                            }
+                          }}
+                          placeholder="https://api.yourservice.com"
+                          className={validationErrors.targetUrl ? 'border-red-500' : ''}
+                        />
+                        {validationErrors.targetUrl && (
+                          <p className="text-xs text-red-500">{validationErrors.targetUrl}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Protected service URL that PEP forwards allowed requests to
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        <Label htmlFor="proxy-timeout" className="text-sm font-medium">Proxy Timeout</Label>
+                        <Select defaultValue="30">
+                          <SelectTrigger id="proxy-timeout">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5 seconds</SelectItem>
+                            <SelectItem value="10">10 seconds</SelectItem>
+                            <SelectItem value="30">30 seconds (recommended)</SelectItem>
+                            <SelectItem value="60">60 seconds</SelectItem>
+                            <SelectItem value="120">2 minutes</SelectItem>
+                            <SelectItem value="300">5 minutes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Max time to wait for upstream response (504 timeout if exceeded)
+                        </p>
+                      </div>
+                    </div>
                     <div className="space-y-3">
-                      <Label htmlFor="upstream-url" className="text-sm font-medium">Upstream Target URL</Label>
+                      <Label htmlFor="proxy-url" className="text-sm font-medium">Public Proxy URL</Label>
                       <Input
-                        id="upstream-url"
-                        value={bouncerConfig.targetUrl || ""}
+                        id="proxy-url"
+                        value={bouncerConfig.proxyUrl || ""}
                         onChange={(e) => {
                           setBouncerConfig({
                             ...bouncerConfig,
-                            targetUrl: e.target.value
+                            proxyUrl: e.target.value
                           });
                           setHasUnsavedChanges(true);
-                          if (validationErrors.targetUrl) {
-                            setValidationErrors({...validationErrors, targetUrl: ''});
+                          if (validationErrors.proxyUrl) {
+                            setValidationErrors({...validationErrors, proxyUrl: ''});
                           }
                         }}
-                        placeholder="https://api.yourservice.com"
-                        className={validationErrors.targetUrl ? 'border-red-500' : ''}
+                        placeholder="https://bouncer-prod.yourcompany.com"
+                        className={validationErrors.proxyUrl ? 'border-red-500' : ''}
                       />
-                      {validationErrors.targetUrl && (
-                        <p className="text-xs text-red-500">{validationErrors.targetUrl}</p>
+                      {validationErrors.proxyUrl && (
+                        <p className="text-xs text-red-500">{validationErrors.proxyUrl}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Protected service URL that PEP forwards allowed requests to
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      <Label htmlFor="proxy-timeout" className="text-sm font-medium">Proxy Timeout</Label>
-                      <Select defaultValue="30">
-                        <SelectTrigger id="proxy-timeout">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="5">5 seconds</SelectItem>
-                          <SelectItem value="10">10 seconds</SelectItem>
-                          <SelectItem value="30">30 seconds (recommended)</SelectItem>
-                          <SelectItem value="60">60 seconds</SelectItem>
-                          <SelectItem value="120">2 minutes</SelectItem>
-                          <SelectItem value="300">5 minutes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Max time to wait for upstream response (504 timeout if exceeded)
+                        Public URL where this bouncer is accessible to clients
                       </p>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="proxy-url" className="text-sm font-medium">Public Proxy URL</Label>
-                    <Input
-                      id="proxy-url"
-                      value={bouncerConfig.proxyUrl || ""}
-                      onChange={(e) => {
-                        setBouncerConfig({
-                          ...bouncerConfig,
-                          proxyUrl: e.target.value
-                        });
-                        setHasUnsavedChanges(true);
-                        if (validationErrors.proxyUrl) {
-                          setValidationErrors({...validationErrors, proxyUrl: ''});
-                        }
-                      }}
-                      placeholder="https://bouncer-prod.yourcompany.com"
-                      className={validationErrors.proxyUrl ? 'border-red-500' : ''}
-                    />
-                    {validationErrors.proxyUrl && (
-                      <p className="text-xs text-red-500">{validationErrors.proxyUrl}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Public URL where this bouncer is accessible to clients
-                    </p>
+                )}
+
+                {/* Sidecar Configuration - Sidecar Only */}
+                {bouncerConfig.deploymentMode === 'sidecar' && (
+                  <div className="space-y-5 border-t pt-6">
+                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Container className="h-4 w-4 text-green-600" />
+                      Sidecar Configuration
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="sidecar-port-override" className="text-sm font-medium">Sidecar Port Override</Label>
+                        <Input
+                          id="sidecar-port-override"
+                          type="number"
+                          placeholder="8080 (uses global default)"
+                          min="1"
+                          max="65535"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Override the global sidecar port for this specific bouncer
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        <Label htmlFor="sidecar-traffic-mode" className="text-sm font-medium">Traffic Interception Mode</Label>
+                        <Select defaultValue="iptables">
+                          <SelectTrigger id="sidecar-traffic-mode">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="iptables">iptables (Direct)</SelectItem>
+                            <SelectItem value="istio">Istio Service Mesh</SelectItem>
+                            <SelectItem value="linkerd">Linkerd Service Mesh</SelectItem>
+                            <SelectItem value="envoy">Envoy Proxy</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          How the sidecar intercepts traffic
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="sidecar-cpu-override" className="text-sm font-medium">CPU Limit Override</Label>
+                        <Input
+                          id="sidecar-cpu-override"
+                          placeholder="500m (uses global default)"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Override CPU limit for this sidecar (e.g., 500m, 1, 2)
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        <Label htmlFor="sidecar-memory-override" className="text-sm font-medium">Memory Limit Override</Label>
+                        <Input
+                          id="sidecar-memory-override"
+                          placeholder="256Mi (uses global default)"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Override memory limit for this sidecar (e.g., 256Mi, 512Mi, 1Gi)
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Resource Identification Rules */}
                 <div className="space-y-5 border-t pt-6">
